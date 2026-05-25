@@ -96,6 +96,47 @@ type ShopifyStoreTruthPreview = {
   note: string;
 };
 
+type WordPressStatus = {
+  platform: "wordpress";
+  configured: boolean;
+  connected: boolean;
+  previewReady: boolean;
+  siteUrl: string;
+  apiVersion: string;
+  queryStringAuth: boolean;
+  missingEnv: string[];
+  usesMockData: boolean;
+  storeName: string | null;
+  currencyCode: string | null;
+  connectionError: string | null;
+  recommendedNextStep: string;
+};
+
+type WordPressStoreTruthPreview = {
+  snapshot: {
+    storeName: string;
+    currencyCode: string;
+    ordersCount: number;
+    grossSales: number;
+    taxTotal: number;
+    shippingTotal: number;
+    netSales: number;
+    averageOrderValue: number;
+  };
+  orders: Array<{
+    id: number;
+    number: string;
+    status: string;
+    dateCreated: string;
+    currency: string;
+    total: number;
+    totalTax: number;
+    shippingTotal: number;
+    lineItemsQuantity: number;
+  }>;
+  note: string;
+};
+
 function Surface({
   title,
   eyebrow,
@@ -171,13 +212,20 @@ export default function AdminPage() {
   const [metaInsights, setMetaInsights] = useState<MetaInsightsPreview | null>(null);
   const [shopifyStatus, setShopifyStatus] = useState<ShopifyStatus | null>(null);
   const [shopifyPreview, setShopifyPreview] = useState<ShopifyStoreTruthPreview | null>(null);
+  const [wordpressStatus, setWordpressStatus] = useState<WordPressStatus | null>(null);
+  const [wordpressPreview, setWordpressPreview] =
+    useState<WordPressStoreTruthPreview | null>(null);
   const [accountDraft, setAccountDraft] = useState("");
   const [metaMessage, setMetaMessage] = useState<string | null>(null);
   const [shopifyMessage, setShopifyMessage] = useState<string | null>(null);
+  const [wordpressMessage, setWordpressMessage] = useState<string | null>(null);
   const [isMetaLoading, setIsMetaLoading] = useState(true);
   const [isMetaPreviewLoading, setIsMetaPreviewLoading] = useState(false);
   const [isShopifyLoading, setIsShopifyLoading] = useState(true);
   const [isShopifyPreviewLoading, setIsShopifyPreviewLoading] = useState(false);
+  const [isWordPressLoading, setIsWordPressLoading] = useState(true);
+  const [isWordPressPreviewLoading, setIsWordPressPreviewLoading] =
+    useState(false);
 
   async function loadMetaStatus() {
     setIsMetaLoading(true);
@@ -216,9 +264,28 @@ export default function AdminPage() {
     }
   }
 
+  async function loadWordPressStatus() {
+    setIsWordPressLoading(true);
+
+    try {
+      const response = await fetch("/api/integrations/wordpress/status", {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as WordPressStatus;
+      setWordpressStatus(payload);
+    } catch (error) {
+      setWordpressMessage(
+        error instanceof Error ? error.message : "Could not load WordPress status."
+      );
+    } finally {
+      setIsWordPressLoading(false);
+    }
+  }
+
   useEffect(() => {
     void loadMetaStatus();
     void loadShopifyStatus();
+    void loadWordPressStatus();
   }, []);
 
   async function handleDisconnectMeta() {
@@ -345,42 +412,112 @@ export default function AdminPage() {
     }
   }
 
+  async function handleWordPressConnect() {
+    setWordpressMessage(null);
+    setIsWordPressLoading(true);
+
+    try {
+      const response = await fetch("/api/integrations/wordpress/connect", {
+        method: "POST",
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        storeName?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Could not connect WordPress.");
+      }
+
+      setWordpressMessage(
+        `Connected to ${payload.storeName ?? "the WordPress store"}.`
+      );
+      await loadWordPressStatus();
+    } catch (error) {
+      setWordpressMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not connect WordPress or WooCommerce."
+      );
+    } finally {
+      setIsWordPressLoading(false);
+    }
+  }
+
+  async function handleWordPressPreview() {
+    setWordpressMessage(null);
+    setIsWordPressPreviewLoading(true);
+
+    try {
+      const response = await fetch(
+        "/api/integrations/wordpress/store-truth-preview",
+        {
+          cache: "no-store",
+        }
+      );
+      const payload = (await response.json()) as WordPressStoreTruthPreview & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(
+          payload.error ?? "Could not load WordPress store-truth preview."
+        );
+      }
+
+      setWordpressPreview(payload);
+    } catch (error) {
+      setWordpressMessage(
+        error instanceof Error
+          ? error.message
+          : "Could not load WordPress store truth."
+      );
+    } finally {
+      setIsWordPressPreviewLoading(false);
+    }
+  }
+
   const metaReadyState = metaStatus?.connected
     ? "Good"
     : metaStatus?.configured
-    ? "Watch"
-    : "Fix";
+      ? "Watch"
+      : "Fix";
   const shopifyReadyState = shopifyStatus?.previewReady
     ? "Good"
     : shopifyStatus?.configured
-    ? "Watch"
-    : "Fix";
+      ? "Watch"
+      : "Fix";
+  const wordpressReadyState = wordpressStatus?.previewReady
+    ? "Good"
+    : wordpressStatus?.configured
+      ? "Watch"
+      : "Fix";
 
   return (
     <AppShell>
       <div className="space-y-5">
         <Section
           title="Official API Onboarding"
-          subtitle="Use each platform's official developer workflow first. Meta is the first media source, and Shopify is the first business-truth source."
+          subtitle="Use each platform's official developer workflow first. Meta is the first media source. Shopify is the first storefront truth source, and WordPress clients should use the official WooCommerce API path."
         >
-          <div className="grid gap-5 xl:grid-cols-2">
+          <div className="grid gap-5 xl:grid-cols-3">
             <Surface
               eyebrow="Meta Marketing API"
               title={
                 isMetaLoading
                   ? "Checking Meta setup"
                   : metaStatus?.connected
-                  ? "Connected through official app flow"
-                  : metaStatus?.configured
-                  ? "Ready for developer-mode testing"
-                  : "Needs official Meta app setup"
+                    ? "Connected through official app flow"
+                    : metaStatus?.configured
+                      ? "Ready for developer-mode testing"
+                      : "Needs official Meta app setup"
               }
               status={metaReadyState}
             >
               <p className="text-sm text-slate-300">
-                This flow follows the official Meta app path: app setup,
-                redirect URI, OAuth login, ad account selection, then a live
-                insights preview before the dashboard trusts any scaling logic.
+                This follows the official Meta app path: app setup, redirect URI,
+                OAuth login, ad account selection, then a live insights preview
+                before the dashboard trusts any scaling logic.
               </p>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -492,18 +629,17 @@ export default function AdminPage() {
                 isShopifyLoading
                   ? "Checking Shopify setup"
                   : shopifyStatus?.previewReady
-                  ? "Store truth preview is ready"
-                  : shopifyStatus?.configured
-                  ? "Ready for official Shopify testing"
-                  : "Needs Shopify app credentials"
+                    ? "Store truth preview is ready"
+                    : shopifyStatus?.configured
+                      ? "Ready for official Shopify testing"
+                      : "Needs Shopify app credentials"
               }
               status={shopifyReadyState}
             >
               <p className="text-sm text-slate-300">
-                This follows Shopify&apos;s official GraphQL Admin API path.
-                For a store you control, the trusted server route is app
-                credentials plus store-level permissions, then order-based
-                business truth queries.
+                This follows Shopify&apos;s official GraphQL Admin API path. For a
+                store you control, the trusted server route is app credentials plus
+                store-level permissions, then order-based business truth queries.
               </p>
 
               <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -564,6 +700,77 @@ export default function AdminPage() {
                 </button>
               </div>
             </Surface>
+
+            <Surface
+              eyebrow="WordPress Or WooCommerce"
+              title={
+                isWordPressLoading
+                  ? "Checking WordPress setup"
+                  : wordpressStatus?.previewReady
+                    ? "WordPress truth preview is ready"
+                    : wordpressStatus?.configured
+                      ? "Ready for official WooCommerce testing"
+                      : "Needs site URL and WooCommerce keys"
+              }
+              status={wordpressReadyState}
+            >
+              <p className="text-sm text-slate-300">
+                For WordPress ecommerce, the first official path is WooCommerce
+                REST API keys. This lets the dashboard use order truth from the
+                store before it trusts any Meta recommendation layer.
+              </p>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <MiniMetric
+                  label="Site URL"
+                  value={wordpressStatus?.siteUrl || "Not configured"}
+                  hint="WordPress site with WooCommerce installed"
+                  tone={wordpressStatus?.siteUrl ? "good" : "default"}
+                />
+                <MiniMetric
+                  label="API Version"
+                  value={wordpressStatus?.apiVersion ?? "wc/v3"}
+                  hint={
+                    wordpressStatus?.queryStringAuth
+                      ? "Query-string auth enabled"
+                      : "Basic auth over HTTPS"
+                  }
+                  tone="warn"
+                />
+              </div>
+
+              <div className="mt-4 space-y-4">
+                <EnvList values={wordpressStatus?.missingEnv ?? []} />
+                <MessageBox message={wordpressStatus?.connectionError ?? null} />
+                <MessageBox tone="info" message={wordpressMessage} />
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => void handleWordPressConnect()}
+                  className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-500"
+                >
+                  Connect WordPress
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void loadWordPressStatus()}
+                  className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-slate-500 hover:text-white"
+                >
+                  Refresh Status
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleWordPressPreview()}
+                  className="rounded-xl border border-emerald-500/40 px-4 py-3 text-sm font-bold text-emerald-200 transition hover:border-emerald-400 hover:text-white"
+                >
+                  {isWordPressPreviewLoading
+                    ? "Loading Store Truth"
+                    : "Load Store-Truth Preview"}
+                </button>
+              </div>
+            </Surface>
           </div>
         </Section>
 
@@ -571,7 +778,7 @@ export default function AdminPage() {
           title="Readiness Snapshot"
           subtitle="The dashboard should only trust scaling logic after platform data is paired with business truth."
         >
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-5">
             <MiniMetric
               label="Meta Status"
               value={metaStatus?.connected ? "Connected" : "Pending"}
@@ -588,15 +795,26 @@ export default function AdminPage() {
               tone={shopifyStatus?.connected ? "good" : "warn"}
             />
             <MiniMetric
+              label="WordPress Status"
+              value={wordpressStatus?.connected ? "Connected" : "Pending"}
+              hint={
+                wordpressStatus?.recommendedNextStep ??
+                "Add the site URL and WooCommerce keys"
+              }
+              tone={wordpressStatus?.connected ? "good" : "warn"}
+            />
+            <MiniMetric
               label="Decision Trust"
               value={
-                metaStatus?.connected && shopifyStatus?.previewReady
+                metaStatus?.connected &&
+                (shopifyStatus?.previewReady || wordpressStatus?.previewReady)
                   ? "Pair Ready"
                   : "Blocked"
               }
-              hint="Real scaling needs platform plus business-truth agreement"
+              hint="Real scaling needs platform plus storefront truth agreement"
               tone={
-                metaStatus?.connected && shopifyStatus?.previewReady
+                metaStatus?.connected &&
+                (shopifyStatus?.previewReady || wordpressStatus?.previewReady)
                   ? "good"
                   : "bad"
               }
@@ -675,9 +893,9 @@ export default function AdminPage() {
               </>
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/30 p-5 text-sm text-slate-400">
-                No live Meta preview loaded yet. Connect the official app,
-                choose a test account, then pull a preview before trusting any
-                recommendation layer.
+                No live Meta preview loaded yet. Connect the official app, choose a
+                test account, then pull a preview before trusting any recommendation
+                layer.
               </div>
             )}
           </Section>
@@ -760,6 +978,81 @@ export default function AdminPage() {
         </div>
 
         <Section
+          title="WordPress Preview"
+          subtitle="Use WooCommerce order truth to validate platform reporting on WordPress clients."
+        >
+          {wordpressPreview ? (
+            <>
+              <div className="grid gap-4 md:grid-cols-4">
+                <MiniMetric
+                  label="Gross Sales"
+                  value={`${wordpressPreview.snapshot.currencyCode} ${wordpressPreview.snapshot.grossSales.toFixed(0)}`}
+                  tone="good"
+                />
+                <MiniMetric
+                  label="Net Sales"
+                  value={`${wordpressPreview.snapshot.currencyCode} ${wordpressPreview.snapshot.netSales.toFixed(0)}`}
+                  tone="good"
+                />
+                <MiniMetric
+                  label="Orders"
+                  value={`${wordpressPreview.snapshot.ordersCount}`}
+                  tone="default"
+                />
+                <MiniMetric
+                  label="AOV"
+                  value={`${wordpressPreview.snapshot.currencyCode} ${wordpressPreview.snapshot.averageOrderValue.toFixed(0)}`}
+                  tone="warn"
+                />
+              </div>
+
+              <p className="mt-4 text-sm text-slate-400">{wordpressPreview.note}</p>
+
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead className="text-xs uppercase text-slate-400">
+                    <tr>
+                      <th className="pb-3">Order</th>
+                      <th>Total</th>
+                      <th>Tax</th>
+                      <th>Shipping</th>
+                      <th>Items</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {wordpressPreview.orders.slice(0, 8).map((order) => (
+                      <tr key={order.id} className="border-t border-slate-800">
+                        <td className="py-4 font-semibold text-white">
+                          #{order.number}
+                        </td>
+                        <td className="text-slate-300">
+                          {wordpressPreview.snapshot.currencyCode} {order.total.toFixed(0)}
+                        </td>
+                        <td className="text-slate-300">
+                          {wordpressPreview.snapshot.currencyCode} {order.totalTax.toFixed(0)}
+                        </td>
+                        <td className="text-slate-300">
+                          {wordpressPreview.snapshot.currencyCode} {order.shippingTotal.toFixed(0)}
+                        </td>
+                        <td className="text-slate-300">{order.lineItemsQuantity}</td>
+                        <td className="text-slate-300">{order.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/30 p-5 text-sm text-slate-400">
+              No WordPress truth preview loaded yet. Once this is connected,
+              WordPress or WooCommerce clients can use the same store-truth path as
+              Shopify clients.
+            </div>
+          )}
+        </Section>
+
+        <Section
           title="What Comes Next"
           subtitle="The product becomes truly testable on live accounts once the official connection layer is followed by stored facts and repeatable syncs."
         >
@@ -771,7 +1064,7 @@ export default function AdminPage() {
               </div>
               <p className="mt-3 text-sm text-slate-300">
                 Finish official app setup in developer mode, then add the real
-                Vercel environment values for Meta and Shopify.
+                Vercel environment values for Meta, Shopify, and WordPress.
               </p>
             </div>
             <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
@@ -803,9 +1096,10 @@ export default function AdminPage() {
             </div>
             <p className="mt-3 text-sm text-slate-300">
               1. Meta app credentials and test account access. 2. Shopify store
-              credentials and order preview. 3. Persistence tables plus sync
-              runs. 4. Scheduled syncs. 5. Google Ads and GA4. 6. Only then turn
-              on real decision scoring for live clients.
+              credentials and order preview. 3. WordPress or WooCommerce keys and
+              order preview. 4. Persistence tables plus sync runs. 5. Scheduled
+              syncs. 6. Google Ads and GA4. 7. Only then turn on real decision
+              scoring for live clients.
             </p>
           </div>
         </Section>
