@@ -39,27 +39,20 @@ export function getSecureCookieFlag() {
   return process.env.NODE_ENV === "production";
 }
 
-type MetaPaging = {
-  cursors?: {
-    before?: string;
-    after?: string;
-  };
-  next?: string;
-};
-
 type MetaApiResponse<T> = {
   data?: T;
-  paging?: MetaPaging;
+  paging?: {
+    cursors?: {
+      before?: string;
+      after?: string;
+    };
+    next?: string;
+  };
   error?: {
     message?: string;
     type?: string;
     code?: number;
   };
-};
-
-type MetaAdAccountsResponse = {
-  data: MetaAdAccount[];
-  paging?: MetaPaging;
 };
 
 type MetaInsightAction = {
@@ -186,7 +179,10 @@ export async function fetchMetaAdAccounts(accessToken: string) {
   let afterCursor: string | null = null;
 
   while (true) {
-    const page: MetaAdAccountsResponse = await metaGraphGet<MetaAdAccountsResponse>(
+    const response = await metaGraphGet<{
+      data: MetaAdAccount[];
+      paging?: MetaApiResponse<never>["paging"];
+    }>(
       "/me/adaccounts",
       {
         fields: "id,name,account_status,currency,timezone_name",
@@ -196,9 +192,9 @@ export async function fetchMetaAdAccounts(accessToken: string) {
       accessToken
     );
 
-    accounts.push(...(page.data ?? []));
+    accounts.push(...(response.data ?? []));
 
-    const nextCursor = page.paging?.cursors?.after;
+    const nextCursor = response.paging?.cursors?.after;
 
     if (!nextCursor || nextCursor === afterCursor) {
       break;
@@ -216,15 +212,39 @@ function getActionValue(actions: MetaInsightAction[] | undefined, actionType: st
 }
 
 export async function fetchMetaInsightsPreview(accessToken: string, accountId: string) {
+  return fetchMetaInsightsPreviewForRange(accessToken, accountId, {
+    datePreset: "last_7d",
+  });
+}
+
+export async function fetchMetaInsightsPreviewForRange(
+  accessToken: string,
+  accountId: string,
+  options: {
+    datePreset?: string;
+    since?: string;
+    until?: string;
+  }
+) {
+  const baseParams: Record<string, string> = {
+    level: "campaign",
+    limit: "25",
+    fields:
+      "campaign_id,campaign_name,spend,impressions,clicks,ctr,cpc,cpm,frequency,reach,actions,action_values",
+  };
+
+  if (options.since && options.until) {
+    baseParams.time_range = JSON.stringify({
+      since: options.since,
+      until: options.until,
+    });
+  } else {
+    baseParams.date_preset = options.datePreset ?? "last_7d";
+  }
+
   const response = await metaGraphGet<{ data: MetaInsightRecord[] }>(
     `/${accountId}/insights`,
-    {
-      level: "campaign",
-      date_preset: "last_7d",
-      limit: "25",
-      fields:
-        "campaign_id,campaign_name,spend,impressions,clicks,ctr,cpc,cpm,frequency,reach,actions,action_values",
-    },
+    baseParams,
     accessToken
   );
 
