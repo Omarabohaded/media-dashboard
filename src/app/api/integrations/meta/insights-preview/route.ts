@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  fetchMetaInsightsPreview,
+  fetchMetaInsightsPreviewForRange,
 } from "@/lib/integrations/meta";
 import { getClientById, getMetaConnection } from "@/lib/clientStore";
 
@@ -10,6 +10,9 @@ export async function GET(request: NextRequest) {
     const connection = await getMetaConnection(client.id);
     const accessToken = connection?.accessToken;
     const accountId = connection?.selectedAccountId;
+    const datePreset = request.nextUrl.searchParams.get("datePreset") ?? undefined;
+    const since = request.nextUrl.searchParams.get("since") ?? undefined;
+    const until = request.nextUrl.searchParams.get("until") ?? undefined;
 
     if (!accessToken) {
       return NextResponse.json(
@@ -25,7 +28,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const rows = await fetchMetaInsightsPreview(accessToken, accountId);
+    const rows = await fetchMetaInsightsPreviewForRange(accessToken, accountId, {
+      datePreset,
+      since,
+      until,
+    });
     const totals = rows.reduce(
       (acc, row) => {
         acc.spend += row.spend;
