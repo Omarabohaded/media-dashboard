@@ -1,21 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
-
-export type WebsitePlatform =
-  | "shopify"
-  | "wordpress"
-  | "salla"
-  | "wix"
-  | "custom";
-
-export type ClientRecord = {
-  id: string;
-  name: string;
-  websitePlatform: WebsitePlatform;
-  notes: string | null;
-  createdAt: string;
-};
+import {
+  type ClientCurrencyCode,
+  type ClientRecord,
+  type WebsitePlatform,
+} from "@/lib/clientTypes";
 
 export type MetaClientConnection = {
   clientId: string;
@@ -41,6 +31,7 @@ function buildDefaultClient(): ClientRecord {
     id: "client-unresolved-crime",
     name: "Unresolved Crime",
     websitePlatform: "shopify",
+    currencyCode: "USD",
     notes: "Prototype seed client",
     createdAt: new Date().toISOString(),
   };
@@ -77,6 +68,11 @@ export async function readClientStore(): Promise<ClientStoreState> {
       state.clients = [buildDefaultClient()];
     }
 
+    state.clients = state.clients.map((client) => ({
+      ...client,
+      currencyCode: client.currencyCode ?? "USD",
+    }));
+
     return state;
   } catch {
     return defaultState();
@@ -112,12 +108,14 @@ export async function getClientById(clientId: string | null | undefined) {
 export async function createClient(input: {
   name: string;
   websitePlatform: WebsitePlatform;
+  currencyCode: ClientCurrencyCode;
   notes?: string | null;
 }) {
   const client: ClientRecord = {
     id: `client-${crypto.randomUUID()}`,
     name: input.name,
     websitePlatform: input.websitePlatform,
+    currencyCode: input.currencyCode,
     notes: input.notes?.trim() || null,
     createdAt: new Date().toISOString(),
   };
