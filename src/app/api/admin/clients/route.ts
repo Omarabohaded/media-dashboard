@@ -3,8 +3,12 @@ import {
   createClient,
   getClientById,
   listClients,
-  WebsitePlatform,
 } from "@/lib/clientStore";
+import {
+  type ClientCurrencyCode,
+  SUPPORTED_CLIENT_CURRENCIES,
+  type WebsitePlatform,
+} from "@/lib/clientTypes";
 
 const allowedPlatforms = new Set<WebsitePlatform>([
   "shopify",
@@ -31,6 +35,7 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
     name?: string;
     websitePlatform?: WebsitePlatform;
+    currencyCode?: ClientCurrencyCode;
     notes?: string;
   };
 
@@ -49,9 +54,17 @@ export async function POST(request: NextRequest) {
     ? (body.websitePlatform as WebsitePlatform)
     : "custom";
 
+  const allowedCurrencies = new Set(
+    SUPPORTED_CLIENT_CURRENCIES.map((item) => item.code)
+  );
+  const currencyCode = allowedCurrencies.has(body.currencyCode ?? "USD")
+    ? (body.currencyCode as ClientCurrencyCode)
+    : "USD";
+
   const client = await createClient({
     name,
     websitePlatform,
+    currencyCode,
     notes: body.notes,
   });
 
