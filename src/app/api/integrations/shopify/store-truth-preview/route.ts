@@ -2,11 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   exchangeShopifyClientCredentials,
   fetchShopifyStoreTruthPreview,
+  getShopifyConfig,
   SHOPIFY_TOKEN_COOKIE,
 } from "@/lib/integrations/shopify";
 
 export async function GET(request: NextRequest) {
   try {
+    const config = getShopifyConfig();
+
+    if (config.missingEnv.length > 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Shopify is not configured yet. Add store domain, client ID, and client secret first.",
+          missingEnv: config.missingEnv,
+        },
+        { status: 400 }
+      );
+    }
+
     let accessToken = request.cookies.get(SHOPIFY_TOKEN_COOKIE)?.value;
 
     if (!accessToken) {
