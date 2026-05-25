@@ -1,3 +1,5 @@
+import type { RuntimeStorageMode } from "@/lib/runtimeStorage";
+
 export type IntegrationPlatform =
   | "meta"
   | "shopify"
@@ -39,7 +41,7 @@ export type SyncRunRecord = {
   startedAt: string | null;
   finishedAt: string | null;
   recordsProcessed: number;
-  storageMode: "ephemeral_tmp";
+  storageMode: RuntimeStorageMode;
   error: string | null;
   notes: string[];
 };
@@ -74,7 +76,7 @@ export type MediaPlatformSnapshot = {
 
 export type SyncStateStore = {
   version: 1;
-  storageMode: "ephemeral_tmp";
+  storageMode: RuntimeStorageMode;
   updatedAt: string | null;
   connections: IntegrationConnectionRecord[];
   syncRuns: SyncRunRecord[];
