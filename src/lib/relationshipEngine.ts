@@ -1,11 +1,5 @@
+import type { DecisionSignal } from "./decisionTypes";
 import { relationshipRules } from "./relationshipRules";
-type RelationshipResult = {
-  title: string;
-  severity: "healthy" | "warning" | "danger";
-  diagnosis: string;
-  recommendation: string;
-  priorityFactors: any;
-};
 
 type RelationshipInputs = {
   mer?: number;
@@ -16,114 +10,95 @@ type RelationshipInputs = {
   frequency?: number;
   spendGrowth?: number;
   revenueGrowth?: number;
+  bounceRate?: number;
+  sessionDuration?: number;
+  checkoutCompletionRate?: number;
+  backendConversions?: number;
+  platformConversions?: number;
+  trackingMismatch?: boolean;
+  checkoutFailure?: boolean;
+  merBelowThreshold?: boolean;
 };
 
 export function evaluateRelationships(
   inputs: RelationshipInputs
-): RelationshipResult[] {
-  const results: RelationshipResult[] = [];
+): DecisionSignal[] {
+  const results: DecisionSignal[] = [];
+  const addRule = (id: string) => {
+    const rule = relationshipRules.find((item) => item.id === id);
+    if (rule) {
+      results.push(rule);
+    }
+  };
 
-  // Revenue up but MER down
   if (
-    inputs.revenueGrowth &&
-    inputs.spendGrowth &&
-    inputs.mer
+    typeof inputs.revenueGrowth === "number" &&
+    typeof inputs.spendGrowth === "number" &&
+    typeof inputs.mer === "number"
   ) {
     if (
       inputs.revenueGrowth > 0 &&
       inputs.spendGrowth > inputs.revenueGrowth &&
-      inputs.mer < 2.2
+      (inputs.mer < 2.2 || inputs.merBelowThreshold)
     ) {
-const rule = relationshipRules.find(
-  (rule) => rule.id === "sales_up_mer_down"
-);
-
-if (rule) {
-  results.push({
-    title: rule.title,
-    severity: rule.severity,
-    diagnosis: rule.diagnosis,
-    recommendation: rule.recommendation,
-    priorityFactors: rule.priorityFactors,
-  });
-}
+      addRule("sales_up_mer_down");
     }
   }
 
-  // Creative fatigue
   if (
-    inputs.frequency &&
-    inputs.ctr
+    typeof inputs.frequency === "number" &&
+    typeof inputs.ctr === "number"
   ) {
-    if (
-      inputs.frequency > 2.5 &&
-      inputs.ctr < 1
-    ) {
-      const rule = relationshipRules.find(
-  (rule) => rule.id === "creative_fatigue"
-);
-
-if (rule) {
-  results.push({
-    title: rule.title,
-    severity: rule.severity,
-    diagnosis: rule.diagnosis,
-    recommendation: rule.recommendation,
-    priorityFactors: rule.priorityFactors,
-  });
-}
+    if (inputs.frequency > 2.5 && inputs.ctr < 1) {
+      addRule("creative_fatigue");
     }
   }
 
-  // Funnel issue
   if (
-    inputs.ctr &&
-    inputs.cvr
+    typeof inputs.ctr === "number" &&
+    typeof inputs.cvr === "number"
   ) {
     if (
       inputs.ctr > 2 &&
-      inputs.cvr < 1
+      inputs.cvr < 1 &&
+      (typeof inputs.bounceRate !== "number" || inputs.bounceRate > 55)
     ) {
-    const rule = relationshipRules.find(
-  (rule) => rule.id === "funnel_issue"
-);
-
-if (rule) {
-  results.push({
-    title: rule.title,
-    severity: rule.severity,
-    diagnosis: rule.diagnosis,
-    recommendation: rule.recommendation,
-    priorityFactors: rule.priorityFactors,
-  });
-}
+      addRule("traffic_quality_issue");
     }
   }
 
-  // Safe scaling opportunity
   if (
-    inputs.mer &&
-    inputs.roas &&
-    inputs.ncac
+    inputs.checkoutFailure ||
+    (typeof inputs.checkoutCompletionRate === "number" &&
+      inputs.checkoutCompletionRate < 35)
+  ) {
+    addRule("checkout_failure");
+  }
+
+  const hasConversionGap =
+    typeof inputs.backendConversions === "number" &&
+    typeof inputs.platformConversions === "number" &&
+    Math.abs(inputs.backendConversions - inputs.platformConversions) >=
+      Math.max(25, inputs.backendConversions * 0.2);
+
+  if (inputs.trackingMismatch || hasConversionGap) {
+    addRule("tracking_mismatch");
+  }
+
+  if (
+    typeof inputs.mer === "number" &&
+    typeof inputs.roas === "number" &&
+    typeof inputs.ncac === "number"
   ) {
     if (
       inputs.mer >= 3 &&
       inputs.roas >= 4 &&
-      inputs.ncac < 120
+      inputs.ncac < 120 &&
+      !inputs.trackingMismatch &&
+      !inputs.checkoutFailure &&
+      !inputs.merBelowThreshold
     ) {
-    const rule = relationshipRules.find(
-  (rule) => rule.id === "safe_scaling"
-);
-
-if (rule) {
-  results.push({
-    title: rule.title,
-    severity: rule.severity,
-    diagnosis: rule.diagnosis,
-    recommendation: rule.recommendation,
-    priorityFactors: rule.priorityFactors,
-  });
-}
+      addRule("safe_scaling_opportunity");
     }
   }
 
