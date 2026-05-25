@@ -1,11 +1,13 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { tmpdir } from "node:os";
 import {
   type ClientCurrencyCode,
   type ClientRecord,
   type WebsitePlatform,
 } from "@/lib/clientTypes";
+import {
+  getRuntimeStorageMeta,
+  readRuntimeJsonStore,
+  writeRuntimeJsonStore,
+} from "@/lib/runtimeStorage";
 
 export type MetaClientConnection = {
   clientId: string;
@@ -23,8 +25,8 @@ type ClientStoreState = {
   metaConnections: MetaClientConnection[];
 };
 
-const STORE_DIR = path.join(tmpdir(), "media-dashboard");
-const STORE_FILE = path.join(STORE_DIR, "client-state.json");
+const CLIENT_STORE_KEY = "media-dashboard:client-state";
+const CLIENT_STORE_FILE = "client-state.json";
 
 function buildDefaultClient(): ClientRecord {
   return {
@@ -46,37 +48,27 @@ function defaultState(): ClientStoreState {
   };
 }
 
-async function ensureStoreDir() {
-  await mkdir(STORE_DIR, { recursive: true });
-}
-
-async function writeState(state: ClientStoreState) {
-  await ensureStoreDir();
-  await writeFile(STORE_FILE, JSON.stringify(state, null, 2), "utf-8");
-}
-
 export async function readClientStore(): Promise<ClientStoreState> {
-  try {
-    const raw = await readFile(STORE_FILE, "utf-8");
-    const parsed = JSON.parse(raw) as ClientStoreState;
-    const state = {
-      ...defaultState(),
-      ...parsed,
-    };
+  const parsed = await readRuntimeJsonStore<ClientStoreState>(
+    CLIENT_STORE_KEY,
+    CLIENT_STORE_FILE,
+    defaultState()
+  );
+  const state = {
+    ...defaultState(),
+    ...parsed,
+  };
 
-    if (!state.clients.length) {
-      state.clients = [buildDefaultClient()];
-    }
-
-    state.clients = state.clients.map((client) => ({
-      ...client,
-      currencyCode: client.currencyCode ?? "USD",
-    }));
-
-    return state;
-  } catch {
-    return defaultState();
+  if (!state.clients.length) {
+    state.clients = [buildDefaultClient()];
   }
+
+  state.clients = state.clients.map((client) => ({
+    ...client,
+    currencyCode: client.currencyCode ?? "USD",
+  }));
+
+  return state;
 }
 
 async function updateClientStore(
@@ -85,8 +77,12 @@ async function updateClientStore(
   const current = await readClientStore();
   const next = updater(current);
   next.updatedAt = new Date().toISOString();
-  await writeState(next);
+  await writeRuntimeJsonStore(CLIENT_STORE_KEY, CLIENT_STORE_FILE, next);
   return next;
+}
+
+export function getClientStoreMeta() {
+  return getRuntimeStorageMeta(CLIENT_STORE_FILE);
 }
 
 export async function listClients() {
@@ -152,6 +148,28 @@ export async function clearMetaConnection(clientId: string) {
   await updateClientStore((state) => ({
     ...state,
     metaConnections: state.metaConnections.filter(
+      (connection) => connection.clientId !== clientId
+    ),
+  }));
+}
+
+export async function deleteClient(clientId: string) {
+  const state = await readClientStore();
+
+  if (state.clients.length <= 1) {
+    throw new Error("At least one client must remain in the dashboard.");
+  }
+
+  const exists = state.clients.some((client) => client.id === clientId);
+
+  if (!exists) {
+    throw new Error("Client was not found.");
+  }
+
+  await updateClientStore((current) => ({
+    ...current,
+    clients: current.clients.filter((client) => client.id !== clientId),
+    metaConnections: current.metaConnections.filter(
       (connection) => connection.clientId !== clientId
     ),
   }));
