@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { AppShell, MiniMetric, Section, StatusPill } from "../../components/AppShell";
 import { Database, Plug, ShieldCheck, Store, Workflow } from "lucide-react";
 
@@ -251,7 +250,6 @@ function MessageBox({
 }
 
 export default function AdminPage() {
-  const searchParams = useSearchParams();
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [activeClientId, setActiveClientId] = useState("");
   const [clientNameDraft, setClientNameDraft] = useState("");
@@ -408,17 +406,26 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    const preferredFromUrl = searchParams.get("clientId");
-    const preferredFromStorage =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem("media-dashboard-active-client")
-        : null;
+    const params = new URLSearchParams(window.location.search);
+    const preferredFromUrl = params.get("clientId");
+    const preferredFromStorage = window.localStorage.getItem(
+      "media-dashboard-active-client"
+    );
 
     void loadClients(preferredFromUrl ?? preferredFromStorage);
     void loadShopifyStatus();
     void loadWordPressStatus();
     void loadSyncState();
-  }, [searchParams]);
+
+    const connected = params.get("meta_connected");
+    const error = params.get("meta_error");
+
+    if (connected === "1") {
+      setMetaMessage("Meta connected. Now choose the ad account for this client.");
+    } else if (error) {
+      setMetaMessage(decodeURIComponent(error));
+    }
+  }, []);
 
   useEffect(() => {
     if (!activeClientId) {
@@ -427,17 +434,6 @@ export default function AdminPage() {
 
     void loadMetaStatus();
   }, [activeClientId]);
-
-  useEffect(() => {
-    const connected = searchParams.get("meta_connected");
-    const error = searchParams.get("meta_error");
-
-    if (connected === "1") {
-      setMetaMessage("Meta connected. Now choose the ad account for this client.");
-    } else if (error) {
-      setMetaMessage(decodeURIComponent(error));
-    }
-  }, [searchParams]);
 
   async function handleCreateClient() {
     const trimmedName = clientNameDraft.trim();
