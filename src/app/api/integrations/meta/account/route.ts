@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   fetchMetaAdAccounts,
-  getSecureCookieFlag,
-  META_ACCOUNT_COOKIE,
-  META_TOKEN_COOKIE,
 } from "@/lib/integrations/meta";
+import { getClientById, getMetaConnection, upsertMetaConnection } from "@/lib/clientStore";
 
 export async function POST(request: NextRequest) {
   try {
-    const accessToken = request.cookies.get(META_TOKEN_COOKIE)?.value;
+    const body = (await request.json()) as { accountId?: string; clientId?: string };
+    const client = await getClientById(body.clientId);
+    const connection = await getMetaConnection(client.id);
+    const accessToken = connection?.accessToken;
 
     if (!accessToken) {
       return NextResponse.json(
@@ -17,7 +18,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = (await request.json()) as { accountId?: string };
     const accountId = body.accountId?.trim();
 
     if (!accountId) {
@@ -37,16 +37,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const response = NextResponse.json({ ok: true, account });
-    response.cookies.set(META_ACCOUNT_COOKIE, account.id, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: getSecureCookieFlag(),
-      path: "/",
-      maxAge: 60 * 60 * 12,
+    await upsertMetaConnection({
+      clientId: client.id,
+      accessToken,
+      connectedAt: connection?.connectedAt ?? new Date().toISOString(),
+      selectedAccountId: account.id,
+      selectedAccountName: account.name,
+      lastError: null,
     });
 
-    return response;
+    return NextResponse.json({ ok: true, account, clientId: client.id });
   } catch (error) {
     return NextResponse.json(
       {
