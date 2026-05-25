@@ -8,10 +8,13 @@ export async function GET() {
     getSyncStorageMeta(),
   ]);
 
+  const note = storage.durable
+    ? "This sync state is stored in durable runtime storage and will survive refreshes and deployments."
+    : "This sync state is still stored in temporary server storage. Add Vercel KV / Upstash REST environment variables so sync history survives refreshes and deployments.";
+
   return NextResponse.json({
     ...state,
     storage,
-    note:
-      "This is prototype persistence stored in ephemeral server storage. It is useful for testing the sync flow now, and should be replaced by a real database next.",
+    note,
   });
 }
