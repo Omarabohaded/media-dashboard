@@ -1,8 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { AppShell, MiniMetric, Section, StatusPill } from "../../components/AppShell";
-import { Plug, ShieldCheck, Store, Workflow } from "lucide-react";
+import { Database, Plug, ShieldCheck, Store, Workflow } from "lucide-react";
+
+type WebsitePlatform = "shopify" | "wordpress" | "salla" | "wix" | "custom";
+
+type ClientRecord = {
+  id: string;
+  name: string;
+  websitePlatform: WebsitePlatform;
+  notes: string | null;
+  createdAt: string;
+};
+
+type ClientDirectoryResponse = {
+  clients: ClientRecord[];
+  activeClientId: string;
+};
 
 type MetaAccountOption = {
   id: string;
@@ -12,9 +28,11 @@ type MetaAccountOption = {
 };
 
 type MetaStatus = {
+  client: ClientRecord;
   platform: "meta";
   configured: boolean;
   connected: boolean;
+  accountFetchHealthy: boolean;
   appMode: string;
   scopes: string[];
   callbackUrl: string;
@@ -43,8 +61,6 @@ type MetaInsightsPreview = {
     reach: number;
     purchases: number;
     purchaseValue: number;
-    addToCart: number;
-    checkoutInitiated: number;
   }>;
   totals: {
     spend: number;
@@ -75,24 +91,11 @@ type ShopifyStoreTruthPreview = {
   snapshot: {
     shopName: string;
     currencyCode: string;
-    primaryDomainUrl: string;
     ordersCount: number;
     grossSales: number;
-    taxTotal: number;
-    shippingTotal: number;
     netSales: number;
     averageOrderValue: number;
   };
-  orders: Array<{
-    id: string;
-    name: string;
-    createdAt: string;
-    totalPrice: number;
-    taxTotal: number;
-    shippingTotal: number;
-    lineItemsQuantity: number;
-    financialStatus: string;
-  }>;
   note: string;
 };
 
@@ -118,22 +121,62 @@ type WordPressStoreTruthPreview = {
     currencyCode: string;
     ordersCount: number;
     grossSales: number;
-    taxTotal: number;
-    shippingTotal: number;
     netSales: number;
     averageOrderValue: number;
   };
-  orders: Array<{
-    id: number;
-    number: string;
-    status: string;
-    dateCreated: string;
-    currency: string;
-    total: number;
-    totalTax: number;
-    shippingTotal: number;
-    lineItemsQuantity: number;
+  note: string;
+};
+
+type SyncStateResponse = {
+  version: 1;
+  storageMode: "ephemeral_tmp";
+  updatedAt: string | null;
+  connections: Array<{
+    clientId: string;
+    clientName: string;
+    platform: string;
+    accountLabel: string;
+    accountId: string | null;
+    health: string;
+    scopes: string[];
+    lastError: string | null;
+    connectedAt: string | null;
+    lastSyncedAt: string | null;
+    sourceMode: "live" | "mock" | "ephemeral";
+    recommendedNextStep: string;
   }>;
+  syncRuns: Array<{
+    id: string;
+    clientId: string | null;
+    clientName: string | null;
+    platform: string;
+    status: string;
+    finishedAt: string | null;
+    startedAt: string | null;
+    recordsProcessed: number;
+    error: string | null;
+    notes: string[];
+  }>;
+  businessTruthSnapshots: Array<{
+    clientId: string;
+    clientName: string;
+    source: string;
+    netSales: number;
+    orders: number;
+    averageOrderValue: number;
+  }>;
+  mediaSnapshots: Array<{
+    clientId: string;
+    clientName: string;
+    platform: string;
+    accountLabel: string;
+    spend: number;
+    purchaseValue: number;
+  }>;
+  storage: {
+    filePath: string;
+    storageMode: "ephemeral_tmp";
+  };
   note: string;
 };
 
@@ -208,32 +251,96 @@ function MessageBox({
 }
 
 export default function AdminPage() {
+  const searchParams = useSearchParams();
+  const [clients, setClients] = useState<ClientRecord[]>([]);
+  const [activeClientId, setActiveClientId] = useState("");
+  const [clientNameDraft, setClientNameDraft] = useState("");
+  const [clientNotesDraft, setClientNotesDraft] = useState("");
+  const [websitePlatformDraft, setWebsitePlatformDraft] =
+    useState<WebsitePlatform>("shopify");
+  const [clientMessage, setClientMessage] = useState<string | null>(null);
+  const [isClientLoading, setIsClientLoading] = useState(true);
+  const [isCreatingClient, setIsCreatingClient] = useState(false);
+
   const [metaStatus, setMetaStatus] = useState<MetaStatus | null>(null);
   const [metaInsights, setMetaInsights] = useState<MetaInsightsPreview | null>(null);
+  const [metaMessage, setMetaMessage] = useState<string | null>(null);
+  const [accountDraft, setAccountDraft] = useState("");
+  const [isMetaLoading, setIsMetaLoading] = useState(true);
+  const [isMetaPreviewLoading, setIsMetaPreviewLoading] = useState(false);
+  const [isMetaSyncRunning, setIsMetaSyncRunning] = useState(false);
+
   const [shopifyStatus, setShopifyStatus] = useState<ShopifyStatus | null>(null);
   const [shopifyPreview, setShopifyPreview] = useState<ShopifyStoreTruthPreview | null>(null);
+  const [shopifyMessage, setShopifyMessage] = useState<string | null>(null);
+  const [isShopifyLoading, setIsShopifyLoading] = useState(true);
+  const [isShopifyPreviewLoading, setIsShopifyPreviewLoading] = useState(false);
+  const [isShopifySyncRunning, setIsShopifySyncRunning] = useState(false);
+
   const [wordpressStatus, setWordpressStatus] = useState<WordPressStatus | null>(null);
   const [wordpressPreview, setWordpressPreview] =
     useState<WordPressStoreTruthPreview | null>(null);
-  const [accountDraft, setAccountDraft] = useState("");
-  const [metaMessage, setMetaMessage] = useState<string | null>(null);
-  const [shopifyMessage, setShopifyMessage] = useState<string | null>(null);
   const [wordpressMessage, setWordpressMessage] = useState<string | null>(null);
-  const [isMetaLoading, setIsMetaLoading] = useState(true);
-  const [isMetaPreviewLoading, setIsMetaPreviewLoading] = useState(false);
-  const [isShopifyLoading, setIsShopifyLoading] = useState(true);
-  const [isShopifyPreviewLoading, setIsShopifyPreviewLoading] = useState(false);
   const [isWordPressLoading, setIsWordPressLoading] = useState(true);
   const [isWordPressPreviewLoading, setIsWordPressPreviewLoading] =
     useState(false);
 
+  const [syncState, setSyncState] = useState<SyncStateResponse | null>(null);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [isSyncLoading, setIsSyncLoading] = useState(true);
+
+  const activeClient = useMemo(
+    () =>
+      clients.find((client) => client.id === activeClientId) ??
+      clients[0] ??
+      null,
+    [activeClientId, clients]
+  );
+
+  async function loadClients(preferredClientId?: string | null) {
+    setIsClientLoading(true);
+
+    try {
+      const query = preferredClientId
+        ? `?clientId=${encodeURIComponent(preferredClientId)}`
+        : "";
+      const response = await fetch(`/api/admin/clients${query}`, {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as ClientDirectoryResponse;
+      setClients(payload.clients);
+
+      const nextClientId =
+        preferredClientId &&
+        payload.clients.some((client) => client.id === preferredClientId)
+          ? preferredClientId
+          : payload.activeClientId;
+
+      setActiveClientId(nextClientId);
+      window.localStorage.setItem("media-dashboard-active-client", nextClientId);
+    } catch (error) {
+      setClientMessage(
+        error instanceof Error ? error.message : "Could not load clients."
+      );
+    } finally {
+      setIsClientLoading(false);
+    }
+  }
+
   async function loadMetaStatus() {
+    if (!activeClientId) {
+      setMetaStatus(null);
+      setIsMetaLoading(false);
+      return;
+    }
+
     setIsMetaLoading(true);
 
     try {
-      const response = await fetch("/api/integrations/meta/status", {
-        cache: "no-store",
-      });
+      const response = await fetch(
+        `/api/integrations/meta/status?clientId=${encodeURIComponent(activeClientId)}`,
+        { cache: "no-store" }
+      );
       const payload = (await response.json()) as MetaStatus;
       setMetaStatus(payload);
       setAccountDraft(payload.selectedAccountId ?? payload.accounts[0]?.id ?? "");
@@ -282,18 +389,106 @@ export default function AdminPage() {
     }
   }
 
+  async function loadSyncState() {
+    setIsSyncLoading(true);
+
+    try {
+      const response = await fetch("/api/sync/state", {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as SyncStateResponse;
+      setSyncState(payload);
+    } catch (error) {
+      setSyncMessage(
+        error instanceof Error ? error.message : "Could not load sync state."
+      );
+    } finally {
+      setIsSyncLoading(false);
+    }
+  }
+
   useEffect(() => {
-    void loadMetaStatus();
+    const preferredFromUrl = searchParams.get("clientId");
+    const preferredFromStorage =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem("media-dashboard-active-client")
+        : null;
+
+    void loadClients(preferredFromUrl ?? preferredFromStorage);
     void loadShopifyStatus();
     void loadWordPressStatus();
-  }, []);
+    void loadSyncState();
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!activeClientId) {
+      return;
+    }
+
+    void loadMetaStatus();
+  }, [activeClientId]);
+
+  useEffect(() => {
+    const connected = searchParams.get("meta_connected");
+    const error = searchParams.get("meta_error");
+
+    if (connected === "1") {
+      setMetaMessage("Meta connected. Now choose the ad account for this client.");
+    } else if (error) {
+      setMetaMessage(decodeURIComponent(error));
+    }
+  }, [searchParams]);
+
+  async function handleCreateClient() {
+    const trimmedName = clientNameDraft.trim();
+
+    if (!trimmedName) {
+      setClientMessage("Client name is required.");
+      return;
+    }
+
+    setClientMessage(null);
+    setIsCreatingClient(true);
+
+    try {
+      const response = await fetch("/api/admin/clients", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: trimmedName,
+          websitePlatform: websitePlatformDraft,
+          notes: clientNotesDraft,
+        }),
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        client?: ClientRecord;
+      };
+
+      if (!response.ok || !payload.client) {
+        throw new Error(payload.error ?? "Could not create the client.");
+      }
+
+      setClientNameDraft("");
+      setClientNotesDraft("");
+      await loadClients(payload.client.id);
+      setMetaMessage("Client created. You can now connect Meta for this client.");
+    } catch (error) {
+      setClientMessage(
+        error instanceof Error ? error.message : "Could not create the client."
+      );
+    } finally {
+      setIsCreatingClient(false);
+    }
+  }
 
   async function handleDisconnectMeta() {
-    setMetaMessage(null);
-
-    const response = await fetch("/api/integrations/meta/status", {
-      method: "DELETE",
-    });
+    const response = await fetch(
+      `/api/integrations/meta/status?clientId=${encodeURIComponent(activeClientId)}`,
+      { method: "DELETE" }
+    );
 
     if (!response.ok) {
       setMetaMessage("Could not disconnect Meta.");
@@ -310,14 +505,12 @@ export default function AdminPage() {
       return;
     }
 
-    setMetaMessage(null);
-
     const response = await fetch("/api/integrations/meta/account", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ accountId: accountDraft }),
+      body: JSON.stringify({ accountId: accountDraft, clientId: activeClientId }),
     });
 
     if (!response.ok) {
@@ -327,16 +520,17 @@ export default function AdminPage() {
     }
 
     await loadMetaStatus();
+    setMetaMessage("Meta ad account saved for this client.");
   }
 
   async function handleMetaPreview() {
-    setMetaMessage(null);
     setIsMetaPreviewLoading(true);
 
     try {
-      const response = await fetch("/api/integrations/meta/insights-preview", {
-        cache: "no-store",
-      });
+      const response = await fetch(
+        `/api/integrations/meta/insights-preview?clientId=${encodeURIComponent(activeClientId)}`,
+        { cache: "no-store" }
+      );
       const payload = (await response.json()) as MetaInsightsPreview & {
         error?: string;
       };
@@ -356,7 +550,6 @@ export default function AdminPage() {
   }
 
   async function handleShopifyConnect() {
-    setShopifyMessage(null);
     setIsShopifyLoading(true);
 
     try {
@@ -380,32 +573,24 @@ export default function AdminPage() {
   }
 
   async function handleShopifyPreview() {
-    setShopifyMessage(null);
     setIsShopifyPreviewLoading(true);
 
     try {
-      const response = await fetch(
-        "/api/integrations/shopify/store-truth-preview",
-        {
-          cache: "no-store",
-        }
-      );
+      const response = await fetch("/api/integrations/shopify/store-truth-preview", {
+        cache: "no-store",
+      });
       const payload = (await response.json()) as ShopifyStoreTruthPreview & {
         error?: string;
       };
 
       if (!response.ok) {
-        throw new Error(
-          payload.error ?? "Could not load Shopify store-truth preview."
-        );
+        throw new Error(payload.error ?? "Could not load Shopify preview.");
       }
 
       setShopifyPreview(payload);
     } catch (error) {
       setShopifyMessage(
-        error instanceof Error
-          ? error.message
-          : "Could not load Shopify store truth."
+        error instanceof Error ? error.message : "Could not load Shopify preview."
       );
     } finally {
       setIsShopifyPreviewLoading(false);
@@ -413,31 +598,23 @@ export default function AdminPage() {
   }
 
   async function handleWordPressConnect() {
-    setWordpressMessage(null);
     setIsWordPressLoading(true);
 
     try {
       const response = await fetch("/api/integrations/wordpress/connect", {
         method: "POST",
       });
-      const payload = (await response.json()) as {
-        error?: string;
-        storeName?: string;
-      };
+      const payload = (await response.json()) as { error?: string; storeName?: string };
 
       if (!response.ok) {
         throw new Error(payload.error ?? "Could not connect WordPress.");
       }
 
-      setWordpressMessage(
-        `Connected to ${payload.storeName ?? "the WordPress store"}.`
-      );
+      setWordpressMessage(`Connected to ${payload.storeName ?? "the WordPress store"}.`);
       await loadWordPressStatus();
     } catch (error) {
       setWordpressMessage(
-        error instanceof Error
-          ? error.message
-          : "Could not connect WordPress or WooCommerce."
+        error instanceof Error ? error.message : "Could not connect WordPress."
       );
     } finally {
       setIsWordPressLoading(false);
@@ -445,60 +622,192 @@ export default function AdminPage() {
   }
 
   async function handleWordPressPreview() {
-    setWordpressMessage(null);
     setIsWordPressPreviewLoading(true);
 
     try {
-      const response = await fetch(
-        "/api/integrations/wordpress/store-truth-preview",
-        {
-          cache: "no-store",
-        }
-      );
+      const response = await fetch("/api/integrations/wordpress/store-truth-preview", {
+        cache: "no-store",
+      });
       const payload = (await response.json()) as WordPressStoreTruthPreview & {
         error?: string;
       };
 
       if (!response.ok) {
-        throw new Error(
-          payload.error ?? "Could not load WordPress store-truth preview."
-        );
+        throw new Error(payload.error ?? "Could not load WordPress preview.");
       }
 
       setWordpressPreview(payload);
     } catch (error) {
       setWordpressMessage(
-        error instanceof Error
-          ? error.message
-          : "Could not load WordPress store truth."
+        error instanceof Error ? error.message : "Could not load WordPress preview."
       );
     } finally {
       setIsWordPressPreviewLoading(false);
     }
   }
 
+  async function handleRunSync(platform: "meta" | "shopify") {
+    if (platform === "meta") {
+      setIsMetaSyncRunning(true);
+    } else {
+      setIsShopifySyncRunning(true);
+    }
+
+    try {
+      const response = await fetch("/api/sync/run", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ platform, clientId: activeClientId }),
+      });
+      const payload = (await response.json()) as { error?: string; notes?: string[] };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Sync run failed.");
+      }
+
+      setSyncMessage(payload.notes?.[0] ?? "Sync completed.");
+      await loadSyncState();
+      await loadMetaStatus();
+    } catch (error) {
+      setSyncMessage(error instanceof Error ? error.message : "Could not run sync.");
+    } finally {
+      if (platform === "meta") {
+        setIsMetaSyncRunning(false);
+      } else {
+        setIsShopifySyncRunning(false);
+      }
+    }
+  }
+
   const metaReadyState = metaStatus?.connected
-    ? "Good"
+    ? metaStatus.accountFetchHealthy
+      ? "Good"
+      : "Watch"
     : metaStatus?.configured
-      ? "Watch"
-      : "Fix";
+    ? "Watch"
+    : "Fix";
   const shopifyReadyState = shopifyStatus?.previewReady
     ? "Good"
     : shopifyStatus?.configured
-      ? "Watch"
-      : "Fix";
+    ? "Watch"
+    : "Fix";
   const wordpressReadyState = wordpressStatus?.previewReady
     ? "Good"
     : wordpressStatus?.configured
-      ? "Watch"
-      : "Fix";
+    ? "Watch"
+    : "Fix";
 
   return (
     <AppShell>
       <div className="space-y-5">
         <Section
+          title="Client Onboarding"
+          subtitle="Add a client first, then connect Meta and the right storefront truth source for that client."
+        >
+          <div className="grid gap-5 xl:grid-cols-[1.1fr,0.9fr]">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold uppercase text-slate-400">Active Client</div>
+                  <h3 className="mt-2 text-2xl font-black text-white">
+                    {isClientLoading ? "Loading clients" : activeClient?.name ?? "No client selected"}
+                  </h3>
+                </div>
+                <StatusPill status={activeClient ? "Good" : "Watch"} />
+              </div>
+
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <MiniMetric
+                  label="Website Type"
+                  value={activeClient?.websitePlatform ?? "Not set"}
+                  hint="Used to decide Shopify or WordPress onboarding next"
+                  tone="warn"
+                />
+                <MiniMetric
+                  label="Saved Clients"
+                  value={`${clients.length}`}
+                  hint="Each client keeps its own Meta account assignment"
+                  tone="good"
+                />
+              </div>
+
+              <div className="mt-4">
+                <div className="text-xs font-black uppercase text-slate-400">Client Selector</div>
+                <select
+                  value={activeClientId}
+                  onChange={(event) => setActiveClientId(event.target.value)}
+                  className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
+                >
+                  {clients.map((client) => (
+                    <option key={client.id} value={client.id}>
+                      {client.name} · {client.websitePlatform}
+                    </option>
+                  ))}
+                </select>
+                {activeClient?.notes ? (
+                  <p className="mt-3 text-sm text-slate-400">{activeClient.notes}</p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
+              <div className="text-sm font-bold uppercase text-slate-400">Add New Client</div>
+              <div className="mt-4 grid gap-4">
+                <input
+                  value={clientNameDraft}
+                  onChange={(event) => setClientNameDraft(event.target.value)}
+                  placeholder="Client name"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                />
+                <select
+                  value={websitePlatformDraft}
+                  onChange={(event) => setWebsitePlatformDraft(event.target.value as WebsitePlatform)}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
+                >
+                  <option value="shopify">Shopify</option>
+                  <option value="wordpress">WordPress / WooCommerce</option>
+                  <option value="salla">Salla</option>
+                  <option value="wix">Wix</option>
+                  <option value="custom">Other / Custom</option>
+                </select>
+                <textarea
+                  value={clientNotesDraft}
+                  onChange={(event) => setClientNotesDraft(event.target.value)}
+                  placeholder="Optional notes"
+                  rows={3}
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                />
+              </div>
+
+              <div className="mt-4 space-y-4">
+                <MessageBox tone="info" message={clientMessage} />
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => void handleCreateClient()}
+                  className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-500"
+                >
+                  {isCreatingClient ? "Creating Client" : "Create Client"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void loadClients(activeClientId)}
+                  className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-slate-500 hover:text-white"
+                >
+                  Refresh Clients
+                </button>
+              </div>
+            </div>
+          </div>
+        </Section>
+
+        <Section
           title="Official API Onboarding"
-          subtitle="Use each platform's official developer workflow first. Meta is the first media source. Shopify is the first storefront truth source, and WordPress clients should use the official WooCommerce API path."
+          subtitle="Meta is the paid media source. Shopify and WordPress provide the store-truth layer for real validation."
         >
           <div className="grid gap-5 xl:grid-cols-3">
             <Surface
@@ -507,56 +816,33 @@ export default function AdminPage() {
                 isMetaLoading
                   ? "Checking Meta setup"
                   : metaStatus?.connected
-                    ? "Connected through official app flow"
-                    : metaStatus?.configured
-                      ? "Ready for developer-mode testing"
-                      : "Needs official Meta app setup"
+                  ? "Connected for this client"
+                  : metaStatus?.configured
+                  ? "Ready for developer-mode testing"
+                  : "Needs official Meta app setup"
               }
               status={metaReadyState}
             >
-              <p className="text-sm text-slate-300">
-                This follows the official Meta app path: app setup, redirect URI,
-                OAuth login, ad account selection, then a live insights preview
-                before the dashboard trusts any scaling logic.
-              </p>
-
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2">
                 <MiniMetric
-                  label="App Mode"
-                  value={metaStatus?.appMode ?? "development"}
-                  hint="Start with test people and test assets"
-                  tone="warn"
+                  label="Client"
+                  value={metaStatus?.client.name ?? activeClient?.name ?? "None"}
+                  hint={metaStatus?.client.websitePlatform ?? activeClient?.websitePlatform ?? "Choose a client first"}
+                  tone="good"
                 />
                 <MiniMetric
                   label="Selected Account"
                   value={metaStatus?.selectedAccount?.name ?? "Not selected"}
-                  hint={metaStatus?.selectedAccountId ?? "Choose a test ad account"}
+                  hint={metaStatus?.selectedAccountId ?? "Choose a Meta ad account"}
                   tone={metaStatus?.selectedAccount ? "good" : "default"}
                 />
               </div>
 
               <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-                <div className="text-xs font-black uppercase text-slate-400">
-                  Callback URL
-                </div>
+                <div className="text-xs font-black uppercase text-slate-400">Callback URL</div>
                 <div className="mt-2 break-all text-sm font-bold text-cyan-300">
                   {metaStatus?.callbackUrl ?? "/api/integrations/meta/callback"}
                 </div>
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {(metaStatus?.scopes ?? [
-                  "ads_read",
-                  "ads_management",
-                  "business_management",
-                ]).map((scope) => (
-                  <span
-                    key={scope}
-                    className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1 text-xs font-bold text-slate-300"
-                  >
-                    {scope}
-                  </span>
-                ))}
               </div>
 
               <div className="mt-4 space-y-4">
@@ -567,7 +853,11 @@ export default function AdminPage() {
 
               <div className="mt-4 flex flex-wrap gap-3">
                 <a
-                  href="/api/integrations/meta/connect"
+                  href={
+                    activeClientId
+                      ? `/api/integrations/meta/connect?clientId=${encodeURIComponent(activeClientId)}`
+                      : "/admin"
+                  }
                   className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-500"
                 >
                   Connect Meta App
@@ -589,9 +879,7 @@ export default function AdminPage() {
               </div>
 
               <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-                <div className="text-xs font-black uppercase text-slate-400">
-                  Test Account Selection
-                </div>
+                <div className="text-xs font-black uppercase text-slate-400">Account Selection</div>
                 <select
                   value={accountDraft}
                   onChange={(event) => setAccountDraft(event.target.value)}
@@ -604,13 +892,16 @@ export default function AdminPage() {
                     </option>
                   ))}
                 </select>
+                <p className="mt-3 text-xs text-slate-500">
+                  Missing ad accounts usually means this Meta user does not have access to those accounts in Business Manager.
+                </p>
                 <div className="mt-3 flex flex-wrap gap-3">
                   <button
                     type="button"
                     onClick={() => void handleAccountSelect()}
                     className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-500"
                   >
-                    Use This Account
+                    Save Account To Client
                   </button>
                   <button
                     type="button"
@@ -624,56 +915,29 @@ export default function AdminPage() {
             </Surface>
 
             <Surface
-              eyebrow="Shopify Store Truth"
+              eyebrow="Shopify Truth"
               title={
                 isShopifyLoading
                   ? "Checking Shopify setup"
                   : shopifyStatus?.previewReady
-                    ? "Store truth preview is ready"
-                    : shopifyStatus?.configured
-                      ? "Ready for official Shopify testing"
-                      : "Needs Shopify app credentials"
+                  ? "Store truth preview is ready"
+                  : shopifyStatus?.configured
+                  ? "Ready for Shopify testing"
+                  : "Needs Shopify credentials"
               }
               status={shopifyReadyState}
             >
-              <p className="text-sm text-slate-300">
-                This follows Shopify&apos;s official GraphQL Admin API path. For a
-                store you control, the trusted server route is app credentials plus
-                store-level permissions, then order-based business truth queries.
-              </p>
-
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <MiniMetric
-                  label="Store Domain"
-                  value={shopifyStatus?.storeDomain || "Not configured"}
-                  hint="Official app install required"
-                  tone={shopifyStatus?.storeDomain ? "good" : "default"}
-                />
-                <MiniMetric
-                  label="API Version"
-                  value={shopifyStatus?.apiVersion ?? "2026-01"}
-                  hint="GraphQL Admin API"
-                  tone="warn"
-                />
-              </div>
-
-              <div className="mt-4 flex flex-wrap gap-2">
-                {(shopifyStatus?.requestedScopes ?? ["read_orders"]).map((scope) => (
-                  <span
-                    key={scope}
-                    className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1 text-xs font-bold text-slate-300"
-                  >
-                    {scope}
-                  </span>
-                ))}
-              </div>
-
+              <MiniMetric
+                label="Store Domain"
+                value={shopifyStatus?.storeDomain || "Not configured"}
+                hint={shopifyStatus?.recommendedNextStep ?? "Add Shopify app credentials"}
+                tone={shopifyStatus?.storeDomain ? "good" : "default"}
+              />
               <div className="mt-4 space-y-4">
                 <EnvList values={shopifyStatus?.missingEnv ?? []} />
                 <MessageBox message={shopifyStatus?.connectionError ?? null} />
                 <MessageBox tone="info" message={shopifyMessage} />
               </div>
-
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
                   type="button"
@@ -684,67 +948,38 @@ export default function AdminPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => void loadShopifyStatus()}
-                  className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-slate-500 hover:text-white"
-                >
-                  Refresh Status
-                </button>
-                <button
-                  type="button"
                   onClick={() => void handleShopifyPreview()}
                   className="rounded-xl border border-emerald-500/40 px-4 py-3 text-sm font-bold text-emerald-200 transition hover:border-emerald-400 hover:text-white"
                 >
-                  {isShopifyPreviewLoading
-                    ? "Loading Store Truth"
-                    : "Load Store-Truth Preview"}
+                  {isShopifyPreviewLoading ? "Loading Preview" : "Load Store Truth"}
                 </button>
               </div>
             </Surface>
 
             <Surface
-              eyebrow="WordPress Or WooCommerce"
+              eyebrow="WordPress Truth"
               title={
                 isWordPressLoading
                   ? "Checking WordPress setup"
                   : wordpressStatus?.previewReady
-                    ? "WordPress truth preview is ready"
-                    : wordpressStatus?.configured
-                      ? "Ready for official WooCommerce testing"
-                      : "Needs site URL and WooCommerce keys"
+                  ? "WordPress truth preview is ready"
+                  : wordpressStatus?.configured
+                  ? "Ready for WooCommerce testing"
+                  : "Needs WooCommerce keys"
               }
               status={wordpressReadyState}
             >
-              <p className="text-sm text-slate-300">
-                For WordPress ecommerce, the first official path is WooCommerce
-                REST API keys. This lets the dashboard use order truth from the
-                store before it trusts any Meta recommendation layer.
-              </p>
-
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <MiniMetric
-                  label="Site URL"
-                  value={wordpressStatus?.siteUrl || "Not configured"}
-                  hint="WordPress site with WooCommerce installed"
-                  tone={wordpressStatus?.siteUrl ? "good" : "default"}
-                />
-                <MiniMetric
-                  label="API Version"
-                  value={wordpressStatus?.apiVersion ?? "wc/v3"}
-                  hint={
-                    wordpressStatus?.queryStringAuth
-                      ? "Query-string auth enabled"
-                      : "Basic auth over HTTPS"
-                  }
-                  tone="warn"
-                />
-              </div>
-
+              <MiniMetric
+                label="Site URL"
+                value={wordpressStatus?.siteUrl || "Not configured"}
+                hint={wordpressStatus?.recommendedNextStep ?? "Add site URL and WooCommerce keys"}
+                tone={wordpressStatus?.siteUrl ? "good" : "default"}
+              />
               <div className="mt-4 space-y-4">
                 <EnvList values={wordpressStatus?.missingEnv ?? []} />
                 <MessageBox message={wordpressStatus?.connectionError ?? null} />
                 <MessageBox tone="info" message={wordpressMessage} />
               </div>
-
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
                   type="button"
@@ -755,19 +990,10 @@ export default function AdminPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => void loadWordPressStatus()}
-                  className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-slate-500 hover:text-white"
-                >
-                  Refresh Status
-                </button>
-                <button
-                  type="button"
                   onClick={() => void handleWordPressPreview()}
                   className="rounded-xl border border-emerald-500/40 px-4 py-3 text-sm font-bold text-emerald-200 transition hover:border-emerald-400 hover:text-white"
                 >
-                  {isWordPressPreviewLoading
-                    ? "Loading Store Truth"
-                    : "Load Store-Truth Preview"}
+                  {isWordPressPreviewLoading ? "Loading Preview" : "Load Store Truth"}
                 </button>
               </div>
             </Surface>
@@ -776,32 +1002,26 @@ export default function AdminPage() {
 
         <Section
           title="Readiness Snapshot"
-          subtitle="The dashboard should only trust scaling logic after platform data is paired with business truth."
+          subtitle="The decision engine should trust scaling only when Meta and store truth are both ready."
         >
           <div className="grid gap-4 md:grid-cols-5">
             <MiniMetric
               label="Meta Status"
               value={metaStatus?.connected ? "Connected" : "Pending"}
-              hint={metaStatus?.recommendedNextStep ?? "Configure the official app first"}
-              tone={metaStatus?.connected ? "good" : "warn"}
+              hint={metaStatus?.recommendedNextStep ?? "Connect Meta first"}
+              tone={metaStatus?.connected ? (metaStatus.accountFetchHealthy ? "good" : "warn") : "warn"}
             />
             <MiniMetric
-              label="Shopify Status"
-              value={shopifyStatus?.connected ? "Connected" : "Pending"}
-              hint={
-                shopifyStatus?.recommendedNextStep ??
-                "Add store credentials and install the app"
-              }
-              tone={shopifyStatus?.connected ? "good" : "warn"}
+              label="Shopify"
+              value={shopifyStatus?.previewReady ? "Preview Ready" : "Pending"}
+              hint={shopifyStatus?.recommendedNextStep ?? "Add Shopify credentials"}
+              tone={shopifyStatus?.previewReady ? "good" : "warn"}
             />
             <MiniMetric
-              label="WordPress Status"
-              value={wordpressStatus?.connected ? "Connected" : "Pending"}
-              hint={
-                wordpressStatus?.recommendedNextStep ??
-                "Add the site URL and WooCommerce keys"
-              }
-              tone={wordpressStatus?.connected ? "good" : "warn"}
+              label="WordPress"
+              value={wordpressStatus?.previewReady ? "Preview Ready" : "Pending"}
+              hint={wordpressStatus?.recommendedNextStep ?? "Add WooCommerce keys"}
+              tone={wordpressStatus?.previewReady ? "good" : "warn"}
             />
             <MiniMetric
               label="Decision Trust"
@@ -811,7 +1031,7 @@ export default function AdminPage() {
                   ? "Pair Ready"
                   : "Blocked"
               }
-              hint="Real scaling needs platform plus storefront truth agreement"
+              hint="Real scaling needs platform plus business-truth agreement"
               tone={
                 metaStatus?.connected &&
                 (shopifyStatus?.previewReady || wordpressStatus?.previewReady)
@@ -822,239 +1042,177 @@ export default function AdminPage() {
             <MiniMetric
               label="Mode"
               value="Developer First"
-              hint="Test users, test assets, then live review"
+              hint="Keep testing in developer mode until flows are proven"
               tone="warn"
             />
           </div>
         </Section>
 
-        <div className="grid gap-5 xl:grid-cols-2">
-          <Section
-            title="Meta Preview"
-            subtitle="Pull a live sample from the selected ad account before wiring these metrics deeper into the decision engine."
-          >
+        <div className="grid gap-5 xl:grid-cols-3">
+          <Section title="Meta Preview" subtitle="Quick live sample from the selected Meta ad account.">
             {metaInsights ? (
-              <>
-                <div className="grid gap-4 md:grid-cols-4">
-                  <MiniMetric
-                    label="Spend"
-                    value={`$${metaInsights.totals.spend.toFixed(0)}`}
-                    tone="warn"
-                  />
-                  <MiniMetric
-                    label="Purchases"
-                    value={`${metaInsights.totals.purchases}`}
-                    tone="good"
-                  />
-                  <MiniMetric
-                    label="Revenue"
-                    value={`$${metaInsights.totals.purchaseValue.toFixed(0)}`}
-                    tone="good"
-                  />
-                  <MiniMetric
-                    label="Clicks"
-                    value={`${metaInsights.totals.clicks}`}
-                    tone="default"
-                  />
-                </div>
-
-                <p className="mt-4 text-sm text-slate-400">{metaInsights.note}</p>
-
-                <div className="mt-4 overflow-x-auto">
-                  <table className="w-full min-w-[720px] text-left text-sm">
-                    <thead className="text-xs uppercase text-slate-400">
-                      <tr>
-                        <th className="pb-3">Campaign</th>
-                        <th>Spend</th>
-                        <th>CTR</th>
-                        <th>Frequency</th>
-                        <th>Purchases</th>
-                        <th>Purchase Value</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {metaInsights.rows.slice(0, 8).map((row) => (
-                        <tr key={row.campaignId} className="border-t border-slate-800">
-                          <td className="py-4 font-semibold text-white">
-                            {row.campaignName}
-                          </td>
-                          <td className="text-slate-300">${row.spend.toFixed(0)}</td>
-                          <td className="text-slate-300">{row.ctr.toFixed(2)}%</td>
-                          <td className="text-slate-300">{row.frequency.toFixed(2)}</td>
-                          <td className="text-slate-300">{row.purchases}</td>
-                          <td className="text-slate-300">
-                            ${row.purchaseValue.toFixed(0)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+              <div className="grid gap-4 md:grid-cols-2">
+                <MiniMetric label="Spend" value={`$${metaInsights.totals.spend.toFixed(0)}`} tone="warn" />
+                <MiniMetric label="Purchases" value={`${metaInsights.totals.purchases}`} tone="good" />
+                <MiniMetric label="Revenue" value={`$${metaInsights.totals.purchaseValue.toFixed(0)}`} tone="good" />
+                <MiniMetric label="Clicks" value={`${metaInsights.totals.clicks}`} tone="default" />
+              </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/30 p-5 text-sm text-slate-400">
-                No live Meta preview loaded yet. Connect the official app, choose a
-                test account, then pull a preview before trusting any recommendation
-                layer.
+                No Meta preview loaded yet for this client.
               </div>
             )}
           </Section>
 
-          <Section
-            title="Shopify Preview"
-            subtitle="Use store truth to validate platform reporting before enabling real scale recommendations."
-          >
+          <Section title="Shopify Preview" subtitle="Store-truth snapshot from Shopify.">
             {shopifyPreview ? (
-              <>
-                <div className="grid gap-4 md:grid-cols-4">
-                  <MiniMetric
-                    label="Gross Sales"
-                    value={`${shopifyPreview.snapshot.currencyCode} ${shopifyPreview.snapshot.grossSales.toFixed(0)}`}
-                    tone="good"
-                  />
-                  <MiniMetric
-                    label="Net Sales"
-                    value={`${shopifyPreview.snapshot.currencyCode} ${shopifyPreview.snapshot.netSales.toFixed(0)}`}
-                    tone="good"
-                  />
-                  <MiniMetric
-                    label="Orders"
-                    value={`${shopifyPreview.snapshot.ordersCount}`}
-                    tone="default"
-                  />
-                  <MiniMetric
-                    label="AOV"
-                    value={`${shopifyPreview.snapshot.currencyCode} ${shopifyPreview.snapshot.averageOrderValue.toFixed(0)}`}
-                    tone="warn"
-                  />
-                </div>
-
-                <p className="mt-4 text-sm text-slate-400">{shopifyPreview.note}</p>
-
-                <div className="mt-4 overflow-x-auto">
-                  <table className="w-full min-w-[720px] text-left text-sm">
-                    <thead className="text-xs uppercase text-slate-400">
-                      <tr>
-                        <th className="pb-3">Order</th>
-                        <th>Total</th>
-                        <th>Tax</th>
-                        <th>Shipping</th>
-                        <th>Items</th>
-                        <th>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {shopifyPreview.orders.slice(0, 8).map((order) => (
-                        <tr key={order.id} className="border-t border-slate-800">
-                          <td className="py-4 font-semibold text-white">{order.name}</td>
-                          <td className="text-slate-300">
-                            {shopifyPreview.snapshot.currencyCode}{" "}
-                            {order.totalPrice.toFixed(0)}
-                          </td>
-                          <td className="text-slate-300">
-                            {shopifyPreview.snapshot.currencyCode}{" "}
-                            {order.taxTotal.toFixed(0)}
-                          </td>
-                          <td className="text-slate-300">
-                            {shopifyPreview.snapshot.currencyCode}{" "}
-                            {order.shippingTotal.toFixed(0)}
-                          </td>
-                          <td className="text-slate-300">{order.lineItemsQuantity}</td>
-                          <td className="text-slate-300">{order.financialStatus}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
+              <div className="grid gap-4 md:grid-cols-2">
+                <MiniMetric label="Gross Sales" value={`${shopifyPreview.snapshot.currencyCode} ${shopifyPreview.snapshot.grossSales.toFixed(0)}`} tone="good" />
+                <MiniMetric label="Net Sales" value={`${shopifyPreview.snapshot.currencyCode} ${shopifyPreview.snapshot.netSales.toFixed(0)}`} tone="good" />
+                <MiniMetric label="Orders" value={`${shopifyPreview.snapshot.ordersCount}`} tone="default" />
+                <MiniMetric label="AOV" value={`${shopifyPreview.snapshot.currencyCode} ${shopifyPreview.snapshot.averageOrderValue.toFixed(0)}`} tone="warn" />
+              </div>
             ) : (
               <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/30 p-5 text-sm text-slate-400">
-                No Shopify truth preview loaded yet. Once this is connected, the
-                dashboard can compare real store sales and orders against Meta
-                reporting instead of relying on platform attribution alone.
+                No Shopify preview loaded yet.
+              </div>
+            )}
+          </Section>
+
+          <Section title="WordPress Preview" subtitle="Store-truth snapshot from WooCommerce.">
+            {wordpressPreview ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <MiniMetric label="Gross Sales" value={`${wordpressPreview.snapshot.currencyCode} ${wordpressPreview.snapshot.grossSales.toFixed(0)}`} tone="good" />
+                <MiniMetric label="Net Sales" value={`${wordpressPreview.snapshot.currencyCode} ${wordpressPreview.snapshot.netSales.toFixed(0)}`} tone="good" />
+                <MiniMetric label="Orders" value={`${wordpressPreview.snapshot.ordersCount}`} tone="default" />
+                <MiniMetric label="AOV" value={`${wordpressPreview.snapshot.currencyCode} ${wordpressPreview.snapshot.averageOrderValue.toFixed(0)}`} tone="warn" />
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/30 p-5 text-sm text-slate-400">
+                No WordPress preview loaded yet.
               </div>
             )}
           </Section>
         </div>
 
         <Section
-          title="WordPress Preview"
-          subtitle="Use WooCommerce order truth to validate platform reporting on WordPress clients."
+          title="Sync History"
+          subtitle="Prototype persistence now records runs and snapshots while we wait for a real database."
         >
-          {wordpressPreview ? (
-            <>
-              <div className="grid gap-4 md:grid-cols-4">
-                <MiniMetric
-                  label="Gross Sales"
-                  value={`${wordpressPreview.snapshot.currencyCode} ${wordpressPreview.snapshot.grossSales.toFixed(0)}`}
-                  tone="good"
-                />
-                <MiniMetric
-                  label="Net Sales"
-                  value={`${wordpressPreview.snapshot.currencyCode} ${wordpressPreview.snapshot.netSales.toFixed(0)}`}
-                  tone="good"
-                />
-                <MiniMetric
-                  label="Orders"
-                  value={`${wordpressPreview.snapshot.ordersCount}`}
-                  tone="default"
-                />
-                <MiniMetric
-                  label="AOV"
-                  value={`${wordpressPreview.snapshot.currencyCode} ${wordpressPreview.snapshot.averageOrderValue.toFixed(0)}`}
-                  tone="warn"
-                />
+          <div className="grid gap-5 xl:grid-cols-[0.9fr,1.1fr]">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
+              <div className="flex items-center gap-3 text-blue-300">
+                <Database size={18} />
+                <div className="text-sm font-black uppercase">Persistence Mode</div>
               </div>
-
-              <p className="mt-4 text-sm text-slate-400">{wordpressPreview.note}</p>
-
-              <div className="mt-4 overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm">
-                  <thead className="text-xs uppercase text-slate-400">
-                    <tr>
-                      <th className="pb-3">Order</th>
-                      <th>Total</th>
-                      <th>Tax</th>
-                      <th>Shipping</th>
-                      <th>Items</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {wordpressPreview.orders.slice(0, 8).map((order) => (
-                      <tr key={order.id} className="border-t border-slate-800">
-                        <td className="py-4 font-semibold text-white">
-                          #{order.number}
-                        </td>
-                        <td className="text-slate-300">
-                          {wordpressPreview.snapshot.currencyCode} {order.total.toFixed(0)}
-                        </td>
-                        <td className="text-slate-300">
-                          {wordpressPreview.snapshot.currencyCode} {order.totalTax.toFixed(0)}
-                        </td>
-                        <td className="text-slate-300">
-                          {wordpressPreview.snapshot.currencyCode} {order.shippingTotal.toFixed(0)}
-                        </td>
-                        <td className="text-slate-300">{order.lineItemsQuantity}</td>
-                        <td className="text-slate-300">{order.status}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <p className="mt-3 text-sm text-slate-300">
+                {syncState?.note ?? "This is still temporary storage, but it is enough to test the real workflow."}
+              </p>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <MiniMetric label="Connections" value={`${syncState?.connections.length ?? 0}`} hint="Stored per-platform records" tone="good" />
+                <MiniMetric label="Sync Runs" value={`${syncState?.syncRuns.length ?? 0}`} hint={syncState?.updatedAt ?? "No sync history yet"} tone="warn" />
               </div>
-            </>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/30 p-5 text-sm text-slate-400">
-              No WordPress truth preview loaded yet. Once this is connected,
-              WordPress or WooCommerce clients can use the same store-truth path as
-              Shopify clients.
+              <div className="mt-4 space-y-4">
+                <MessageBox tone="info" message={syncMessage} />
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4 text-xs text-slate-400">
+                  Storage path: {syncState?.storage.filePath ?? "Not loaded yet"}
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => void handleRunSync("meta")}
+                  className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-500"
+                >
+                  {isMetaSyncRunning ? "Running Meta Sync" : "Run Meta Sync"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleRunSync("shopify")}
+                  className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-500"
+                >
+                  {isShopifySyncRunning ? "Running Shopify Sync" : "Run Shopify Sync"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void loadSyncState()}
+                  className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-slate-500 hover:text-white"
+                >
+                  Refresh Sync State
+                </button>
+              </div>
             </div>
-          )}
+
+            <div className="space-y-5">
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
+                <div className="flex items-center gap-3 text-cyan-300">
+                  <Workflow size={18} />
+                  <div className="text-sm font-black uppercase">Recent Runs</div>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {(syncState?.syncRuns.length ?? 0) > 0 ? (
+                    syncState?.syncRuns.slice(0, 5).map((run) => (
+                      <div key={run.id} className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="text-sm font-black uppercase text-white">
+                            {run.clientName ? `${run.clientName} · ` : ""}
+                            {run.platform} · {run.status}
+                          </div>
+                          <div className="text-xs text-slate-400">
+                            {run.finishedAt ?? run.startedAt ?? "No timestamp"}
+                          </div>
+                        </div>
+                        <div className="mt-2 text-sm text-slate-300">
+                          {run.error ?? run.notes[0] ?? "No notes recorded yet."}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/30 p-5 text-sm text-slate-400">
+                      No sync runs recorded yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
+                  <div className="text-sm font-bold uppercase text-slate-400">Latest Media Snapshot</div>
+                  {syncState?.mediaSnapshots[0] ? (
+                    <div className="mt-4 space-y-2 text-sm text-slate-300">
+                      <p><span className="text-slate-500">Client:</span> {syncState.mediaSnapshots[0].clientName}</p>
+                      <p><span className="text-slate-500">Platform:</span> {syncState.mediaSnapshots[0].platform}</p>
+                      <p><span className="text-slate-500">Account:</span> {syncState.mediaSnapshots[0].accountLabel}</p>
+                      <p><span className="text-slate-500">Spend:</span> ${syncState.mediaSnapshots[0].spend.toFixed(0)}</p>
+                      <p><span className="text-slate-500">Revenue:</span> ${syncState.mediaSnapshots[0].purchaseValue.toFixed(0)}</p>
+                    </div>
+                  ) : (
+                    <div className="mt-4 text-sm text-slate-400">No stored Meta snapshot yet.</div>
+                  )}
+                </div>
+
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
+                  <div className="text-sm font-bold uppercase text-slate-400">Latest Business Truth</div>
+                  {syncState?.businessTruthSnapshots[0] ? (
+                    <div className="mt-4 space-y-2 text-sm text-slate-300">
+                      <p><span className="text-slate-500">Client:</span> {syncState.businessTruthSnapshots[0].clientName}</p>
+                      <p><span className="text-slate-500">Source:</span> {syncState.businessTruthSnapshots[0].source}</p>
+                      <p><span className="text-slate-500">Net Sales:</span> ${syncState.businessTruthSnapshots[0].netSales.toFixed(0)}</p>
+                      <p><span className="text-slate-500">Orders:</span> {syncState.businessTruthSnapshots[0].orders}</p>
+                      <p><span className="text-slate-500">AOV:</span> ${syncState.businessTruthSnapshots[0].averageOrderValue.toFixed(0)}</p>
+                    </div>
+                  ) : (
+                    <div className="mt-4 text-sm text-slate-400">No stored storefront truth snapshot yet.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </Section>
 
         <Section
           title="What Comes Next"
-          subtitle="The product becomes truly testable on live accounts once the official connection layer is followed by stored facts and repeatable syncs."
+          subtitle="This gets the product into a real onboarding shape, but a few steps still remain before it is fully finished."
         >
           <div className="grid gap-5 md:grid-cols-3">
             <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
@@ -1063,8 +1221,7 @@ export default function AdminPage() {
                 <div className="text-sm font-black uppercase">Connections</div>
               </div>
               <p className="mt-3 text-sm text-slate-300">
-                Finish official app setup in developer mode, then add the real
-                Vercel environment values for Meta, Shopify, and WordPress.
+                Each client now has a place to live in admin, and Meta can be attached per client instead of per browser session.
               </p>
             </div>
             <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
@@ -1073,8 +1230,7 @@ export default function AdminPage() {
                 <div className="text-sm font-black uppercase">Truth Layer</div>
               </div>
               <p className="mt-3 text-sm text-slate-300">
-                Persist daily platform facts and store facts so MER, tracking
-                mismatch, and scaling decisions are based on real history.
+                Shopify and WordPress still need to become client-scoped next, just like Meta is now.
               </p>
             </div>
             <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
@@ -1083,24 +1239,9 @@ export default function AdminPage() {
                 <div className="text-sm font-black uppercase">Validation</div>
               </div>
               <p className="mt-3 text-sm text-slate-300">
-                Add scheduled syncs, then bring in Google Ads and GA4 once the
-                first Meta-plus-store pairing is behaving correctly.
+                The next serious step is replacing temporary storage with a real database so tokens, sync runs, and client assignments survive reliably.
               </p>
             </div>
-          </div>
-
-          <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/30 p-5">
-            <div className="flex items-center gap-3 text-blue-300">
-              <Workflow size={18} />
-              <div className="text-sm font-black uppercase">Recommended Order</div>
-            </div>
-            <p className="mt-3 text-sm text-slate-300">
-              1. Meta app credentials and test account access. 2. Shopify store
-              credentials and order preview. 3. WordPress or WooCommerce keys and
-              order preview. 4. Persistence tables plus sync runs. 5. Scheduled
-              syncs. 6. Google Ads and GA4. 7. Only then turn on real decision
-              scoring for live clients.
-            </p>
           </div>
         </Section>
       </div>
