@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import MetricHealthCard from "../../components/MetricHealthCard";
 import { evaluateMetric } from "../../lib/healthEngine";
 import { metricDictionary } from "../../lib/metricDictionary";
@@ -25,7 +26,60 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Store,
+  Workflow,
 } from "lucide-react";
+
+type MetaAccountOption = {
+  id: string;
+  name: string;
+  currency?: string;
+  timezone_name?: string;
+};
+
+type MetaStatus = {
+  platform: "meta";
+  configured: boolean;
+  connected: boolean;
+  appMode: string;
+  scopes: string[];
+  callbackUrl: string;
+  missingEnv: string[];
+  usesMockData: boolean;
+  selectedAccountId: string | null;
+  selectedAccount: MetaAccountOption | null;
+  accounts: MetaAccountOption[];
+  connectionError: string | null;
+  syncReady: boolean;
+  recommendedNextStep: string;
+};
+
+type MetaInsightsPreview = {
+  accountId: string;
+  rows: Array<{
+    campaignId: string;
+    campaignName: string;
+    spend: number;
+    impressions: number;
+    clicks: number;
+    ctr: number;
+    cpc: number;
+    cpm: number;
+    frequency: number;
+    reach: number;
+    purchases: number;
+    purchaseValue: number;
+    addToCart: number;
+    checkoutInitiated: number;
+  }>;
+  totals: {
+    spend: number;
+    purchases: number;
+    purchaseValue: number;
+    impressions: number;
+    clicks: number;
+  };
+  note: string;
+};
 
 const merHealth = evaluateMetric("mer", 1.8);
 const metricCards = buildMetricCards([
@@ -80,7 +134,6 @@ const scalingDecision = evaluateScaling({
   checkoutFailure: prioritizedSignals.some((signal) => signal.id === "checkout_failure"),
   trafficQualityIssue: prioritizedSignals.some((signal) => signal.id === "traffic_quality_issue"),
 });
-console.log(merHealth);
 
 const clientSetup = {
   clientName: "Unresolved Crime",
@@ -271,12 +324,379 @@ function AdminCard({
 }
 
 export default function AdminPage() {
+  const [metaStatus, setMetaStatus] = useState<MetaStatus | null>(null);
+  const [metaInsights, setMetaInsights] = useState<MetaInsightsPreview | null>(null);
+  const [isStatusLoading, setIsStatusLoading] = useState(true);
+  const [isInsightsLoading, setIsInsightsLoading] = useState(false);
+  const [accountDraft, setAccountDraft] = useState("");
+  const [metaMessage, setMetaMessage] = useState<string | null>(null);
+
+  async function loadMetaStatus() {
+    setIsStatusLoading(true);
+
+    try {
+      const response = await fetch("/api/integrations/meta/status", {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as MetaStatus;
+      setMetaStatus(payload);
+      setAccountDraft(payload.selectedAccountId ?? payload.accounts[0]?.id ?? "");
+    } catch (error) {
+      setMetaMessage(
+        error instanceof Error ? error.message : "Could not load Meta status."
+      );
+    } finally {
+      setIsStatusLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    void loadMetaStatus();
+  }, []);
+
+  async function handleDisconnectMeta() {
+    setMetaMessage(null);
+
+    const response = await fetch("/api/integrations/meta/status", {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      setMetaMessage("Could not disconnect Meta.");
+      return;
+    }
+
+    setMetaInsights(null);
+    await loadMetaStatus();
+  }
+
+  async function handleAccountSelect() {
+    if (!accountDraft) {
+      setMetaMessage("Choose an ad account first.");
+      return;
+    }
+
+    setMetaMessage(null);
+
+    const response = await fetch("/api/integrations/meta/account", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ accountId: accountDraft }),
+    });
+
+    if (!response.ok) {
+      const payload = (await response.json()) as { error?: string };
+      setMetaMessage(payload.error ?? "Could not save the Meta ad account.");
+      return;
+    }
+
+    await loadMetaStatus();
+  }
+
+  async function handleInsightsPreview() {
+    setMetaMessage(null);
+    setIsInsightsLoading(true);
+
+    try {
+      const response = await fetch("/api/integrations/meta/insights-preview", {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as MetaInsightsPreview & {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Could not load Meta insights preview.");
+      }
+
+      setMetaInsights(payload);
+    } catch (error) {
+      setMetaMessage(
+        error instanceof Error ? error.message : "Could not load Meta preview."
+      );
+    } finally {
+      setIsInsightsLoading(false);
+    }
+  }
+
   return (
     <AppShell>
       <div className="space-y-5">
         <Section
+          title="Official API Onboarding"
+          subtitle="Use the official Meta app flow in developer mode first, then expand to other platforms using the same pattern."
+        >
+          <div className="grid gap-5 xl:grid-cols-[1.25fr,0.75fr]">
+            <div className="rounded-2xl border border-cyan-500/30 bg-cyan-950/20 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold uppercase text-cyan-300">
+                    Meta Marketing API
+                  </div>
+                  <h3 className="mt-2 text-2xl font-black text-white">
+                    {isStatusLoading
+                      ? "Checking connection status"
+                      : metaStatus?.connected
+                      ? "Connected through official app flow"
+                      : metaStatus?.configured
+                      ? "Ready to connect in developer mode"
+                      : "Needs official app configuration"}
+                  </h3>
+                </div>
+                <StatusPill
+                  status={
+                    metaStatus?.connected
+                      ? "Good"
+                      : metaStatus?.configured
+                      ? "Watch"
+                      : "Fix"
+                  }
+                />
+              </div>
+
+              <p className="mt-3 text-sm text-slate-300">
+                This uses Meta&apos;s official app-developer flow: app setup, approved
+                redirect URI, OAuth login, ad-account selection, then a live insights
+                preview before any decision logic is trusted.
+              </p>
+
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                  <div className="text-xs font-black uppercase text-slate-400">
+                    App Mode
+                  </div>
+                  <div className="mt-2 text-lg font-bold text-white">
+                    {metaStatus?.appMode ?? "development"}
+                  </div>
+                  <p className="mt-2 text-xs text-slate-400">
+                    Start in developer mode with test users and test ad accounts, then move
+                    to live mode after review and validation.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
+                  <div className="text-xs font-black uppercase text-slate-400">
+                    Callback URL
+                  </div>
+                  <div className="mt-2 break-all text-sm font-bold text-cyan-300">
+                    {metaStatus?.callbackUrl ?? "/api/integrations/meta/callback"}
+                  </div>
+                  <p className="mt-2 text-xs text-slate-400">
+                    Add this exact URL to your Meta app&apos;s valid OAuth redirect list.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                {(metaStatus?.scopes ?? [
+                  "ads_read",
+                  "ads_management",
+                  "business_management",
+                ]).map((scope) => (
+                  <span
+                    key={scope}
+                    className="rounded-full border border-slate-700 bg-slate-950/70 px-3 py-1 text-xs font-bold text-slate-300"
+                  >
+                    {scope}
+                  </span>
+                ))}
+              </div>
+
+              {metaStatus?.missingEnv?.length ? (
+                <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-950/20 p-4">
+                  <div className="text-sm font-bold uppercase text-red-300">
+                    Missing Environment Values
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {metaStatus.missingEnv.map((item) => (
+                      <span
+                        key={item}
+                        className="rounded-full bg-red-950/70 px-3 py-1 text-xs font-bold text-red-200"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {metaStatus?.connectionError ? (
+                <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-950/20 p-4 text-sm text-amber-200">
+                  {metaStatus.connectionError}
+                </div>
+              ) : null}
+
+              {metaMessage ? (
+                <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-950/20 p-4 text-sm text-amber-200">
+                  {metaMessage}
+                </div>
+              ) : null}
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                <a
+                  href="/api/integrations/meta/connect"
+                  className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-500"
+                >
+                  Connect Meta App
+                </a>
+                <button
+                  type="button"
+                  onClick={() => void loadMetaStatus()}
+                  className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-slate-500 hover:text-white"
+                >
+                  Refresh Status
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDisconnectMeta()}
+                  className="rounded-xl border border-red-500/40 px-4 py-3 text-sm font-bold text-red-200 transition hover:border-red-400 hover:text-white"
+                >
+                  Disconnect
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
+              <div className="text-sm font-bold uppercase text-slate-400">
+                Recommended Sequence
+              </div>
+              <div className="mt-4 space-y-4 text-sm text-slate-300">
+                <div>
+                  <div className="font-bold text-white">1. Meta App Setup</div>
+                  <div className="mt-1">Create the app, set the redirect URI, and keep it in developer mode first.</div>
+                </div>
+                <div>
+                  <div className="font-bold text-white">2. Real Account Test</div>
+                  <div className="mt-1">Connect a real user with access to the test ad account and preview insights before syncing wider data.</div>
+                </div>
+                <div>
+                  <div className="font-bold text-white">3. Store Truth Pairing</div>
+                  <div className="mt-1">Only trust scale recommendations after Meta numbers are compared against the website or store source.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-5 xl:grid-cols-[0.85fr,1.15fr]">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl bg-emerald-600/20 p-2 text-emerald-300">
+                  <Workflow size={20} />
+                </div>
+                <h4 className="text-lg font-black text-white">Meta Test Account Selection</h4>
+              </div>
+
+              <p className="mt-3 text-sm text-slate-400">
+                In developer mode, Meta only allows app admins, developers, testers, and
+                assets they can access. Pick the exact ad account you want this dashboard to test.
+              </p>
+
+              <select
+                value={accountDraft}
+                onChange={(event) => setAccountDraft(event.target.value)}
+                className="mt-4 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
+              >
+                <option value="">Select a Meta ad account</option>
+                {(metaStatus?.accounts ?? []).map((account) => (
+                  <option key={account.id} value={account.id}>
+                    {account.name} ({account.id})
+                  </option>
+                ))}
+              </select>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => void handleAccountSelect()}
+                  className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-500"
+                >
+                  Use This Account
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleInsightsPreview()}
+                  className="rounded-xl border border-cyan-500/40 px-4 py-3 text-sm font-bold text-cyan-200 transition hover:border-cyan-400 hover:text-white"
+                >
+                  {isInsightsLoading ? "Loading Preview" : "Load Insights Preview"}
+                </button>
+              </div>
+
+              <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                <div className="text-xs font-black uppercase text-slate-400">
+                  Next Step
+                </div>
+                <div className="mt-2 text-sm text-slate-200">
+                  {metaStatus?.recommendedNextStep ??
+                    "Configure the Meta app env values, then connect through the official flow."}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold uppercase text-slate-400">
+                    Live Meta Preview
+                  </div>
+                  <h4 className="mt-2 text-lg font-black text-white">
+                    Campaign-level insights for the last 7 days
+                  </h4>
+                </div>
+                <StatusPill
+                  status={metaInsights?.rows?.length ? "Good" : metaStatus?.syncReady ? "Watch" : "Fix"}
+                />
+              </div>
+
+              {metaInsights ? (
+                <>
+                  <div className="mt-4 grid gap-4 md:grid-cols-4">
+                    <MiniMetric label="Spend" value={`$${metaInsights.totals.spend.toFixed(0)}`} tone="warn" />
+                    <MiniMetric label="Purchases" value={`${metaInsights.totals.purchases}`} tone="good" />
+                    <MiniMetric label="Purchase Value" value={`$${metaInsights.totals.purchaseValue.toFixed(0)}`} tone="good" />
+                    <MiniMetric label="Clicks" value={`${metaInsights.totals.clicks}`} tone="default" />
+                  </div>
+
+                  <p className="mt-4 text-sm text-slate-400">{metaInsights.note}</p>
+
+                  <div className="mt-4 overflow-x-auto">
+                    <table className="w-full min-w-[760px] text-left text-sm">
+                      <thead className="text-xs uppercase text-slate-400">
+                        <tr>
+                          <th className="pb-3">Campaign</th>
+                          <th>Spend</th>
+                          <th>CTR</th>
+                          <th>Frequency</th>
+                          <th>Purchases</th>
+                          <th>Purchase Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {metaInsights.rows.slice(0, 8).map((row) => (
+                          <tr key={row.campaignId} className="border-t border-slate-800">
+                            <td className="py-4 font-semibold text-white">{row.campaignName}</td>
+                            <td className="text-slate-300">${row.spend.toFixed(0)}</td>
+                            <td className="text-slate-300">{row.ctr.toFixed(2)}%</td>
+                            <td className="text-slate-300">{row.frequency.toFixed(2)}</td>
+                            <td className="text-slate-300">{row.purchases}</td>
+                            <td className="text-slate-300">${row.purchaseValue.toFixed(0)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              ) : (
+                <div className="mt-4 rounded-2xl border border-dashed border-slate-700 bg-slate-950/30 p-5 text-sm text-slate-400">
+                  No live Meta preview loaded yet. Connect the app, choose an account, then pull a preview before wiring this into the dashboard metrics.
+                </div>
+              )}
+            </div>
+          </div>
+        </Section>
+        <Section
   title="Admin Panel Foundation"
-  subtitle="This is where the dashboard will eventually be configured. For now it is a visual setup layer with mock mappings."
+  subtitle="This is where the dashboard will eventually be configured. It now includes the first official Meta onboarding scaffold alongside the mock mapping layer."
 >
   <div className="mb-6 rounded-2xl border border-blue-500/30 bg-blue-950/30 p-5">
     <div className="text-sm font-bold uppercase text-blue-300">
