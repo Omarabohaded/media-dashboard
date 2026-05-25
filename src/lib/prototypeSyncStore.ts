@@ -69,7 +69,11 @@ export async function upsertConnectionRecord(
 ) {
   return updateSyncStateStore((state) => {
     const connections = state.connections.filter(
-      (item) => item.platform !== connection.platform
+      (item) =>
+        !(
+          item.platform === connection.platform &&
+          item.clientId === connection.clientId
+        )
     );
 
     connections.unshift(connection);
