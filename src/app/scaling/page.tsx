@@ -6,19 +6,29 @@ import { evaluateScaling } from "@/lib/scalingEngine";
 
 export default function ScalingPage() {
   const scalingDecision = evaluateScaling({
-  merStatus: "danger",
+  merStatus: "warning",
   merTrend: "declining",
   hasCreativeFatigue: true,
   revenueGrowth: 10,
   spendGrowth: 25,
   priorityScore: 69,
+  trackingMismatch: true,
+  checkoutFailure: true,
+  businessTruthFailure: true,
+  trafficQualityIssue: true,
 });
   return (
     <AppShell>
       <div className="space-y-5">
         <Section title="Scaling Engine" subtitle="Can we increase spend safely? This is the main page for performance marketers/scalers.">
           <div className="space-y-4">
-            <div className="rounded-2xl border border-cyan-500 bg-cyan-950/20 p-5">
+            <div className={`rounded-2xl border p-5 ${
+              scalingDecision.status === "danger"
+                ? "border-red-500 bg-red-950/20"
+                : scalingDecision.status === "cautious"
+                ? "border-yellow-500 bg-yellow-950/20"
+                : "border-cyan-500 bg-cyan-950/20"
+            }`}>
   <div className="flex items-center justify-between">
     <div>
       <div className="text-sm text-slate-400">
@@ -44,6 +54,17 @@ export default function ScalingPage() {
       </div>
     </div>
   </div>
+
+  {scalingDecision.recommendedScalePercent === 0 ? (
+    <div className="mt-5 rounded-2xl border border-red-500/30 bg-slate-950/60 p-4">
+      <div className="text-xs uppercase text-red-300">
+        Scaling Blocked
+      </div>
+      <div className="mt-2 text-sm text-slate-300">
+        The current decision layer is intentionally blocking budget increases because business-truth, tracking, or checkout issues are active.
+      </div>
+    </div>
+  ) : null}
 
   <div className="mt-5 grid gap-4 md:grid-cols-3">
     <MiniMetric
