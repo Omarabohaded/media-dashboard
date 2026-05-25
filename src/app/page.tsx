@@ -51,6 +51,12 @@ import {
   TrendingUp,
   Zap,
 } from "lucide-react";
+import { generateActions } from "@/lib/actionEngine";
+import { detectRootCauses } from "@/lib/crossMetricEngine";
+import { buildDecisionFeed } from "@/lib/decisionEngine";
+import { prioritizeSignals } from "@/lib/priorityEngine";
+import { evaluateRelationships } from "@/lib/relationshipEngine";
+import { evaluateScaling } from "@/lib/scalingEngine";
 
 type Platform = "All" | "Meta" | "Google" | "TikTok" | "Snap";
 type DateRange = "Today" | "Yesterday" | "Last 7 Days" | "Last 30 Days" | "MTD" | "QTD" | "Last 90 Days" | "Custom";
@@ -454,16 +460,6 @@ export default function Dashboard() {
   const checkoutRate = storeTruth.checkoutStarted / storeTruth.addToCart;
   const prevCheckoutRate = storeTruth.prevCheckoutStarted / storeTruth.prevAddToCart;
 
-  const commandPriority = mer < prevMer && storeSales > prevStoreSales
-    ? "Store sales are up, but MER dropped. Check Google and TikTok before scaling further."
-    : mer >= prevMer && platformRows.find((row) => row.platform === "Meta")!.scaleSignal === "Scale"
-      ? "Account is healthy. Meta is the safest scaling opportunity right now."
-      : "Creative fatigue is the main risk today. Refresh winning angles before increasing spend.";
-
-  const commandAction = mer < prevMer
-    ? "Hold overall scale, audit Google CPA and TikTok creative efficiency, then shift budget toward Meta winners."
-    : "Increase Meta prospecting spend by 12–15%, keep Snap stable, and monitor MER hourly.";
-
   const bottleneck = atcRate < prevAtcRate
     ? { area: "Funnel / Offer", reason: "Add to Cart rate declined while sessions stayed healthy.", action: "Check product page, offer clarity, pricing, and traffic quality." }
     : platformRows.some((row) => row.frequency > 6 && row.ctr < row.benchmarkCtr)
@@ -472,6 +468,67 @@ export default function Dashboard() {
 
   const scaleCandidates = filteredPlatforms.filter((row) => row.scaleSignal === "Scale");
   const riskChannels = filteredPlatforms.filter((row) => row.scaleSignal === "Fix" || row.mer < row.benchmarkMer);
+  const averageCtr = filteredPlatforms.reduce((sum, row) => sum + row.ctr, 0) / filteredPlatforms.length;
+  const averageCpc = filteredPlatforms.reduce((sum, row) => sum + row.cpc, 0) / filteredPlatforms.length;
+  const averageFrequency = filteredPlatforms.reduce((sum, row) => sum + row.frequency, 0) / filteredPlatforms.length;
+  const averageRoas = filteredPlatforms.reduce((sum, row) => sum + row.roas, 0) / filteredPlatforms.length;
+  const averageBounceRate = 62;
+  const averageSessionDuration = 42;
+  const backendConversions = orders;
+  const platformConversions = Math.round(orders * 1.14);
+  const trackingMismatch = Math.abs(platformConversions - backendConversions) > backendConversions * 0.1;
+  const checkoutFailure = checkoutRate < 0.55;
+  const relationshipSignals = prioritizeSignals(
+    evaluateRelationships({
+      mer,
+      ctr: averageCtr,
+      cvr: purchaseCvr * 100,
+      roas: averageRoas,
+      ncac: cpa,
+      frequency: averageFrequency,
+      spendGrowth: pct(totalSpend, prevSpend),
+      revenueGrowth: pct(storeSales, prevStoreSales),
+      bounceRate: averageBounceRate,
+      sessionDuration: averageSessionDuration,
+      checkoutCompletionRate: checkoutRate * 100,
+      backendConversions,
+      platformConversions,
+      trackingMismatch,
+      checkoutFailure,
+      merBelowThreshold: mer < 3,
+    })
+  );
+  const decisionFeed = buildDecisionFeed(relationshipSignals);
+  const scalingDecision = evaluateScaling({
+    merStatus: mer >= prevMer ? "healthy" : mer >= prevMer * 0.92 ? "warning" : "danger",
+    merTrend: mer >= prevMer ? "stable" : "declining",
+    hasCreativeFatigue: averageFrequency > 2.5 && averageCtr < 2,
+    revenueGrowth: pct(storeSales, prevStoreSales),
+    spendGrowth: pct(totalSpend, prevSpend),
+    priorityScore: relationshipSignals[0]?.score ?? 0,
+    trackingMismatch,
+    businessTruthFailure: relationshipSignals.some((signal) => signal.id === "sales_up_mer_down"),
+    checkoutFailure,
+    trafficQualityIssue: relationshipSignals.some((signal) => signal.id === "traffic_quality_issue"),
+  });
+  const homepageActions = generateActions(relationshipSignals);
+  const riskActions = homepageActions.filter((action) => action.lane === "risk");
+  const opportunityActions = homepageActions.filter((action) => action.lane === "opportunity");
+  const rootCauses = detectRootCauses({
+    ctr: averageCtr,
+    frequency: averageFrequency,
+    mer,
+    cpc: averageCpc,
+    cvr: purchaseCvr * 100,
+    bounceRate: averageBounceRate,
+    sessionDuration: averageSessionDuration,
+    checkoutRate: checkoutRate * 100,
+    purchaseCvr: purchaseCvr * 100,
+    revenueGrowth: pct(storeSales, prevStoreSales),
+    spendGrowth: pct(totalSpend, prevSpend),
+    backendConversions,
+    platformConversions,
+  });
 
   return (
     <main className="min-h-screen bg-[#06111f] text-white">
@@ -485,22 +542,27 @@ export default function Dashboard() {
                 <div className="rounded-2xl bg-blue-600 p-3"><Sparkles size={24} /></div>
                 <div>
                   <p className="text-sm font-black uppercase text-blue-300">Operator Summary</p>
-                  <h3 className="text-3xl font-black">{commandPriority}</h3>
+                  <h3 className="text-3xl font-black">{decisionFeed.headline}</h3>
                 </div>
               </div>
-              <p className="max-w-4xl text-lg leading-8 text-slate-300">{commandAction}</p>
+              <p className="max-w-4xl text-lg leading-8 text-slate-300">{decisionFeed.summary}</p>
               <div className="mt-6 grid gap-4 md:grid-cols-3">
-                <MiniMetric label="Scale Status" value={scaleCandidates.length ? "Scale Carefully" : "Hold"} hint={scaleCandidates.length ? `${scaleCandidates.map((row) => row.platform).join(", ")} ready` : "No safe scale source"} tone={scaleCandidates.length ? "good" : "warn"} />
+                <MiniMetric label="Scale Status" value={scalingDecision.status.toUpperCase()} hint={scalingDecision.recommendation} tone={scalingDecision.status === "safe" ? "good" : scalingDecision.status === "cautious" ? "warn" : "bad"} />
                 <MiniMetric label="Risk Area" value={riskChannels.length ? riskChannels.map((row) => row.platform).join(" + ") : "Low"} hint="Based on MER/CPA benchmark" tone={riskChannels.length ? "warn" : "good"} />
-                <MiniMetric label="Bottleneck" value={bottleneck.area} hint={bottleneck.reason} tone="warn" />
+                <MiniMetric label="Bottleneck" value={relationshipSignals[0]?.title ?? bottleneck.area} hint={relationshipSignals[0]?.recommendation ?? bottleneck.reason} tone="warn" />
               </div>
             </div>
             <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
               <p className="text-sm font-black uppercase text-slate-400">Today’s Priority Order</p>
               <div className="mt-5 space-y-4">
-                <Signal type="risk" title="1. Protect MER" body="Sales are higher, but efficiency must be protected before increasing total spend." action="Audit weak channels first" />
-                <Signal type="scale" title="2. Scale Meta Winners" body="Meta shows the strongest combination of MER, CPA, and CTR versus benchmark." action="Increase 12–15% gradually" />
-                <Signal type="info" title="3. Watch Creative Fatigue" body="Retargeting frequency is high. Scale can fail if creative refresh is delayed." action="Prepare new hooks" />
+                {riskActions.slice(0, 2).map((action, index) => (
+                  <Signal key={action.id} type="risk" title={`${index + 1}. ${action.title}`} body={action.reason} action={action.recommendation} />
+                ))}
+                {opportunityActions[0] ? (
+                  <Signal type="scale" title={`${Math.min(riskActions.length, 2) + 1}. ${opportunityActions[0].title}`} body={opportunityActions[0].reason} action={opportunityActions[0].recommendation} />
+                ) : (
+                  <Signal type="info" title="Scaling held back" body="Opportunity signals stay suppressed while higher-priority business risks are active." action="Resolve the risk lane first" />
+                )}
               </div>
             </div>
           </section>
@@ -519,6 +581,26 @@ export default function Dashboard() {
           <div className="grid gap-5 2xl:grid-cols-3">
             <Section id="scaling" title="Growth / Scaling Engine" subtitle="Can we increase spend safely?" icon={Rocket}>
               <div className="space-y-4">
+                <div className={`rounded-2xl border p-5 ${
+                  scalingDecision.status === "danger"
+                    ? "border-red-500 bg-red-950/20"
+                    : scalingDecision.status === "cautious"
+                    ? "border-yellow-500 bg-yellow-950/20"
+                    : "border-emerald-500 bg-emerald-950/20"
+                }`}>
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div>
+                      <div className="text-sm uppercase text-slate-400">Account Decision</div>
+                      <div className="mt-2 text-3xl font-black text-white">{scalingDecision.status.toUpperCase()}</div>
+                      <div className="mt-2 text-sm text-slate-300">{scalingDecision.summary}</div>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <MiniMetric label="Confidence" value={`${scalingDecision.confidence}%`} tone={scalingDecision.status === "safe" ? "good" : scalingDecision.status === "cautious" ? "warn" : "bad"} />
+                      <MiniMetric label="Risk Level" value={scalingDecision.riskLevel} tone={scalingDecision.status === "danger" ? "bad" : "warn"} />
+                      <MiniMetric label="Recommended Scale" value={`${scalingDecision.recommendedScalePercent}%`} tone={scalingDecision.recommendedScalePercent > 0 ? "good" : "bad"} />
+                    </div>
+                  </div>
+                </div>
                 {filteredPlatforms.map((row) => (
                   <div key={row.platform} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -538,10 +620,14 @@ export default function Dashboard() {
 
             <Section id="action" title="What Needs Action?" subtitle="Diagnosis before decisions" icon={AlertTriangle}>
               <div className="space-y-4">
-                <Signal type="risk" title="MER pressure detected" body={`MER changed ${signed(pct(mer, prevMer))}. Sales are up ${signed(pct(storeSales, prevStoreSales))}, but spend rose ${signed(pct(totalSpend, prevSpend))}.`} action="Do not scale all channels equally" />
-                <Signal type="risk" title={bottleneck.area} body={bottleneck.reason} action={bottleneck.action} />
-                <Signal type="scale" title="Best scaling path" body="Meta prospecting has the strongest scale signal and beats account benchmarks." action="Scale in small increments, then re-check MER" />
-                <Signal type="info" title="Reporting note" body="Weekly/monthly reporting should summarize the same signals, but daily decisions remain priority." action="Keep reporting lower in the page" />
+                {riskActions.slice(0, 3).map((action) => (
+                  <Signal key={action.id} type="risk" title={action.title} body={action.reason} action={action.recommendation} />
+                ))}
+                {opportunityActions[0] ? (
+                  <Signal type="scale" title={opportunityActions[0].title} body={opportunityActions[0].reason} action={opportunityActions[0].recommendation} />
+                ) : (
+                  <Signal type="info" title="No active scaling promotion" body="Opportunities are intentionally capped while business risks are still unresolved." action="Clear blockers before expanding budgets" />
+                )}
               </div>
             </Section>
 
@@ -588,6 +674,17 @@ export default function Dashboard() {
                 <MiniMetric label="ATC Rate" value={`${num(atcRate * 100, 2)}%`} hint={`Prev ${num(prevAtcRate * 100, 2)}%`} tone={atcRate >= prevAtcRate ? "good" : "warn"} />
                 <MiniMetric label="Checkout Rate" value={`${num(checkoutRate * 100, 2)}%`} hint={`Prev ${num(prevCheckoutRate * 100, 2)}%`} tone={checkoutRate >= prevCheckoutRate ? "good" : "warn"} />
               </div>
+              <div className="mt-5 space-y-3">
+                {rootCauses.slice(0, 2).map((cause) => (
+                  <div key={cause.id} className="rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-bold text-white">{cause.title}</div>
+                      <StatusPill status={cause.severity === "danger" ? "Fix" : cause.severity === "warning" ? "Watch" : "Stable"} />
+                    </div>
+                    <div className="mt-2 text-sm text-slate-300">{cause.diagnosis}</div>
+                  </div>
+                ))}
+              </div>
             </Section>
 
             <Section title="Executive Trend" subtitle="Store sales, spend, and MER" icon={BarChart3}>
@@ -612,7 +709,7 @@ export default function Dashboard() {
                 <div className="h-[190px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={creativeDiagnostics} dataKey="value" innerRadius={55} outerRadius={85}>{creativeDiagnostics.map((entry) => <Cell key={entry.label} fill={entry.color} />)}</Pie><Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 12 }} /></PieChart></ResponsiveContainer></div>
                 <div className="space-y-3">{creativeDiagnostics.map((item) => <p key={item.label}><span style={{ color: item.color }}>●</span> {item.label}: <b>{item.value}</b></p>)}</div>
               </div>
-              <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4"><MiniMetric label="Fatigue Risk" value="Medium" tone="warn" /><MiniMetric label="Avg CTR" value="1.42%" tone="warn" /><MiniMetric label="Creative CPA" value="$39" tone="warn" /><MiniMetric label="Next Action" value="Refresh" tone="bad" /></div>
+              <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4"><MiniMetric label="Fatigue Risk" value={averageFrequency > 2.5 && averageCtr < 2 ? "High" : "Medium"} tone={averageFrequency > 2.5 && averageCtr < 2 ? "bad" : "warn"} /><MiniMetric label="Avg CTR" value={`${num(averageCtr, 2)}%`} tone={averageCtr >= 2 ? "good" : "warn"} /><MiniMetric label="Creative CPA" value={money(cpa)} tone={cpa <= 40 ? "good" : "warn"} /><MiniMetric label="Next Action" value={rootCauses.find((cause) => cause.id === "creative_fatigue") ? "Refresh" : "Monitor"} tone={rootCauses.find((cause) => cause.id === "creative_fatigue") ? "bad" : "warn"} /></div>
             </Section>
 
             <Section id="campaigns" title="Campaign Action Table" subtitle="What should be scaled, held, or fixed?" icon={Megaphone}>
@@ -626,8 +723,8 @@ export default function Dashboard() {
 
             <Section id="benchmarks" title="Benchmark Engine" subtitle="Account-specific health classification" icon={Gauge}>
               <div className="grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl bg-slate-950/50 p-5 text-center"><div className="mx-auto flex h-32 w-32 items-center justify-center rounded-full border-[14px] border-emerald-500/60"><div><p className="text-4xl font-black">82</p><p className="text-sm text-emerald-300">Healthy</p></div></div><p className="mt-4 text-slate-400">Scale score based on MER, CPA, CVR, and channel variance.</p></div>
-                <div className="space-y-3"><MiniMetric label="MER vs Baseline" value="Strong" tone="good" /><MiniMetric label="CPA Stability" value="Watch" tone="warn" /><MiniMetric label="Creative Fatigue" value="Medium" tone="warn" /><MiniMetric label="Tracking Confidence" value="Good" tone="good" /></div>
+                <div className="rounded-2xl bg-slate-950/50 p-5 text-center"><div className={`mx-auto flex h-32 w-32 items-center justify-center rounded-full border-[14px] ${scalingDecision.status === "safe" ? "border-emerald-500/60" : scalingDecision.status === "cautious" ? "border-amber-500/60" : "border-red-500/60"}`}><div><p className="text-4xl font-black">{relationshipSignals[0]?.score ?? 0}</p><p className={`text-sm ${scalingDecision.status === "safe" ? "text-emerald-300" : scalingDecision.status === "cautious" ? "text-amber-300" : "text-red-300"}`}>{scalingDecision.status === "safe" ? "Healthy" : scalingDecision.status === "cautious" ? "Watch" : "Blocked"}</p></div></div><p className="mt-4 text-slate-400">Decision score based on Lamba priority weighting and override rules.</p></div>
+                <div className="space-y-3"><MiniMetric label="MER vs Baseline" value={mer >= prevMer ? "Strong" : "Weak"} tone={mer >= prevMer ? "good" : "warn"} /><MiniMetric label="CPA Stability" value={cpa <= prevCpa ? "Stable" : "Watch"} tone={cpa <= prevCpa ? "good" : "warn"} /><MiniMetric label="Creative Fatigue" value={rootCauses.find((cause) => cause.id === "creative_fatigue") ? "High" : "Medium"} tone={rootCauses.find((cause) => cause.id === "creative_fatigue") ? "bad" : "warn"} /><MiniMetric label="Tracking Confidence" value={trackingMismatch ? "Low" : "Good"} tone={trackingMismatch ? "bad" : "good"} /></div>
               </div>
             </Section>
           </div>
