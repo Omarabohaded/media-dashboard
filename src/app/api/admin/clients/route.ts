@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   createClient,
+  deleteClient,
+  getClientStoreMeta,
   getClientById,
   listClients,
 } from "@/lib/clientStore";
@@ -20,14 +22,16 @@ const allowedPlatforms = new Set<WebsitePlatform>([
 
 export async function GET(request: NextRequest) {
   const requestedClientId = request.nextUrl.searchParams.get("clientId");
-  const [clients, activeClient] = await Promise.all([
+  const [clients, activeClient, storage] = await Promise.all([
     listClients(),
     getClientById(requestedClientId),
+    Promise.resolve(getClientStoreMeta()),
   ]);
 
   return NextResponse.json({
     clients,
     activeClientId: activeClient.id,
+    storage,
   });
 }
 
@@ -69,4 +73,38 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ client }, { status: 201 });
+}
+
+export async function DELETE(request: NextRequest) {
+  const clientId =
+    request.nextUrl.searchParams.get("clientId") ||
+    ((await request.json().catch(() => ({}))) as { clientId?: string }).clientId ||
+    "";
+
+  if (!clientId.trim()) {
+    return NextResponse.json(
+      { error: "Client ID is required." },
+      { status: 400 }
+    );
+  }
+
+  try {
+    await deleteClient(clientId.trim());
+    const clients = await listClients();
+
+    return NextResponse.json({
+      ok: true,
+      deletedClientId: clientId.trim(),
+      clients,
+      activeClientId: clients[0]?.id ?? "",
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Could not delete the client.",
+      },
+      { status: 400 }
+    );
+  }
 }
