@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { META_ACCOUNT_COOKIE, META_TOKEN_COOKIE } from "@/lib/integrations/meta";
 import { SHOPIFY_TOKEN_COOKIE } from "@/lib/integrations/shopify";
-import { runMetaSync, runShopifySync } from "@/lib/syncEngine";
+import { runMetaSync, runShopifySync, runWordPressSync } from "@/lib/syncEngine";
 
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
-    platform?: "meta" | "shopify";
+    platform?: "meta" | "shopify" | "wordpress";
   };
 
   if (body.platform === "meta") {
@@ -29,8 +29,16 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  if (body.platform === "wordpress") {
+    const run = await runWordPressSync();
+
+    return NextResponse.json(run, {
+      status: run.status === "succeeded" ? 200 : 400,
+    });
+  }
+
   return NextResponse.json(
-    { error: "Platform must be meta or shopify." },
+    { error: "Platform must be meta, shopify, or wordpress." },
     { status: 400 }
   );
 }
