@@ -1,6 +1,3 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { tmpdir } from "node:os";
 import {
   BusinessTruthSnapshot,
   IntegrationConnectionRecord,
@@ -8,14 +5,21 @@ import {
   SyncRunRecord,
   SyncStateStore,
 } from "./syncContracts";
+import {
+  getRuntimeStorageMeta,
+  readRuntimeJsonStore,
+  writeRuntimeJsonStore,
+} from "./runtimeStorage";
 
-const STORE_DIR = path.join(tmpdir(), "media-dashboard");
-const STORE_FILE = path.join(STORE_DIR, "sync-state.json");
+const SYNC_STORE_KEY = "media-dashboard:sync-state";
+const SYNC_STORE_FILE = "sync-state.json";
 
 function defaultState(): SyncStateStore {
+  const storageMeta = getRuntimeStorageMeta(SYNC_STORE_FILE);
+
   return {
     version: 1,
-    storageMode: "ephemeral_tmp",
+    storageMode: storageMeta.storageMode,
     updatedAt: null,
     connections: [],
     syncRuns: [],
@@ -24,34 +28,21 @@ function defaultState(): SyncStateStore {
   };
 }
 
-async function ensureStoreDir() {
-  await mkdir(STORE_DIR, { recursive: true });
-}
-
 export async function readSyncStateStore(): Promise<SyncStateStore> {
-  try {
-    const raw = await readFile(STORE_FILE, "utf-8");
-    const parsed = JSON.parse(raw) as SyncStateStore;
+  const parsed = await readRuntimeJsonStore<SyncStateStore>(
+    SYNC_STORE_KEY,
+    SYNC_STORE_FILE,
+    defaultState()
+  );
 
-    return {
-      ...defaultState(),
-      ...parsed,
-    };
-  } catch {
-    return defaultState();
-  }
-}
-
-async function writeSyncStateStore(state: SyncStateStore) {
-  await ensureStoreDir();
-  await writeFile(STORE_FILE, JSON.stringify(state, null, 2), "utf-8");
+  return {
+    ...defaultState(),
+    ...parsed,
+  };
 }
 
 export async function getSyncStorageMeta() {
-  return {
-    filePath: STORE_FILE,
-    storageMode: "ephemeral_tmp" as const,
-  };
+  return getRuntimeStorageMeta(SYNC_STORE_FILE);
 }
 
 export async function updateSyncStateStore(
@@ -60,7 +51,8 @@ export async function updateSyncStateStore(
   const current = await readSyncStateStore();
   const next = updater(current);
   next.updatedAt = new Date().toISOString();
-  await writeSyncStateStore(next);
+  next.storageMode = getRuntimeStorageMeta(SYNC_STORE_FILE).storageMode;
+  await writeRuntimeJsonStore(SYNC_STORE_KEY, SYNC_STORE_FILE, next);
   return next;
 }
 
