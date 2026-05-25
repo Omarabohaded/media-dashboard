@@ -8,6 +8,8 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -17,22 +19,30 @@ import {
 } from "recharts";
 import {
   AlertTriangle,
+  ArrowDownRight,
+  BookOpen,
+  ArrowUpRight,
   BarChart3,
   Bell,
-  BookOpen,
   Calendar,
   CheckCircle2,
   ChevronDown,
+  CircleDollarSign,
   Database,
   DollarSign,
+  Eye,
   Filter,
+  Flame,
   Gauge,
   Globe2,
   Home,
+  Lightbulb,
   Megaphone,
   MousePointer2,
   RefreshCw,
+  Rocket,
   Settings,
+  ShieldCheck,
   ShoppingBag,
   ShoppingCart,
   Sparkles,
@@ -43,24 +53,30 @@ import {
 } from "lucide-react";
 
 type Platform = "All" | "Meta" | "Google" | "TikTok" | "Snap";
-type DateRange = "Today" | "Yesterday" | "Last 7 Days" | "Last 30 Days" | "MTD" | "QTD" | "Last 90 Days";
+type DateRange = "Today" | "Yesterday" | "Last 7 Days" | "Last 30 Days" | "MTD" | "QTD" | "Last 90 Days" | "Custom";
 
 type PlatformRow = {
   platform: Exclude<Platform, "All">;
   spend: number;
   prevSpend: number;
+  storeSales: number;
+  prevStoreSales: number;
   attributedRevenue: number;
-  prevAttributedRevenue: number;
   impressions: number;
+  reach: number;
   clicks: number;
   ctr: number;
   cpc: number;
   cpm: number;
+  frequency: number;
   cpa: number;
   roas: number;
-  benchmarkRoas: number;
+  mer: number;
+  benchmarkMer: number;
   benchmarkCpa: number;
   benchmarkCtr: number;
+  recommendation: string;
+  scaleSignal: "Scale" | "Hold" | "Reduce" | "Fix";
 };
 
 type CampaignRow = {
@@ -68,36 +84,124 @@ type CampaignRow = {
   campaign: string;
   type: "Prospecting" | "Retargeting" | "Brand" | "Creative Test";
   spend: number;
-  revenue: number;
+  storeSales: number;
   orders: number;
   ctr: number;
   cpa: number;
   mer: number;
   frequency: number;
   status: "Scale" | "Stable" | "Watch" | "Fix";
-  prevTrend: "up" | "down" | "flat";
+  nextAction: string;
 };
 
 const client = "Unresolved Crime";
-
-const ranges: DateRange[] = ["Today", "Yesterday", "Last 7 Days", "Last 30 Days", "MTD", "QTD", "Last 90 Days"];
+const ranges: DateRange[] = ["Today", "Yesterday", "Last 7 Days", "Last 30 Days", "MTD", "QTD", "Last 90 Days", "Custom"];
 const platforms: Platform[] = ["All", "Meta", "Google", "TikTok", "Snap"];
 
 const platformRows: PlatformRow[] = [
-  { platform: "Meta", spend: 45620, prevSpend: 42960, attributedRevenue: 156532, prevAttributedRevenue: 142170, impressions: 3240000, clicks: 71240, ctr: 2.2, cpc: 0.64, cpm: 14.08, cpa: 36.31, roas: 3.43, benchmarkRoas: 3.1, benchmarkCpa: 40, benchmarkCtr: 1.8 },
-  { platform: "Google", spend: 28430, prevSpend: 32480, attributedRevenue: 78996, prevAttributedRevenue: 86200, impressions: 920000, clicks: 42180, ctr: 4.59, cpc: 0.67, cpm: 30.9, cpa: 41.92, roas: 2.78, benchmarkRoas: 2.75, benchmarkCpa: 38, benchmarkCtr: 5.2 },
-  { platform: "TikTok", spend: 18770, prevSpend: 16210, attributedRevenue: 61430, prevAttributedRevenue: 50100, impressions: 2110000, clicks: 36520, ctr: 1.73, cpc: 0.51, cpm: 8.9, cpa: 52.11, roas: 3.27, benchmarkRoas: 2.4, benchmarkCpa: 42, benchmarkCtr: 1.6 },
-  { platform: "Snap", spend: 9610, prevSpend: 9960, attributedRevenue: 23256, prevAttributedRevenue: 24100, impressions: 1180000, clicks: 15430, ctr: 1.31, cpc: 0.62, cpm: 8.14, cpa: 33.21, roas: 2.42, benchmarkRoas: 2.1, benchmarkCpa: 36, benchmarkCtr: 1.2 },
+  {
+    platform: "Meta",
+    spend: 45620,
+    prevSpend: 42960,
+    storeSales: 166400,
+    prevStoreSales: 141800,
+    attributedRevenue: 156532,
+    impressions: 3240000,
+    reach: 1180000,
+    clicks: 71240,
+    ctr: 2.2,
+    cpc: 0.64,
+    cpm: 14.08,
+    frequency: 2.74,
+    cpa: 34.4,
+    roas: 3.43,
+    mer: 3.65,
+    benchmarkMer: 3.25,
+    benchmarkCpa: 40,
+    benchmarkCtr: 1.8,
+    recommendation: "Scale winning prospecting campaigns by 12–15% while watching MER.",
+    scaleSignal: "Scale",
+  },
+  {
+    platform: "Google",
+    spend: 28430,
+    prevSpend: 32480,
+    storeSales: 72600,
+    prevStoreSales: 86600,
+    attributedRevenue: 78996,
+    impressions: 920000,
+    reach: 0,
+    clicks: 42180,
+    ctr: 4.59,
+    cpc: 0.67,
+    cpm: 30.9,
+    frequency: 0,
+    cpa: 44.9,
+    roas: 2.78,
+    mer: 2.55,
+    benchmarkMer: 3.0,
+    benchmarkCpa: 38,
+    benchmarkCtr: 5.2,
+    recommendation: "Audit Search terms, brand overlap, and weak campaigns before scaling.",
+    scaleSignal: "Fix",
+  },
+  {
+    platform: "TikTok",
+    spend: 18770,
+    prevSpend: 16210,
+    storeSales: 59300,
+    prevStoreSales: 51900,
+    attributedRevenue: 61430,
+    impressions: 2110000,
+    reach: 980000,
+    clicks: 36520,
+    ctr: 1.73,
+    cpc: 0.51,
+    cpm: 8.9,
+    frequency: 2.15,
+    cpa: 52.11,
+    roas: 3.27,
+    mer: 3.16,
+    benchmarkMer: 3.05,
+    benchmarkCpa: 42,
+    benchmarkCtr: 1.6,
+    recommendation: "Hold spend. Creative cost is rising; test new hooks before scaling.",
+    scaleSignal: "Hold",
+  },
+  {
+    platform: "Snap",
+    spend: 9610,
+    prevSpend: 9960,
+    storeSales: 26200,
+    prevStoreSales: 20637,
+    attributedRevenue: 23256,
+    impressions: 1180000,
+    reach: 640000,
+    clicks: 15430,
+    ctr: 1.31,
+    cpc: 0.62,
+    cpm: 8.14,
+    frequency: 1.84,
+    cpa: 33.21,
+    roas: 2.42,
+    mer: 2.73,
+    benchmarkMer: 2.25,
+    benchmarkCpa: 36,
+    benchmarkCtr: 1.2,
+    recommendation: "Keep stable. Use as support channel, not primary scale source.",
+    scaleSignal: "Hold",
+  },
 ];
 
-const websiteTruth = {
-  revenue: 348214,
-  prevRevenue: 300937,
+const storeTruth = {
+  storeSales: 348214,
+  prevStoreSales: 300937,
   orders: 2642,
   prevOrders: 2352,
   sessions: 85247,
   prevSessions: 80220,
   productViews: 24690,
+  prevProductViews: 23880,
   addToCart: 8642,
   prevAddToCart: 9204,
   checkoutStarted: 4521,
@@ -106,39 +210,34 @@ const websiteTruth = {
   prevPurchases: 2352,
   aov: 131.76,
   prevAov: 127.8,
-  grossMargin: 0.54,
-  variableCosts: 27620,
+  shipping: 18420,
+  vat: 13220,
   refunds: 4210,
 };
 
 const trend = [
-  { day: "Mon", spend: 12800, revenue: 38200, mer: 2.98, orders: 312 },
-  { day: "Tue", spend: 13600, revenue: 42100, mer: 3.1, orders: 336 },
-  { day: "Wed", spend: 15100, revenue: 51800, mer: 3.43, orders: 402 },
-  { day: "Thu", spend: 14800, revenue: 49300, mer: 3.33, orders: 374 },
-  { day: "Fri", spend: 17100, revenue: 62200, mer: 3.64, orders: 468 },
-  { day: "Sat", spend: 17700, revenue: 67900, mer: 3.84, orders: 512 },
-  { day: "Sun", spend: 17320, revenue: 56714, mer: 3.27, orders: 238 },
+  { day: "Mon", spend: 12800, storeSales: 38200, mer: 2.98, orders: 312, cpa: 41 },
+  { day: "Tue", spend: 13600, storeSales: 42100, mer: 3.1, orders: 336, cpa: 40 },
+  { day: "Wed", spend: 15100, storeSales: 51800, mer: 3.43, orders: 402, cpa: 37 },
+  { day: "Thu", spend: 14800, storeSales: 49300, mer: 3.33, orders: 374, cpa: 39 },
+  { day: "Fri", spend: 17100, storeSales: 62200, mer: 3.64, orders: 468, cpa: 36 },
+  { day: "Sat", spend: 17700, storeSales: 67900, mer: 3.84, orders: 512, cpa: 34 },
+  { day: "Sun", spend: 17320, storeSales: 56714, mer: 3.27, orders: 238, cpa: 73 },
 ];
 
 const campaigns: CampaignRow[] = [
-  { platform: "Meta", campaign: "Prospecting | Advantage+", type: "Prospecting", spend: 12450, revenue: 52400, orders: 438, ctr: 2.4, cpa: 28.41, mer: 4.21, frequency: 2.7, status: "Scale", prevTrend: "up" },
-  { platform: "Meta", campaign: "Remarketing | 7D", type: "Retargeting", spend: 9230, revenue: 47210, orders: 381, ctr: 3.8, cpa: 24.23, mer: 5.12, frequency: 7.4, status: "Watch", prevTrend: "up" },
-  { platform: "Google", campaign: "Google | Brand", type: "Brand", spend: 6780, revenue: 20880, orders: 218, ctr: 9.4, cpa: 31.12, mer: 3.08, frequency: 0, status: "Stable", prevTrend: "down" },
-  { platform: "TikTok", campaign: "TikTok | Prospecting", type: "Prospecting", spend: 5430, revenue: 11460, orders: 126, ctr: 1.21, cpa: 54.23, mer: 2.11, frequency: 2.1, status: "Fix", prevTrend: "down" },
-  { platform: "Snap", campaign: "Snap | Lookalike", type: "Prospecting", spend: 3220, revenue: 8950, orders: 98, ctr: 1.4, cpa: 33.12, mer: 2.78, frequency: 2.6, status: "Stable", prevTrend: "up" },
+  { platform: "Meta", campaign: "Prospecting | Advantage+", type: "Prospecting", spend: 12450, storeSales: 52400, orders: 438, ctr: 2.4, cpa: 28.41, mer: 4.21, frequency: 2.7, status: "Scale", nextAction: "Increase budget 12–15%" },
+  { platform: "Meta", campaign: "Remarketing | 7D", type: "Retargeting", spend: 9230, storeSales: 47210, orders: 381, ctr: 3.8, cpa: 24.23, mer: 5.12, frequency: 7.4, status: "Watch", nextAction: "Refresh creatives due to frequency" },
+  { platform: "Google", campaign: "Google | Brand", type: "Brand", spend: 6780, storeSales: 20880, orders: 218, ctr: 9.4, cpa: 31.12, mer: 3.08, frequency: 0, status: "Stable", nextAction: "Check brand cannibalization" },
+  { platform: "TikTok", campaign: "TikTok | Prospecting", type: "Prospecting", spend: 5430, storeSales: 11460, orders: 126, ctr: 1.21, cpa: 54.23, mer: 2.11, frequency: 2.1, status: "Fix", nextAction: "Test new hooks before more spend" },
+  { platform: "Snap", campaign: "Snap | Lookalike", type: "Prospecting", spend: 3220, storeSales: 8950, orders: 98, ctr: 1.4, cpa: 33.12, mer: 2.78, frequency: 2.6, status: "Stable", nextAction: "Maintain support budget" },
 ];
 
-const creatives = {
-  total: 128,
-  top: 25,
-  middle: 77,
-  bottom: 26,
-  fatigued: 14,
-  ctrAll: 1.42,
-  cpaAll: 38.76,
-  creativeMer: 3.4,
-};
+const creativeDiagnostics = [
+  { label: "Winning creatives", value: 25, color: "#22c55e" },
+  { label: "Average creatives", value: 77, color: "#3b82f6" },
+  { label: "Weak creatives", value: 26, color: "#ef4444" },
+];
 
 function money(value: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(value);
@@ -153,30 +252,34 @@ function pct(current: number, previous: number) {
   return ((current - previous) / previous) * 100;
 }
 
-function MiniSpark({ color = "#00d19a", reverse = false }: { color?: string; reverse?: boolean }) {
-  const points = reverse
+function signed(value: number, digits = 1) {
+  return `${value > 0 ? "+" : ""}${num(value, digits)}%`;
+}
+
+function deltaClass(value: number, goodWhenUp = true) {
+  const good = goodWhenUp ? value >= 0 : value <= 0;
+  return good ? "text-emerald-400" : "text-red-400";
+}
+
+function spark(reverse = false) {
+  return reverse
     ? "0,20 10,24 20,18 30,26 40,23 50,29 60,31 70,36 80,33 90,39 100,42"
     : "0,36 10,42 20,31 30,34 40,22 50,27 60,24 70,29 80,21 90,28 100,23";
-  return (
-    <svg viewBox="0 0 100 52" className="h-12 w-full">
-      <polyline points={points} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
 }
 
 function Sidebar() {
   const items = [
-    [Home, "Executive Overview", "executive"],
-    [BarChart3, "Performance Scorecard", "scorecard"],
-    [Globe2, "Website & Funnel", "funnel"],
+    [Home, "Command Center", "command"],
+    [ShieldCheck, "Business Health", "health"],
+    [Rocket, "Scaling Engine", "scaling"],
+    [Bell, "What Needs Action", "action"],
+    [BarChart3, "Platform Breakdown", "platforms"],
+    [Globe2, "Funnel Intelligence", "funnel"],
+    [Zap, "Creative Intelligence", "creative"],
     [Megaphone, "Campaigns", "campaigns"],
-    [Zap, "Creatives", "creatives"],
     [Gauge, "Benchmarks", "benchmarks"],
-    [Bell, "Alerts & Insights", "alerts"],
-    [BookOpen, "Operator Guide", "operator"],
-    [Database, "Truth Layers", "truth"],
+    [BookOpen, "Reporting Layer", "reporting"],
     [Database, "Source Mapping", "sources"],
-    [Sparkles, "Custom Signals", "signals"],
     [Settings, "Settings", "settings"],
   ];
 
@@ -189,33 +292,29 @@ function Sidebar() {
           </div>
           <div>
             <h1 className="text-xl font-black">Performance OS</h1>
-            <p className="text-sm text-slate-400">One-client operator dashboard</p>
+            <p className="text-sm text-slate-400">Scaler command center</p>
           </div>
         </div>
       </div>
-
       <nav className="flex-1 space-y-1 overflow-y-auto px-5 pb-4 pr-3">
         {items.map(([Icon, label, id], index) => (
           <a
             key={label as string}
             href={`#${id}`}
-            className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${
-              index === 0 ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-900 hover:text-white"
-            }`}
+            className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition ${index === 0 ? "bg-blue-600 text-white" : "text-slate-300 hover:bg-slate-900 hover:text-white"}`}
           >
             <Icon size={19} />
             <span>{label as string}</span>
           </a>
         ))}
       </nav>
-
       <div className="border-t border-slate-800 p-5">
         <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
           <div className="flex items-center gap-2 text-emerald-400">
             <CheckCircle2 size={16} />
-            <span className="font-black">Data Status</span>
+            <span className="font-black">Live Prototype</span>
           </div>
-          <p className="mt-2 text-xs text-slate-400">Mock source layer active</p>
+          <p className="mt-2 text-xs text-slate-400">Mock data now · API mapping later</p>
         </div>
       </div>
     </aside>
@@ -224,15 +323,16 @@ function Sidebar() {
 
 function Header({ range, setRange, platform, setPlatform }: { range: DateRange; setRange: (v: DateRange) => void; platform: Platform; setPlatform: (v: Platform) => void }) {
   return (
-    <header className="sticky top-0 z-10 border-b border-slate-800 bg-[#07111f]/95 px-6 py-5 backdrop-blur">
+    <header className="sticky top-0 z-20 border-b border-slate-800 bg-[#07111f]/95 px-6 py-5 backdrop-blur">
       <div className="flex flex-col gap-5 2xl:flex-row 2xl:items-center 2xl:justify-between">
         <div>
           <div className="mb-4 flex flex-wrap gap-2">
             <span className="rounded-full border border-blue-500/40 bg-blue-500/10 px-4 py-1 text-sm font-bold text-blue-200">{client}</span>
-            <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-4 py-1 text-sm font-bold text-emerald-200">Website truth + ads truth separated</span>
+            <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-4 py-1 text-sm font-bold text-emerald-200">Primary goal: scale safely</span>
+            <span className="rounded-full border border-purple-500/40 bg-purple-500/10 px-4 py-1 text-sm font-bold text-purple-200">Store sales truth, not platform revenue</span>
           </div>
-          <h2 className="text-4xl font-black tracking-tight text-white md:text-5xl">Performance Marketing Dashboard</h2>
-          <p className="mt-2 text-lg text-slate-400">Executive Overview · ecommerce operating logic · one client only</p>
+          <h2 className="text-4xl font-black tracking-tight text-white md:text-5xl">Performance Marketing Command Center</h2>
+          <p className="mt-2 text-lg text-slate-400">Daily decisions first · reporting second · one client phase</p>
         </div>
         <div className="flex flex-wrap gap-3">
           <Select label="Date Range" icon={Calendar} value={range} onChange={(v) => setRange(v as DateRange)} options={ranges} />
@@ -258,27 +358,6 @@ function Select({ label, value, options, onChange, icon: Icon }: { label: string
   );
 }
 
-function KpiCard({ title, value, change, note, icon: Icon, color, reverse }: { title: string; value: string; change: number; note: string; icon: React.ElementType; color: string; reverse?: boolean }) {
-  const positive = change >= 0;
-  return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl shadow-black/20">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-base font-semibold text-blue-100">{title}</p>
-          <h3 className="mt-3 text-3xl font-black text-white">{value}</h3>
-          <p className={`mt-2 flex items-center gap-1 text-base font-black ${positive ? "text-emerald-400" : "text-red-400"}`}>
-            {positive ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-            {positive ? "+" : ""}{num(change, 1)}%
-          </p>
-        </div>
-        <div className="rounded-full border p-3" style={{ color, borderColor: color + "55", background: color + "15" }}><Icon size={24} /></div>
-      </div>
-      <div className="mt-6"><MiniSpark color={color} reverse={reverse} /></div>
-      <p className="mt-3 min-h-[48px] text-sm leading-6 text-slate-400">{note}</p>
-    </div>
-  );
-}
-
 function Section({ id, title, subtitle, icon: Icon, children }: { id?: string; title: string; subtitle?: string; icon?: React.ElementType; children: React.ReactNode }) {
   return (
     <section id={id} className="scroll-mt-28 rounded-2xl border border-slate-800 bg-slate-900/65 p-5 shadow-xl shadow-black/20">
@@ -294,14 +373,55 @@ function Section({ id, title, subtitle, icon: Icon, children }: { id?: string; t
   );
 }
 
-function StatusPill({ level }: { level: "High" | "Medium" | "Info" | "Good" }) {
-  const styles = {
-    High: "bg-red-500/20 text-red-300 border-red-500/30",
-    Medium: "bg-amber-500/20 text-amber-300 border-amber-500/30",
-    Info: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+function KPI({ title, value, previous, change, icon: Icon, note, color = "#3b82f6", goodWhenUp = true }: { title: string; value: string; previous?: string; change: number; icon: React.ElementType; note: string; color?: string; goodWhenUp?: boolean }) {
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 shadow-xl shadow-black/20">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold uppercase text-slate-400">{title}</p>
+          <h4 className="mt-3 text-3xl font-black text-white">{value}</h4>
+          {previous && <p className="mt-1 text-xs text-slate-500">Previous: {previous}</p>}
+        </div>
+        <div className="rounded-full border p-3" style={{ color, borderColor: `${color}55`, background: `${color}15` }}><Icon size={23} /></div>
+      </div>
+      <div className={`mt-4 flex items-center gap-1 text-sm font-black ${deltaClass(change, goodWhenUp)}`}>
+        {change >= 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
+        {signed(change)} vs previous
+      </div>
+      <svg viewBox="0 0 100 52" className="mt-4 h-10 w-full"><polyline points={spark(!goodWhenUp && change > 0)} fill="none" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      <p className="mt-2 min-h-[42px] text-sm leading-6 text-slate-400">{note}</p>
+    </div>
+  );
+}
+
+function Signal({ type, title, body, action }: { type: "risk" | "scale" | "info"; title: string; body: string; action: string }) {
+  const style = type === "risk" ? "border-red-500/30 bg-red-500/10 text-red-300" : type === "scale" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-blue-500/30 bg-blue-500/10 text-blue-300";
+  const Icon = type === "risk" ? AlertTriangle : type === "scale" ? Rocket : Lightbulb;
+  return (
+    <div className={`rounded-2xl border p-4 ${style}`}>
+      <div className="flex items-center gap-2"><Icon size={18} /><h4 className="font-black text-white">{title}</h4></div>
+      <p className="mt-2 text-sm leading-6 text-slate-300">{body}</p>
+      <div className="mt-3 rounded-xl bg-black/20 px-3 py-2 text-sm font-bold text-white">Action: {action}</div>
+    </div>
+  );
+}
+
+function StatusPill({ status }: { status: "Scale" | "Hold" | "Reduce" | "Fix" | "Good" | "Watch" | "Stable" }) {
+  const styles: Record<string, string> = {
+    Scale: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
     Good: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+    Stable: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+    Hold: "bg-blue-500/20 text-blue-300 border-blue-500/30",
+    Watch: "bg-amber-500/20 text-amber-300 border-amber-500/30",
+    Reduce: "bg-red-500/20 text-red-300 border-red-500/30",
+    Fix: "bg-red-500/20 text-red-300 border-red-500/30",
   };
-  return <span className={`rounded-lg border px-3 py-1 text-xs font-black uppercase ${styles[level]}`}>{level}</span>;
+  return <span className={`rounded-lg border px-3 py-1 text-xs font-black uppercase ${styles[status]}`}>{status}</span>;
+}
+
+function MiniMetric({ label, value, hint, tone = "default" }: { label: string; value: string; hint?: string; tone?: "good" | "bad" | "warn" | "default" }) {
+  const color = tone === "good" ? "text-emerald-300" : tone === "bad" ? "text-red-300" : tone === "warn" ? "text-amber-300" : "text-white";
+  return <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3"><p className="text-xs text-slate-400">{label}</p><p className={`mt-1 text-xl font-black ${color}`}>{value}</p>{hint && <p className="mt-1 text-xs text-slate-500">{hint}</p>}</div>;
 }
 
 export default function Dashboard() {
@@ -311,50 +431,47 @@ export default function Dashboard() {
   const filteredPlatforms = useMemo(() => platform === "All" ? platformRows : platformRows.filter((row) => row.platform === platform), [platform]);
   const filteredCampaigns = useMemo(() => platform === "All" ? campaigns : campaigns.filter((row) => row.platform === platform), [platform]);
 
-  const spend = filteredPlatforms.reduce((sum, row) => sum + row.spend, 0);
+  const totalSpend = filteredPlatforms.reduce((sum, row) => sum + row.spend, 0);
   const prevSpend = filteredPlatforms.reduce((sum, row) => sum + row.prevSpend, 0);
   const attributedRevenue = filteredPlatforms.reduce((sum, row) => sum + row.attributedRevenue, 0);
-  const prevAttributedRevenue = filteredPlatforms.reduce((sum, row) => sum + row.prevAttributedRevenue, 0);
-  const mer = websiteTruth.revenue / spend;
-  const prevMer = websiteTruth.prevRevenue / prevSpend;
-  const blendedRoas = attributedRevenue / spend;
-  const prevBlendedRoas = prevAttributedRevenue / prevSpend;
-  const cpa = spend / websiteTruth.orders;
-  const prevCpa = prevSpend / websiteTruth.prevOrders;
-  const purchaseCvr = websiteTruth.orders / websiteTruth.sessions;
-  const prevPurchaseCvr = websiteTruth.prevOrders / websiteTruth.prevSessions;
-  const atcRate = websiteTruth.addToCart / websiteTruth.sessions;
-  const checkoutRate = websiteTruth.checkoutStarted / websiteTruth.addToCart;
-  const grossProfit = websiteTruth.revenue * websiteTruth.grossMargin;
-  const contributionAfterAds = grossProfit - spend - websiteTruth.variableCosts - websiteTruth.refunds;
-  const operatorScore = Math.round(Math.min(100, mer * 18 + purchaseCvr * 500 + (atcRate > 0.09 ? 15 : 0)));
+  const storeSalesFromFiltered = filteredPlatforms.reduce((sum, row) => sum + row.storeSales, 0);
+  const prevStoreSalesFromFiltered = filteredPlatforms.reduce((sum, row) => sum + row.prevStoreSales, 0);
 
-  const changes = [
-    { label: "Store Revenue", value: money(websiteTruth.revenue - websiteTruth.prevRevenue), pct: pct(websiteTruth.revenue, websiteTruth.prevRevenue), good: true },
-    { label: "MER", value: `+${num(mer - prevMer, 2)}x`, pct: pct(mer, prevMer), good: true },
-    { label: "Orders", value: `+${numberDelta(websiteTruth.orders - websiteTruth.prevOrders)}`, pct: pct(websiteTruth.orders, websiteTruth.prevOrders), good: true },
-    { label: "CPA", value: `${money(cpa - prevCpa)}`, pct: pct(cpa, prevCpa), good: false },
-    { label: "Spend", value: money(spend - prevSpend), pct: pct(spend, prevSpend), good: false },
-  ];
+  const storeSales = platform === "All" ? storeTruth.storeSales : storeSalesFromFiltered;
+  const prevStoreSales = platform === "All" ? storeTruth.prevStoreSales : prevStoreSalesFromFiltered;
+  const orders = platform === "All" ? storeTruth.orders : Math.round(storeTruth.orders * (storeSalesFromFiltered / storeTruth.storeSales));
+  const prevOrders = platform === "All" ? storeTruth.prevOrders : Math.round(storeTruth.prevOrders * (prevStoreSalesFromFiltered / storeTruth.prevStoreSales));
 
-  const attention = useMemo(() => {
-    const items = [];
-    const google = platformRows.find((row) => row.platform === "Google");
-    const tiktok = platformRows.find((row) => row.platform === "TikTok");
-    if (google && google.roas < google.benchmarkRoas) items.push({ level: "High" as const, title: "Google ROAS below benchmark", desc: `ROAS ${google.roas}x vs benchmark ${google.benchmarkRoas}x` });
-    if (tiktok && tiktok.cpa > tiktok.benchmarkCpa) items.push({ level: "High" as const, title: "TikTok CPA above benchmark", desc: `CPA ${money(tiktok.cpa)} vs benchmark ${money(tiktok.benchmarkCpa)}` });
-    if (atcRate < websiteTruth.prevAddToCart / websiteTruth.prevSessions) items.push({ level: "Medium" as const, title: "Add to Cart rate dropped", desc: "ATC rate down vs previous period" });
-    if (campaigns.some((campaign) => campaign.frequency > 6 && campaign.ctr < 4)) items.push({ level: "Medium" as const, title: "Creative fatigue detected", desc: "Frequency is high while CTR is not improving" });
-    items.push({ level: "Info" as const, title: "Website truth and platform truth separated", desc: "Use MER for business truth and platform ROAS for platform optimization" });
-    return items;
-  }, [atcRate]);
+  const mer = storeSales / totalSpend;
+  const prevMer = prevStoreSales / prevSpend;
+  const blendedRoas = attributedRevenue / totalSpend;
+  const cpa = totalSpend / orders;
+  const prevCpa = prevSpend / prevOrders;
+  const purchaseCvr = storeTruth.orders / storeTruth.sessions;
+  const prevPurchaseCvr = storeTruth.prevOrders / storeTruth.prevSessions;
+  const atcRate = storeTruth.addToCart / storeTruth.sessions;
+  const prevAtcRate = storeTruth.prevAddToCart / storeTruth.prevSessions;
+  const checkoutRate = storeTruth.checkoutStarted / storeTruth.addToCart;
+  const prevCheckoutRate = storeTruth.prevCheckoutStarted / storeTruth.prevAddToCart;
 
-  const funnel = [
-    { name: "Sessions", value: websiteTruth.sessions, rate: 100 },
-    { name: "Add to Cart", value: websiteTruth.addToCart, rate: atcRate * 100 },
-    { name: "Checkout Started", value: websiteTruth.checkoutStarted, rate: checkoutRate * 100 },
-    { name: "Purchases", value: websiteTruth.purchases, rate: purchaseCvr * 100 },
-  ];
+  const commandPriority = mer < prevMer && storeSales > prevStoreSales
+    ? "Store sales are up, but MER dropped. Check Google and TikTok before scaling further."
+    : mer >= prevMer && platformRows.find((row) => row.platform === "Meta")!.scaleSignal === "Scale"
+      ? "Account is healthy. Meta is the safest scaling opportunity right now."
+      : "Creative fatigue is the main risk today. Refresh winning angles before increasing spend.";
+
+  const commandAction = mer < prevMer
+    ? "Hold overall scale, audit Google CPA and TikTok creative efficiency, then shift budget toward Meta winners."
+    : "Increase Meta prospecting spend by 12–15%, keep Snap stable, and monitor MER hourly.";
+
+  const bottleneck = atcRate < prevAtcRate
+    ? { area: "Funnel / Offer", reason: "Add to Cart rate declined while sessions stayed healthy.", action: "Check product page, offer clarity, pricing, and traffic quality." }
+    : platformRows.some((row) => row.frequency > 6 && row.ctr < row.benchmarkCtr)
+      ? { area: "Creative", reason: "Frequency rising while CTR weakens.", action: "Refresh creatives and rotate hooks." }
+      : { area: "Paid Media", reason: "Google and TikTok efficiency are weaker than benchmark.", action: "Reallocate budget toward better MER channels." };
+
+  const scaleCandidates = filteredPlatforms.filter((row) => row.scaleSignal === "Scale");
+  const riskChannels = filteredPlatforms.filter((row) => row.scaleSignal === "Fix" || row.mer < row.benchmarkMer);
 
   return (
     <main className="min-h-screen bg-[#06111f] text-white">
@@ -362,53 +479,86 @@ export default function Dashboard() {
       <div className="xl:pl-[280px]">
         <Header range={range} setRange={setRange} platform={platform} setPlatform={setPlatform} />
         <div className="space-y-5 p-6">
-          <div id="executive" className="scroll-mt-28 grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
-            <KpiCard title="Total Ad Spend" value={money(spend)} change={pct(spend, prevSpend)} icon={DollarSign} color="#ff4d4d" note="Total paid media investment across channels for the selected period." reverse />
-            <KpiCard title="Store Revenue" value={money(websiteTruth.revenue)} change={pct(websiteTruth.revenue, websiteTruth.prevRevenue)} icon={ShoppingCart} color="#22c55e" note="The main sales truth from your website/store analytics stack." />
-            <KpiCard title="MER" value={`${num(mer, 2)}x`} change={pct(mer, prevMer)} icon={Target} color="#14b8a6" note="Top-line blended efficiency metric for the whole business." />
-            <KpiCard title="Blended ROAS" value={`${num(blendedRoas, 2)}x`} change={pct(blendedRoas, prevBlendedRoas)} icon={Target} color="#3b82f6" note="Shows return from channel-attributed revenue in one blended view." />
-            <KpiCard title="Orders" value={num(websiteTruth.orders)} change={pct(websiteTruth.orders, websiteTruth.prevOrders)} icon={ShoppingBag} color="#f59e0b" note="Shows how many purchase events turned into real orders." />
-            <KpiCard title="CPA / CAC" value={money(cpa)} change={pct(cpa, prevCpa)} icon={Gauge} color="#a855f7" note="Core acquisition efficiency metric. Lower is usually better." reverse={pct(cpa, prevCpa) > 0} />
-            <KpiCard title="AOV" value={money(websiteTruth.aov)} change={pct(websiteTruth.aov, websiteTruth.prevAov)} icon={Gauge} color="#8b5cf6" note="Shows average order size and offer quality." />
-            <KpiCard title="Purchase Conversion Rate" value={`${num(purchaseCvr * 100, 2)}%`} change={pct(purchaseCvr, prevPurchaseCvr)} icon={Gauge} color="#22c55e" note="Main website conversion efficiency metric." />
-          </div>
+          <section id="command" className="scroll-mt-28 grid gap-5 2xl:grid-cols-[1.5fr_1fr]">
+            <div className="rounded-3xl border border-blue-500/30 bg-gradient-to-br from-slate-900 via-[#0b2035] to-slate-950 p-6 shadow-2xl shadow-blue-950/20">
+              <div className="mb-5 flex items-center gap-3">
+                <div className="rounded-2xl bg-blue-600 p-3"><Sparkles size={24} /></div>
+                <div>
+                  <p className="text-sm font-black uppercase text-blue-300">Operator Summary</p>
+                  <h3 className="text-3xl font-black">{commandPriority}</h3>
+                </div>
+              </div>
+              <p className="max-w-4xl text-lg leading-8 text-slate-300">{commandAction}</p>
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                <MiniMetric label="Scale Status" value={scaleCandidates.length ? "Scale Carefully" : "Hold"} hint={scaleCandidates.length ? `${scaleCandidates.map((row) => row.platform).join(", ")} ready` : "No safe scale source"} tone={scaleCandidates.length ? "good" : "warn"} />
+                <MiniMetric label="Risk Area" value={riskChannels.length ? riskChannels.map((row) => row.platform).join(" + ") : "Low"} hint="Based on MER/CPA benchmark" tone={riskChannels.length ? "warn" : "good"} />
+                <MiniMetric label="Bottleneck" value={bottleneck.area} hint={bottleneck.reason} tone="warn" />
+              </div>
+            </div>
+            <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-6">
+              <p className="text-sm font-black uppercase text-slate-400">Today’s Priority Order</p>
+              <div className="mt-5 space-y-4">
+                <Signal type="risk" title="1. Protect MER" body="Sales are higher, but efficiency must be protected before increasing total spend." action="Audit weak channels first" />
+                <Signal type="scale" title="2. Scale Meta Winners" body="Meta shows the strongest combination of MER, CPA, and CTR versus benchmark." action="Increase 12–15% gradually" />
+                <Signal type="info" title="3. Watch Creative Fatigue" body="Retargeting frequency is high. Scale can fail if creative refresh is delayed." action="Prepare new hooks" />
+              </div>
+            </div>
+          </section>
+
+          <section id="health" className="scroll-mt-28 grid gap-5 md:grid-cols-2 2xl:grid-cols-4">
+            <KPI title="Store Sales" value={money(storeSales)} previous={money(prevStoreSales)} change={pct(storeSales, prevStoreSales)} icon={ShoppingCart} color="#22c55e" note="Business truth: website/store sales including shipping/VAT when available." />
+            <KPI title="MER" value={`${num(mer, 2)}x`} previous={`${num(prevMer, 2)}x`} change={pct(mer, prevMer)} icon={Target} color="#14b8a6" note="Master scaling KPI: store sales divided by total ad spend." />
+            <KPI title="Total Spend" value={money(totalSpend)} previous={money(prevSpend)} change={pct(totalSpend, prevSpend)} icon={DollarSign} color="#ef4444" goodWhenUp={false} note="Spend increase is good only when MER and sales quality hold." />
+            <KPI title="Orders" value={num(orders)} previous={num(prevOrders)} change={pct(orders, prevOrders)} icon={ShoppingBag} color="#f59e0b" note="Core sales volume indicator for daily decisions." />
+            <KPI title="CPA / CAC" value={money(cpa)} previous={money(prevCpa)} change={pct(cpa, prevCpa)} icon={Gauge} color="#a855f7" goodWhenUp={false} note="Acquisition cost. Rising CPA needs channel or funnel diagnosis." />
+            <KPI title="AOV" value={money(storeTruth.aov)} previous={money(storeTruth.prevAov)} change={pct(storeTruth.aov, storeTruth.prevAov)} icon={CircleDollarSign} color="#8b5cf6" note="Offer strength and order quality indicator." />
+            <KPI title="Purchase CVR" value={`${num(purchaseCvr * 100, 2)}%`} previous={`${num(prevPurchaseCvr * 100, 2)}%`} change={pct(purchaseCvr, prevPurchaseCvr)} icon={MousePointer2} color="#22c55e" note="Website conversion efficiency. Helps separate traffic vs site issue." />
+            <KPI title="Blended ROAS" value={`${num(blendedRoas, 2)}x`} change={4.8} icon={Target} color="#3b82f6" note="Platform-attributed return blended across selected channels." />
+          </section>
 
           <div className="grid gap-5 2xl:grid-cols-3">
-            <Section id="scorecard" title="What Changed?" subtitle="Current period vs previous period" icon={TrendingUp}>
-              <div className="space-y-3">
-                {changes.map((item) => (
-                  <div key={item.label} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-                    <div className="flex items-center gap-3"><span className={`h-3 w-3 rounded-full ${item.good ? "bg-emerald-400" : "bg-red-400"}`} /><span className="font-semibold text-slate-200">{item.label}</span></div>
-                    <div className="text-right"><p className={item.good ? "text-emerald-400" : "text-red-400"}>{item.value}</p><p className={item.good ? "text-emerald-400" : "text-red-400"}>{item.pct > 0 ? "+" : ""}{num(item.pct, 1)}%</p></div>
+            <Section id="scaling" title="Growth / Scaling Engine" subtitle="Can we increase spend safely?" icon={Rocket}>
+              <div className="space-y-4">
+                {filteredPlatforms.map((row) => (
+                  <div key={row.platform} className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div><h4 className="text-xl font-black">{row.platform}</h4><p className="text-sm text-slate-400">{row.recommendation}</p></div>
+                      <StatusPill status={row.scaleSignal} />
+                    </div>
+                    <div className="mt-4 grid gap-3 md:grid-cols-4">
+                      <MiniMetric label="MER" value={`${num(row.mer, 2)}x`} hint={`Bench ${num(row.benchmarkMer, 2)}x`} tone={row.mer >= row.benchmarkMer ? "good" : "bad"} />
+                      <MiniMetric label="CPA" value={money(row.cpa)} hint={`Bench ${money(row.benchmarkCpa)}`} tone={row.cpa <= row.benchmarkCpa ? "good" : "bad"} />
+                      <MiniMetric label="CTR" value={`${num(row.ctr, 2)}%`} hint={`Bench ${num(row.benchmarkCtr, 2)}%`} tone={row.ctr >= row.benchmarkCtr ? "good" : "warn"} />
+                      <MiniMetric label="Spend" value={money(row.spend)} hint={signed(pct(row.spend, row.prevSpend))} tone="default" />
+                    </div>
                   </div>
                 ))}
               </div>
             </Section>
 
-            <Section id="alerts" title="What Needs Attention?" subtitle="Prioritized by operator impact" icon={AlertTriangle}>
-              <div className="space-y-3">
-                {attention.map((item) => (
-                  <div key={item.title} className="flex items-start gap-3 border-b border-slate-800 pb-3 last:border-none last:pb-0">
-                    <AlertTriangle className={item.level === "High" ? "text-red-400" : item.level === "Medium" ? "text-amber-400" : "text-blue-400"} size={20} />
-                    <div className="flex-1"><div className="flex items-center gap-2"><StatusPill level={item.level} /><p className="font-bold text-white">{item.title}</p></div><p className="mt-1 text-sm text-slate-400">{item.desc}</p></div>
-                  </div>
-                ))}
+            <Section id="action" title="What Needs Action?" subtitle="Diagnosis before decisions" icon={AlertTriangle}>
+              <div className="space-y-4">
+                <Signal type="risk" title="MER pressure detected" body={`MER changed ${signed(pct(mer, prevMer))}. Sales are up ${signed(pct(storeSales, prevStoreSales))}, but spend rose ${signed(pct(totalSpend, prevSpend))}.`} action="Do not scale all channels equally" />
+                <Signal type="risk" title={bottleneck.area} body={bottleneck.reason} action={bottleneck.action} />
+                <Signal type="scale" title="Best scaling path" body="Meta prospecting has the strongest scale signal and beats account benchmarks." action="Scale in small increments, then re-check MER" />
+                <Signal type="info" title="Reporting note" body="Weekly/monthly reporting should summarize the same signals, but daily decisions remain priority." action="Keep reporting lower in the page" />
               </div>
             </Section>
 
-            <Section id="scorecard" title="Paid Media Scorecard" subtitle="Channel truth, not final store truth" icon={BarChart3}>
+            <Section id="platforms" title="Platform Breakdown" subtitle="Platform truth: diagnose why business truth changed" icon={BarChart3}>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[650px] text-left text-sm">
-                  <thead className="text-xs uppercase text-slate-400"><tr><th className="pb-3">Platform</th><th>Spend</th><th>Attributed Revenue</th><th>CPA</th><th>ROAS</th><th>Benchmark</th></tr></thead>
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead className="text-xs uppercase text-slate-400"><tr><th className="pb-3">Platform</th><th>Spend</th><th>Store Sales</th><th>MER</th><th>ROAS</th><th>CPA</th><th>Signal</th></tr></thead>
                   <tbody>
                     {filteredPlatforms.map((row) => (
                       <tr key={row.platform} className="border-t border-slate-800">
-                        <td className="py-4 text-xl font-black">{row.platform}</td>
-                        <td>{money(row.spend)}<br /><span className={pct(row.spend, row.prevSpend) > 0 ? "text-red-400" : "text-emerald-400"}>{pct(row.spend, row.prevSpend) > 0 ? "+" : ""}{num(pct(row.spend, row.prevSpend), 1)}%</span></td>
-                        <td>{money(row.attributedRevenue)}<br /><span className="text-emerald-400">{pct(row.attributedRevenue, row.prevAttributedRevenue) > 0 ? "+" : ""}{num(pct(row.attributedRevenue, row.prevAttributedRevenue), 1)}%</span></td>
-                        <td className={row.cpa > row.benchmarkCpa ? "text-red-300" : "text-emerald-300"}>{money(row.cpa)}</td>
-                        <td className={row.roas < row.benchmarkRoas ? "text-red-300" : "text-emerald-300"}>{num(row.roas, 2)}x</td>
-                        <td>{row.roas >= row.benchmarkRoas ? <StatusPill level="Good" /> : <StatusPill level="High" />}</td>
+                        <td className="py-4 text-lg font-black">{row.platform}</td>
+                        <td>{money(row.spend)}</td>
+                        <td>{money(row.storeSales)}</td>
+                        <td className={row.mer >= row.benchmarkMer ? "text-emerald-300" : "text-red-300"}>{num(row.mer, 2)}x</td>
+                        <td>{num(row.roas, 2)}x</td>
+                        <td className={row.cpa <= row.benchmarkCpa ? "text-emerald-300" : "text-red-300"}>{money(row.cpa)}</td>
+                        <td><StatusPill status={row.scaleSignal} /></td>
                       </tr>
                     ))}
                   </tbody>
@@ -418,93 +568,83 @@ export default function Dashboard() {
           </div>
 
           <div className="grid gap-5 2xl:grid-cols-5">
-            <Section title="Executive Revenue vs Spend" subtitle="Business truth vs paid media investment" icon={BarChart3}>
-              <div className="h-[320px] 2xl:col-span-3">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trend}>
-                    <defs><linearGradient id="rev" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#22c55e" stopOpacity={0.35} /><stop offset="1" stopColor="#22c55e" stopOpacity={0} /></linearGradient></defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="day" stroke="#94a3b8" />
-                    <YAxis stroke="#94a3b8" />
-                    <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 12 }} />
-                    <Area dataKey="revenue" stroke="#22c55e" fill="url(#rev)" strokeWidth={3} />
-                    <Area dataKey="spend" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.08} strokeWidth={3} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </Section>
-
-            <Section id="funnel" title="Website & Funnel Snapshot" subtitle="Store truth funnel" icon={Globe2}>
+            <Section id="funnel" title="Funnel Intelligence" subtitle="Where are users dropping?" icon={Globe2}>
               <div className="space-y-3">
-                {funnel.map((step, index) => (
+                {[
+                  { name: "Sessions", value: storeTruth.sessions, rate: 100 },
+                  { name: "Product Views", value: storeTruth.productViews, rate: storeTruth.productViews / storeTruth.sessions * 100 },
+                  { name: "Add to Cart", value: storeTruth.addToCart, rate: atcRate * 100 },
+                  { name: "Checkout Started", value: storeTruth.checkoutStarted, rate: checkoutRate * 100 },
+                  { name: "Purchases", value: storeTruth.purchases, rate: purchaseCvr * 100 },
+                ].map((step, index) => (
                   <div key={step.name} className="grid grid-cols-[1fr_100px_80px] items-center gap-3">
-                    <div className="rounded-lg bg-gradient-to-r from-blue-600 to-emerald-500 px-4 py-3 font-bold" style={{ width: `${Math.max(36, 100 - index * 16)}%` }}>{step.name}</div>
+                    <div className="rounded-lg bg-gradient-to-r from-blue-600 to-emerald-500 px-4 py-3 font-bold" style={{ width: `${Math.max(34, 100 - index * 13)}%` }}>{step.name}</div>
                     <div className="text-right font-black">{num(step.value)}</div>
                     <div className="rounded-lg bg-slate-800 px-2 py-1 text-center text-sm">{num(step.rate, 2)}%</div>
                   </div>
                 ))}
               </div>
-              <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
-                <div className="rounded-xl bg-slate-950/50 p-3"><p className="text-slate-400">ATC Rate</p><p className="text-xl font-black text-white">{num(atcRate * 100, 2)}%</p></div>
-                <div className="rounded-xl bg-slate-950/50 p-3"><p className="text-slate-400">Checkout Rate</p><p className="text-xl font-black text-white">{num(checkoutRate * 100, 2)}%</p></div>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <MiniMetric label="ATC Rate" value={`${num(atcRate * 100, 2)}%`} hint={`Prev ${num(prevAtcRate * 100, 2)}%`} tone={atcRate >= prevAtcRate ? "good" : "warn"} />
+                <MiniMetric label="Checkout Rate" value={`${num(checkoutRate * 100, 2)}%`} hint={`Prev ${num(prevCheckoutRate * 100, 2)}%`} tone={checkoutRate >= prevCheckoutRate ? "good" : "warn"} />
+              </div>
+            </Section>
+
+            <Section title="Executive Trend" subtitle="Store sales, spend, and MER" icon={BarChart3}>
+              <div className="h-[360px] 2xl:col-span-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trend}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                    <XAxis dataKey="day" stroke="#94a3b8" />
+                    <YAxis stroke="#94a3b8" />
+                    <Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 12 }} />
+                    <Area dataKey="storeSales" stroke="#22c55e" fill="#22c55e" fillOpacity={0.16} strokeWidth={3} />
+                    <Area dataKey="spend" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.08} strokeWidth={3} />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
             </Section>
           </div>
 
           <div className="grid gap-5 2xl:grid-cols-3">
-            <Section id="campaigns" title="Campaign Performance Top 5" subtitle="Filtered by selected platform" icon={Megaphone}>
+            <Section id="creative" title="Creative Intelligence" subtitle="Fatigue and winning angles" icon={Zap}>
+              <div className="grid items-center gap-4 md:grid-cols-[200px_1fr]">
+                <div className="h-[190px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={creativeDiagnostics} dataKey="value" innerRadius={55} outerRadius={85}>{creativeDiagnostics.map((entry) => <Cell key={entry.label} fill={entry.color} />)}</Pie><Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 12 }} /></PieChart></ResponsiveContainer></div>
+                <div className="space-y-3">{creativeDiagnostics.map((item) => <p key={item.label}><span style={{ color: item.color }}>●</span> {item.label}: <b>{item.value}</b></p>)}</div>
+              </div>
+              <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4"><MiniMetric label="Fatigue Risk" value="Medium" tone="warn" /><MiniMetric label="Avg CTR" value="1.42%" tone="warn" /><MiniMetric label="Creative CPA" value="$39" tone="warn" /><MiniMetric label="Next Action" value="Refresh" tone="bad" /></div>
+            </Section>
+
+            <Section id="campaigns" title="Campaign Action Table" subtitle="What should be scaled, held, or fixed?" icon={Megaphone}>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm">
-                  <thead className="text-xs uppercase text-slate-400"><tr><th className="pb-3">Campaign</th><th>Platform</th><th>Spend</th><th>MER</th><th>CPA</th><th>Orders</th><th>Status</th></tr></thead>
-                  <tbody>{filteredCampaigns.map((row) => <tr key={row.campaign} className="border-t border-slate-800"><td className="py-4 font-bold">{row.campaign}</td><td>{row.platform}</td><td>{money(row.spend)}</td><td className={row.mer < 2.5 ? "text-red-300" : "text-emerald-300"}>{num(row.mer, 2)}x</td><td>{money(row.cpa)}</td><td>{row.orders}</td><td><StatusPill level={row.status === "Fix" ? "High" : row.status === "Watch" ? "Medium" : "Good"} /></td></tr>)}</tbody>
+                <table className="w-full min-w-[850px] text-left text-sm">
+                  <thead className="text-xs uppercase text-slate-400"><tr><th className="pb-3">Campaign</th><th>Platform</th><th>Type</th><th>Spend</th><th>MER</th><th>CPA</th><th>Status</th><th>Next Action</th></tr></thead>
+                  <tbody>{filteredCampaigns.map((row) => <tr key={row.campaign} className="border-t border-slate-800"><td className="py-4 font-bold">{row.campaign}</td><td>{row.platform}</td><td>{row.type}</td><td>{money(row.spend)}</td><td className={row.mer < 2.5 ? "text-red-300" : "text-emerald-300"}>{num(row.mer, 2)}x</td><td>{money(row.cpa)}</td><td><StatusPill status={row.status === "Scale" ? "Scale" : row.status === "Fix" ? "Fix" : row.status === "Watch" ? "Watch" : "Stable"} /></td><td className="text-slate-300">{row.nextAction}</td></tr>)}</tbody>
                 </table>
               </div>
             </Section>
 
-            <Section id="creatives" title="Creative Diagnostics" subtitle="Creative quality and fatigue" icon={Zap}>
-              <div className="grid items-center gap-4 md:grid-cols-[200px_1fr]">
-                <div className="h-[190px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={[{ name: "Top", value: creatives.top }, { name: "Middle", value: creatives.middle }, { name: "Bottom", value: creatives.bottom }]} dataKey="value" innerRadius={55} outerRadius={85}><Cell fill="#22c55e" /><Cell fill="#3b82f6" /><Cell fill="#ef4444" /></Pie><Tooltip contentStyle={{ background: "#0f172a", border: "1px solid #334155", borderRadius: 12 }} /></PieChart></ResponsiveContainer></div>
-                <div className="space-y-3"><p><span className="text-emerald-400">●</span> Top 20% High Performers: <b>{creatives.top}</b></p><p><span className="text-blue-400">●</span> Middle 60% Average: <b>{creatives.middle}</b></p><p><span className="text-red-400">●</span> Bottom 20% Low Performers: <b>{creatives.bottom}</b></p></div>
-              </div>
-              <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4"><MiniMetric label="Fatigued" value={`${creatives.fatigued}`} warn /><MiniMetric label="CTR All" value={`${num(creatives.ctrAll, 2)}%`} warn /><MiniMetric label="CPA All" value={money(creatives.cpaAll)} warn /><MiniMetric label="Creative MER" value={`${num(creatives.creativeMer, 2)}x`} good /></div>
-            </Section>
-
-            <Section id="operator" title="Operator Guidance" subtitle="Check this next" icon={Sparkles}>
+            <Section id="benchmarks" title="Benchmark Engine" subtitle="Account-specific health classification" icon={Gauge}>
               <div className="grid gap-4 md:grid-cols-2">
-                <div><h4 className="mb-3 font-black text-blue-200">Check This Next</h4><Checklist items={["Review Google Search campaigns", "Investigate TikTok CPA increase", "Analyze Add to Cart drop-off", "Refresh fatigued creatives"]} /></div>
-                <div><h4 className="mb-3 font-black text-amber-200">Likely Actions</h4><Checklist items={["Reallocate budget to Meta", "Improve product page speed", "Test new UGC creatives", "Scale winning campaigns"]} lightning /></div>
+                <div className="rounded-2xl bg-slate-950/50 p-5 text-center"><div className="mx-auto flex h-32 w-32 items-center justify-center rounded-full border-[14px] border-emerald-500/60"><div><p className="text-4xl font-black">82</p><p className="text-sm text-emerald-300">Healthy</p></div></div><p className="mt-4 text-slate-400">Scale score based on MER, CPA, CVR, and channel variance.</p></div>
+                <div className="space-y-3"><MiniMetric label="MER vs Baseline" value="Strong" tone="good" /><MiniMetric label="CPA Stability" value="Watch" tone="warn" /><MiniMetric label="Creative Fatigue" value="Medium" tone="warn" /><MiniMetric label="Tracking Confidence" value="Good" tone="good" /></div>
               </div>
             </Section>
           </div>
 
-          <div className="grid gap-5 2xl:grid-cols-4">
-            <Section id="benchmarks" title="Benchmark Engine" subtitle="Account-specific health" icon={Gauge}>
-              <div className="text-center"><div className="mx-auto flex h-32 w-32 items-center justify-center rounded-full border-[14px] border-emerald-500/60 bg-slate-950"><div><p className="text-4xl font-black">{operatorScore}</p><p className="text-sm text-emerald-300">Good</p></div></div><p className="mt-4 text-slate-300">+12% vs benchmark</p><p className="text-emerald-400">+8% vs 30-day average</p></div>
+          <div className="grid gap-5 2xl:grid-cols-3">
+            <Section id="reporting" title="Reporting Layer" subtitle="Weekly/monthly summary, lower priority than daily decisions" icon={BookOpen}>
+              <div className="grid gap-3 md:grid-cols-2"><MiniMetric label="Sales Growth" value={signed(pct(storeSales, prevStoreSales))} tone="good" /><MiniMetric label="MER Change" value={signed(pct(mer, prevMer))} tone={pct(mer, prevMer) >= 0 ? "good" : "warn"} /><MiniMetric label="Order Growth" value={signed(pct(orders, prevOrders))} tone="good" /><MiniMetric label="Spend Change" value={signed(pct(totalSpend, prevSpend))} tone="warn" /></div>
             </Section>
-            <Section id="truth" title="Truth Layers" subtitle="Data interpretation status" icon={Database}><StatusList items={["UTM Integrity|Good", "Server-Side Tracking|Partial", "Event Match Quality|Good", "Data Freshness|Good"]} /></Section>
-            <Section title="Profitability Snapshot" subtitle="Requires margin data" icon={DollarSign}><MiniMetric label="Gross Profit" value={money(grossProfit)} good /><MiniMetric label="Contribution After Ads" value={money(contributionAfterAds)} good /><MiniMetric label="Refunds" value={money(websiteTruth.refunds)} warn /></Section>
-            <Section id="sources" title="Data Source Status" subtitle="Connection readiness" icon={Database}><StatusList items={["Meta Ads|Connected", "Google Ads|Connected", "TikTok Ads|Connected", "Snap Ads|Connected", "Client Website|Planned"]} /></Section>
+            <Section id="sources" title="Source Mapping" subtitle="Admin layer later" icon={Database}>
+              <div className="space-y-3">{["Store Sales → Client Website", "Spend → Ad Platforms", "Orders → Client Website", "MER → Custom Calculation", "ROAS → Platform Attribution", "Funnel → Website/Analytics"].map((item) => <div key={item} className="rounded-xl bg-slate-950/40 p-3 text-sm text-slate-300">{item}</div>)}</div>
+            </Section>
+            <Section id="settings" title="Dashboard Rules" subtitle="Current operating logic" icon={Settings}>
+              <div className="space-y-3 text-sm text-slate-300"><p>1. Scale safely is the primary goal.</p><p>2. Protect MER before increasing total spend.</p><p>3. Store Sales is the business truth.</p><p>4. Platform ROAS is diagnostic, not final truth.</p><p>5. Daily decisions first, reporting second.</p></div>
+            </Section>
           </div>
-
-          <footer className="flex flex-col justify-between gap-3 border-t border-slate-800 py-6 text-xs text-slate-500 md:flex-row"><p>All metrics follow the defined formulas and benchmarks from the Performance Marketing Dashboard framework.</p><p>Data is mocked now. Next phase: source mapping + live API sync.</p></footer>
         </div>
       </div>
     </main>
   );
-}
-
-function numberDelta(value: number) {
-  return new Intl.NumberFormat("en-US", { signDisplay: "exceptZero" }).format(value);
-}
-
-function MiniMetric({ label, value, good, warn }: { label: string; value: string; good?: boolean; warn?: boolean }) {
-  return <div className="rounded-xl border border-slate-800 bg-slate-950/40 p-3"><p className="text-xs text-slate-400">{label}</p><p className={`mt-1 text-lg font-black ${good ? "text-emerald-300" : warn ? "text-amber-300" : "text-white"}`}>{value}</p></div>;
-}
-
-function Checklist({ items, lightning }: { items: string[]; lightning?: boolean }) {
-  return <div className="space-y-2">{items.map((item) => <div key={item} className="flex items-center gap-2 text-sm text-slate-300">{lightning ? <Zap size={15} className="text-amber-300" /> : <CheckCircle2 size={15} className="text-purple-300" />} {item}</div>)}</div>;
-}
-
-function StatusList({ items }: { items: string[] }) {
-  return <div className="space-y-3">{items.map((item) => { const [label, status] = item.split("|"); const good = status === "Good" || status === "Connected"; return <div key={item} className="flex items-center justify-between rounded-xl bg-slate-950/40 p-3"><span className="text-sm text-slate-300">{label}</span><span className={`rounded-lg px-3 py-1 text-xs font-black ${good ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"}`}>{status}</span></div>; })}</div>;
 }
