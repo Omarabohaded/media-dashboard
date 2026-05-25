@@ -14,6 +14,11 @@ import {
 type ClientDirectoryResponse = {
   clients: ClientRecord[];
   activeClientId: string;
+  storage: {
+    storageMode: "vercel_kv" | "ephemeral_tmp";
+    location: string;
+    durable: boolean;
+  };
 };
 
 type MetaAccountOption = {
@@ -78,8 +83,9 @@ type SyncStateResponse = {
     notes: string[];
   }>;
   storage: {
-    filePath: string;
-    storageMode: string;
+    location: string;
+    storageMode: "vercel_kv" | "ephemeral_tmp";
+    durable: boolean;
   };
   note: string;
 };
@@ -136,6 +142,8 @@ export default function AdminPage() {
   const [currencyCodeDraft, setCurrencyCodeDraft] =
     useState<ClientCurrencyCode>("USD");
   const [notesDraft, setNotesDraft] = useState("");
+  const [clientStorage, setClientStorage] =
+    useState<ClientDirectoryResponse["storage"] | null>(null);
   const [clientMessage, setClientMessage] = useState<string | null>(null);
   const [metaMessage, setMetaMessage] = useState<string | null>(null);
   const [shopifyMessage, setShopifyMessage] = useState<string | null>(null);
@@ -172,6 +180,7 @@ export default function AdminPage() {
 
     setClients(payload.clients);
     setActiveClientId(nextClientId);
+    setClientStorage(payload.storage);
     window.localStorage.setItem("media-dashboard-active-client", nextClientId);
   }
 
@@ -280,6 +289,46 @@ export default function AdminPage() {
     setMetaMessage("Client created. You can now connect Meta for this client.");
   }
 
+  async function handleDeleteClient() {
+    if (!activeClient) {
+      setClientMessage("Choose a client first.");
+      return;
+    }
+
+    const shouldDelete = window.confirm(
+      `Delete ${activeClient.name}? This will also remove its saved Meta connection for this client.`
+    );
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    const response = await fetch(
+      `/api/admin/clients?clientId=${encodeURIComponent(activeClient.id)}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    const payload = (await response.json()) as {
+      error?: string;
+      clients?: ClientRecord[];
+      activeClientId?: string;
+      deletedClientId?: string;
+    };
+
+    if (!response.ok) {
+      setClientMessage(payload.error ?? "Could not delete the client.");
+      return;
+    }
+
+    const nextClientId = payload.activeClientId ?? payload.clients?.[0]?.id ?? "";
+    setMetaPreview(null);
+    await loadClients(nextClientId);
+    setMetaMessage(null);
+    setClientMessage(`${activeClient.name} was removed from the dashboard.`);
+  }
+
   async function handleSaveMetaAccount() {
     if (!accountDraft) {
       setMetaMessage("Choose a Meta ad account first.");
@@ -354,6 +403,15 @@ export default function AdminPage() {
   return (
     <AppShell>
       <div className="space-y-5">
+        <Notice
+          message={
+            clientStorage?.durable
+              ? `Client storage is durable now. Data is stored through ${clientStorage.location}, so refreshes and future deployments should not wipe your clients.`
+              : `Client storage is still temporary right now. It is using ${clientStorage?.location ?? "server tmp storage"}, which can reset after refreshes or deployments until durable storage is configured.`
+          }
+          tone={clientStorage?.durable ? "info" : "warn"}
+        />
+
         <Section
           title="Client Onboarding"
           subtitle="Create a client first, choose the website type, and set the main reporting currency."
@@ -485,6 +543,13 @@ export default function AdminPage() {
                   className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-slate-500 hover:text-white"
                 >
                   Refresh Clients
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteClient()}
+                  className="rounded-xl border border-red-500/40 px-4 py-3 text-sm font-bold text-red-200 transition hover:border-red-400 hover:text-white"
+                >
+                  Delete Active Client
                 </button>
               </div>
             </div>
@@ -690,8 +755,8 @@ export default function AdminPage() {
               <MiniMetric
                 label="Sync Storage"
                 value={syncState?.storage.storageMode ?? "Not loaded"}
-                hint="This is still temporary prototype storage."
-                tone="warn"
+                hint={syncState?.storage.location ?? "Storage location pending"}
+                tone={syncState?.storage.durable ? "good" : "warn"}
               />
               <MiniMetric
                 label="Recent Runs"
