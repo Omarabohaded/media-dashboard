@@ -47,15 +47,24 @@ const merTrend = evaluateTrend([
 ]);
 const relationshipSignals = evaluateRelationships({
   mer: 1.8,
-  ctr: 0.7,
+  ctr: 2.4,
   cvr: 0.8,
   roas: 3.2,
   ncac: 145,
   frequency: 3.1,
   spendGrowth: 24,
   revenueGrowth: 12,
+  bounceRate: 61,
+  checkoutCompletionRate: 33,
+  backendConversions: 228,
+  platformConversions: 301,
+  trackingMismatch: true,
+  checkoutFailure: true,
+  merBelowThreshold: true,
 });
 const prioritizedSignals = prioritizeSignals(relationshipSignals);
+const riskSignals = prioritizedSignals.filter((signal) => signal.lane === "risk");
+const opportunitySignals = prioritizedSignals.filter((signal) => signal.lane === "opportunity");
 const decisionFeed = buildDecisionFeed(prioritizedSignals);
 const scalingDecision = evaluateScaling({
   merStatus: merHealth.status,
@@ -66,6 +75,10 @@ const scalingDecision = evaluateScaling({
   revenueGrowth: 12,
   spendGrowth: 24,
   priorityScore: prioritizedSignals[0]?.score || 0,
+  trackingMismatch: prioritizedSignals.some((signal) => signal.id === "tracking_mismatch"),
+  businessTruthFailure: prioritizedSignals.some((signal) => signal.id === "sales_up_mer_down"),
+  checkoutFailure: prioritizedSignals.some((signal) => signal.id === "checkout_failure"),
+  trafficQualityIssue: prioritizedSignals.some((signal) => signal.id === "traffic_quality_issue"),
 });
 console.log(merHealth);
 
@@ -313,10 +326,15 @@ export default function AdminPage() {
   />
 ))}
 </div>
-<div className="mt-6 grid gap-4 md:grid-cols-3">
-  {prioritizedSignals.map((signal) => (
+<div className="mt-6 grid gap-6 xl:grid-cols-2">
+  <div>
+    <div className="mb-3 text-sm font-bold uppercase text-red-300">
+      Risk Lane
+    </div>
+    <div className="grid gap-4">
+  {riskSignals.map((signal) => (
   <div
-    key={signal.title}
+    key={signal.id}
     className={`rounded-2xl border p-5 ${
       signal.priorityLabel === "Critical"
         ? "border-red-500 bg-red-950/20"
@@ -350,6 +368,47 @@ export default function AdminPage() {
     </div>
   </div>
 ))}
+    </div>
+  </div>
+  <div>
+    <div className="mb-3 text-sm font-bold uppercase text-emerald-300">
+      Opportunity Lane
+    </div>
+    <div className="grid gap-4">
+      {opportunitySignals.length ? opportunitySignals.map((signal) => (
+        <div
+          key={signal.id}
+          className="rounded-2xl border border-emerald-500/30 bg-emerald-950/15 p-5"
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-xs uppercase tracking-wide text-emerald-300">
+              {signal.priorityLabel}
+            </div>
+
+            <div className="rounded-full bg-slate-900 px-3 py-1 text-sm font-bold text-cyan-300">
+              Score {signal.score}
+            </div>
+          </div>
+
+          <div className="mt-3 text-xl font-bold text-white">
+            {signal.title}
+          </div>
+
+          <div className="mt-3 text-sm text-slate-300">
+            {signal.diagnosis}
+          </div>
+
+          <div className="mt-4 rounded-xl bg-slate-950/70 p-3 text-sm text-cyan-300">
+            Action: {signal.recommendation}
+          </div>
+        </div>
+      )) : (
+        <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5 text-sm text-slate-300">
+          Opportunities stay suppressed while higher-priority business risks are active on the same account.
+        </div>
+      )}
+    </div>
+  </div>
 </div>
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
             <MiniMetric label="Client" value={clientSetup.clientName} hint={clientSetup.phase} tone="good" />
