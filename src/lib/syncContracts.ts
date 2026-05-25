@@ -16,6 +16,8 @@ export type ConnectionHealth =
 export type SyncRunStatus = "idle" | "queued" | "running" | "succeeded" | "failed";
 
 export type IntegrationConnectionRecord = {
+  clientId: string;
+  clientName: string;
   platform: IntegrationPlatform;
   accountLabel: string;
   accountId: string | null;
@@ -30,6 +32,8 @@ export type IntegrationConnectionRecord = {
 
 export type SyncRunRecord = {
   id: string;
+  clientId: string | null;
+  clientName: string | null;
   platform: IntegrationPlatform;
   status: SyncRunStatus;
   startedAt: string | null;
@@ -41,6 +45,8 @@ export type SyncRunRecord = {
 };
 
 export type BusinessTruthSnapshot = {
+  clientId: string;
+  clientName: string;
   source: "shopify" | "wordpress" | "ga4" | "manual";
   capturedAt: string;
   grossSales: number;
@@ -52,6 +58,8 @@ export type BusinessTruthSnapshot = {
 };
 
 export type MediaPlatformSnapshot = {
+  clientId: string;
+  clientName: string;
   platform: "meta" | "google" | "tiktok" | "snap";
   capturedAt: string;
   accountId: string | null;
