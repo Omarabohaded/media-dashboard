@@ -39,20 +39,27 @@ export function getSecureCookieFlag() {
   return process.env.NODE_ENV === "production";
 }
 
+type MetaPaging = {
+  cursors?: {
+    before?: string;
+    after?: string;
+  };
+  next?: string;
+};
+
 type MetaApiResponse<T> = {
   data?: T;
-  paging?: {
-    cursors?: {
-      before?: string;
-      after?: string;
-    };
-    next?: string;
-  };
+  paging?: MetaPaging;
   error?: {
     message?: string;
     type?: string;
     code?: number;
   };
+};
+
+type MetaAdAccountsResponse = {
+  data: MetaAdAccount[];
+  paging?: MetaPaging;
 };
 
 type MetaInsightAction = {
@@ -179,10 +186,7 @@ export async function fetchMetaAdAccounts(accessToken: string) {
   let afterCursor: string | null = null;
 
   while (true) {
-    const response = await metaGraphGet<{
-      data: MetaAdAccount[];
-      paging?: MetaApiResponse<never>["paging"];
-    }>(
+    const page: MetaAdAccountsResponse = await metaGraphGet<MetaAdAccountsResponse>(
       "/me/adaccounts",
       {
         fields: "id,name,account_status,currency,timezone_name",
@@ -192,9 +196,9 @@ export async function fetchMetaAdAccounts(accessToken: string) {
       accessToken
     );
 
-    accounts.push(...(response.data ?? []));
+    accounts.push(...(page.data ?? []));
 
-    const nextCursor = response.paging?.cursors?.after;
+    const nextCursor = page.paging?.cursors?.after;
 
     if (!nextCursor || nextCursor === afterCursor) {
       break;
