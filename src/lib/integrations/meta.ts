@@ -179,7 +179,10 @@ export async function fetchMetaAdAccounts(accessToken: string) {
   let afterCursor: string | null = null;
 
   while (true) {
-    const response = await metaGraphGet<{
+    const response: {
+      data: MetaAdAccount[];
+      paging?: MetaApiResponse<never>["paging"];
+    } = await metaGraphGet<{
       data: MetaAdAccount[];
       paging?: MetaApiResponse<never>["paging"];
     }>(
