@@ -1,4 +1,10 @@
-export type IntegrationPlatform = "meta" | "shopify" | "google" | "tiktok" | "snap";
+export type IntegrationPlatform =
+  | "meta"
+  | "shopify"
+  | "wordpress"
+  | "google"
+  | "tiktok"
+  | "snap";
 
 export type ConnectionHealth =
   | "missing_config"
@@ -35,7 +41,7 @@ export type SyncRunRecord = {
 };
 
 export type BusinessTruthSnapshot = {
-  source: "shopify" | "ga4" | "manual";
+  source: "shopify" | "wordpress" | "ga4" | "manual";
   capturedAt: string;
   grossSales: number;
   taxTotal: number;
