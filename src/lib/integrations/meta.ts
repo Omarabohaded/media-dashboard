@@ -1,6 +1,5 @@
 export const META_STATE_COOKIE = "meta_oauth_state";
-export const META_TOKEN_COOKIE = "meta_access_token";
-export const META_ACCOUNT_COOKIE = "meta_account_id";
+export const META_OAUTH_CLIENT_COOKIE = "meta_oauth_client_id";
 
 export type MetaConfig = {
   appId: string;
@@ -42,6 +41,13 @@ export function getSecureCookieFlag() {
 
 type MetaApiResponse<T> = {
   data?: T;
+  paging?: {
+    cursors?: {
+      before?: string;
+      after?: string;
+    };
+    next?: string;
+  };
   error?: {
     message?: string;
     type?: string;
@@ -169,16 +175,35 @@ async function metaGraphGet<T>(
 }
 
 export async function fetchMetaAdAccounts(accessToken: string) {
-  const response = await metaGraphGet<{ data: MetaAdAccount[] }>(
-    "/me/adaccounts",
-    {
-      fields: "id,name,account_status,currency,timezone_name",
-      limit: "25",
-    },
-    accessToken
-  );
+  const accounts: MetaAdAccount[] = [];
+  let afterCursor: string | null = null;
 
-  return response.data ?? [];
+  while (true) {
+    const response = await metaGraphGet<{
+      data: MetaAdAccount[];
+      paging?: MetaApiResponse<never>["paging"];
+    }>(
+      "/me/adaccounts",
+      {
+        fields: "id,name,account_status,currency,timezone_name",
+        limit: "100",
+        ...(afterCursor ? { after: afterCursor } : {}),
+      },
+      accessToken
+    );
+
+    accounts.push(...(response.data ?? []));
+
+    const nextCursor = response.paging?.cursors?.after;
+
+    if (!nextCursor || nextCursor === afterCursor) {
+      break;
+    }
+
+    afterCursor = nextCursor;
+  }
+
+  return accounts;
 }
 
 function getActionValue(actions: MetaInsightAction[] | undefined, actionType: string) {
