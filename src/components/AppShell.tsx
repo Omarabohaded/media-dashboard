@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -16,9 +17,62 @@ import {
   ShieldCheck,
   Zap,
 } from "lucide-react";
-import { client } from "@/lib/mockData";
+import { getCurrencyMeta, type ClientRecord } from "@/lib/clientTypes";
+
+type ClientDirectoryResponse = {
+  clients: ClientRecord[];
+  activeClientId: string;
+};
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const [clients, setClients] = useState<ClientRecord[]>([]);
+  const [activeClientId, setActiveClientId] = useState("");
+
+  const activeClient = useMemo(
+    () =>
+      clients.find((entry) => entry.id === activeClientId) ?? clients[0] ?? null,
+    [activeClientId, clients]
+  );
+
+  useEffect(() => {
+    async function loadClients() {
+      const preferredClientId =
+        typeof window !== "undefined"
+          ? window.localStorage.getItem("media-dashboard-active-client")
+          : null;
+      const query = preferredClientId
+        ? `?clientId=${encodeURIComponent(preferredClientId)}`
+        : "";
+
+      try {
+        const response = await fetch(`/api/admin/clients${query}`, {
+          cache: "no-store",
+        });
+        const payload = (await response.json()) as ClientDirectoryResponse;
+        setClients(payload.clients);
+        setActiveClientId(payload.activeClientId);
+      } catch {
+        setClients([]);
+        setActiveClientId("");
+      }
+    }
+
+    void loadClients();
+  }, [pathname]);
+
+  function handleClientSwitch(nextClientId: string) {
+    setActiveClientId(nextClientId);
+    window.localStorage.setItem("media-dashboard-active-client", nextClientId);
+
+    if (pathname === "/admin") {
+      window.location.href = `/admin?clientId=${encodeURIComponent(nextClientId)}`;
+      return;
+    }
+
+    window.location.reload();
+  }
+
   return (
     <main className="min-h-screen bg-[#06111f] text-white">
       <Sidebar />
@@ -27,12 +81,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
             <div>
               <div className="mb-3 flex flex-wrap gap-2">
-                <span className="rounded-full border border-blue-500/40 bg-blue-500/10 px-4 py-1 text-sm font-bold text-blue-200">{client}</span>
+                <span className="rounded-full border border-blue-500/40 bg-blue-500/10 px-4 py-1 text-sm font-bold text-blue-200">
+                  {activeClient?.name ?? "Client not selected"}
+                </span>
+                <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-4 py-1 text-sm font-bold text-amber-200">
+                  {activeClient
+                    ? getCurrencyMeta(activeClient.currencyCode).label
+                    : "Currency pending"}
+                </span>
                 <span className="rounded-full border border-emerald-500/40 bg-emerald-500/10 px-4 py-1 text-sm font-bold text-emerald-200">Scale safely first</span>
                 <span className="rounded-full border border-purple-500/40 bg-purple-500/10 px-4 py-1 text-sm font-bold text-purple-200">Store sales truth</span>
               </div>
               <h1 className="text-3xl font-black tracking-tight md:text-5xl">Performance Marketing Command Center</h1>
-              <p className="mt-2 text-slate-400">Daily decisions first · reporting second · one client phase</p>
+              <p className="mt-2 text-slate-400">Daily decisions first · reporting second · active client always visible</p>
+            </div>
+            <div className="min-w-[280px] rounded-2xl border border-slate-800 bg-slate-950/50 p-3">
+              <div className="text-xs font-black uppercase tracking-wide text-slate-400">
+                Quick Client Switch
+              </div>
+              <select
+                value={activeClientId}
+                onChange={(event) => handleClientSwitch(event.target.value)}
+                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm font-semibold text-white outline-none"
+              >
+                {clients.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.name} · {entry.currencyCode}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </header>
