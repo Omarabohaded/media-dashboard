@@ -12,6 +12,7 @@ import {
   fetchWordPressStoreTruthPreview,
   getWordPressConfig,
 } from "./integrations/wordpress";
+import { getClientById } from "./clientStore";
 import {
   appendBusinessTruthSnapshot,
   appendMediaSnapshot,
@@ -26,9 +27,14 @@ import {
   SyncRunRecord,
 } from "./syncContracts";
 
-function buildRun(platform: SyncRunRecord["platform"]): SyncRunRecord {
+function buildRun(
+  platform: SyncRunRecord["platform"],
+  client?: { id: string; name: string } | null
+): SyncRunRecord {
   return {
     id: crypto.randomUUID(),
+    clientId: client?.id ?? null,
+    clientName: client?.name ?? null,
     platform,
     status: "running",
     startedAt: new Date().toISOString(),
@@ -52,10 +58,12 @@ function finalizeRun(
 }
 
 export async function runMetaSync(input: {
+  clientId: string;
   accessToken: string | null;
   accountId: string | null;
 }) {
-  const run = buildRun("meta");
+  const client = await getClientById(input.clientId);
+  const run = buildRun("meta", client);
   const config = getMetaConfig();
 
   if (config.missingEnv.length > 0) {
@@ -95,6 +103,8 @@ export async function runMetaSync(input: {
     const rows = await fetchMetaInsightsPreview(input.accessToken, input.accountId);
 
     const snapshot: MediaPlatformSnapshot = {
+      clientId: client.id,
+      clientName: client.name,
       platform: "meta",
       capturedAt: new Date().toISOString(),
       accountId: input.accountId,
@@ -108,6 +118,8 @@ export async function runMetaSync(input: {
     };
 
     const connection: IntegrationConnectionRecord = {
+      clientId: client.id,
+      clientName: client.name,
       platform: "meta",
       accountLabel: snapshot.accountLabel,
       accountId: input.accountId,
@@ -175,6 +187,8 @@ export async function runShopifySync(input: { accessToken: string | null }) {
 
     const preview = await fetchShopifyStoreTruthPreview(accessToken);
     const snapshot: BusinessTruthSnapshot = {
+      clientId: "global-shopify",
+      clientName: "Shopify Truth Layer",
       source: "shopify",
       capturedAt: new Date().toISOString(),
       grossSales: preview.snapshot.grossSales,
@@ -186,6 +200,8 @@ export async function runShopifySync(input: { accessToken: string | null }) {
     };
 
     const connection: IntegrationConnectionRecord = {
+      clientId: "global-shopify",
+      clientName: "Shopify Truth Layer",
       platform: "shopify",
       accountLabel: preview.snapshot.shopName,
       accountId: null,
@@ -233,9 +249,7 @@ export async function runWordPressSync() {
     const failed = finalizeRun(run, {
       status: "failed",
       error: `Missing WordPress config: ${config.missingEnv.join(", ")}`,
-      notes: [
-        "Add WordPress site URL and WooCommerce API keys in Vercel before syncing.",
-      ],
+      notes: ["Add WordPress site URL and WooCommerce API keys in Vercel before syncing."],
     });
     await appendSyncRun(failed);
     return failed;
@@ -244,6 +258,8 @@ export async function runWordPressSync() {
   try {
     const preview = await fetchWordPressStoreTruthPreview();
     const snapshot: BusinessTruthSnapshot = {
+      clientId: "global-wordpress",
+      clientName: "WordPress Truth Layer",
       source: "wordpress",
       capturedAt: new Date().toISOString(),
       grossSales: preview.snapshot.grossSales,
@@ -255,6 +271,8 @@ export async function runWordPressSync() {
     };
 
     const connection: IntegrationConnectionRecord = {
+      clientId: "global-wordpress",
+      clientName: "WordPress Truth Layer",
       platform: "wordpress",
       accountLabel: preview.snapshot.storeName,
       accountId: null,
