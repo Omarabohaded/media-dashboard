@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   fetchMetaInsightsPreview,
-  META_ACCOUNT_COOKIE,
-  META_TOKEN_COOKIE,
 } from "@/lib/integrations/meta";
+import { getClientById, getMetaConnection } from "@/lib/clientStore";
 
 export async function GET(request: NextRequest) {
   try {
-    const accessToken = request.cookies.get(META_TOKEN_COOKIE)?.value;
-    const accountId = request.cookies.get(META_ACCOUNT_COOKIE)?.value;
+    const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+    const connection = await getMetaConnection(client.id);
+    const accessToken = connection?.accessToken;
+    const accountId = connection?.selectedAccountId;
 
     if (!accessToken) {
       return NextResponse.json(
@@ -44,6 +45,7 @@ export async function GET(request: NextRequest) {
     );
 
     return NextResponse.json({
+      clientId: client.id,
       accountId,
       rows,
       totals,
