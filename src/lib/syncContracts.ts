@@ -12,18 +12,25 @@ export type SyncRunStatus = "idle" | "queued" | "running" | "succeeded" | "faile
 export type IntegrationConnectionRecord = {
   platform: IntegrationPlatform;
   accountLabel: string;
+  accountId: string | null;
   health: ConnectionHealth;
   scopes: string[];
   lastError: string | null;
+  connectedAt: string | null;
+  lastSyncedAt: string | null;
+  sourceMode: "live" | "mock" | "ephemeral";
   recommendedNextStep: string;
 };
 
 export type SyncRunRecord = {
+  id: string;
   platform: IntegrationPlatform;
   status: SyncRunStatus;
   startedAt: string | null;
   finishedAt: string | null;
   recordsProcessed: number;
+  storageMode: "ephemeral_tmp";
+  error: string | null;
   notes: string[];
 };
 
@@ -36,4 +43,27 @@ export type BusinessTruthSnapshot = {
   netSales: number;
   orders: number;
   averageOrderValue: number;
+};
+
+export type MediaPlatformSnapshot = {
+  platform: "meta" | "google" | "tiktok" | "snap";
+  capturedAt: string;
+  accountId: string | null;
+  accountLabel: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  purchases: number;
+  purchaseValue: number;
+  campaigns: number;
+};
+
+export type SyncStateStore = {
+  version: 1;
+  storageMode: "ephemeral_tmp";
+  updatedAt: string | null;
+  connections: IntegrationConnectionRecord[];
+  syncRuns: SyncRunRecord[];
+  businessTruthSnapshots: BusinessTruthSnapshot[];
+  mediaSnapshots: MediaPlatformSnapshot[];
 };
