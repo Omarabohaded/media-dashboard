@@ -9,6 +9,10 @@ import {
   getShopifyConfig,
 } from "./integrations/shopify";
 import {
+  fetchWordPressStoreTruthPreview,
+  getWordPressConfig,
+} from "./integrations/wordpress";
+import {
   appendBusinessTruthSnapshot,
   appendMediaSnapshot,
   appendSyncRun,
@@ -215,6 +219,75 @@ export async function runShopifySync(input: { accessToken: string | null }) {
       status: "failed",
       error: message,
       notes: ["Check the Shopify app install, scopes, and credentials."],
+    });
+    await appendSyncRun(failed);
+    return failed;
+  }
+}
+
+export async function runWordPressSync() {
+  const run = buildRun("wordpress");
+  const config = getWordPressConfig();
+
+  if (config.missingEnv.length > 0) {
+    const failed = finalizeRun(run, {
+      status: "failed",
+      error: `Missing WordPress config: ${config.missingEnv.join(", ")}`,
+      notes: [
+        "Add WordPress site URL and WooCommerce API keys in Vercel before syncing.",
+      ],
+    });
+    await appendSyncRun(failed);
+    return failed;
+  }
+
+  try {
+    const preview = await fetchWordPressStoreTruthPreview();
+    const snapshot: BusinessTruthSnapshot = {
+      source: "wordpress",
+      capturedAt: new Date().toISOString(),
+      grossSales: preview.snapshot.grossSales,
+      taxTotal: preview.snapshot.taxTotal,
+      shippingTotal: preview.snapshot.shippingTotal,
+      netSales: preview.snapshot.netSales,
+      orders: preview.snapshot.ordersCount,
+      averageOrderValue: preview.snapshot.averageOrderValue,
+    };
+
+    const connection: IntegrationConnectionRecord = {
+      platform: "wordpress",
+      accountLabel: preview.snapshot.storeName,
+      accountId: null,
+      health: "sync_ready",
+      scopes: ["read"],
+      lastError: null,
+      connectedAt: run.startedAt,
+      lastSyncedAt: snapshot.capturedAt,
+      sourceMode: "ephemeral",
+      recommendedNextStep:
+        "Pair this WordPress or WooCommerce truth layer with Meta before enabling live decision scoring.",
+    };
+
+    await appendBusinessTruthSnapshot(snapshot);
+    await upsertConnectionRecord(connection);
+
+    const succeeded = finalizeRun(run, {
+      status: "succeeded",
+      recordsProcessed: preview.orders.length,
+      notes: [
+        `${preview.orders.length} WordPress or WooCommerce orders captured for the last 7 days.`,
+        "This store-truth source follows the official WooCommerce REST API path.",
+      ],
+    });
+    await appendSyncRun(succeeded);
+    return succeeded;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "WordPress sync failed.";
+    const failed = finalizeRun(run, {
+      status: "failed",
+      error: message,
+      notes: ["Check WooCommerce REST keys, HTTPS, and permalink settings."],
     });
     await appendSyncRun(failed);
     return failed;
