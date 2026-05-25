@@ -14,10 +14,30 @@ type Inputs = {
   revenueGrowth: number;
   spendGrowth: number;
   priorityScore: number;
+  trackingMismatch?: boolean;
+  businessTruthFailure?: boolean;
+  checkoutFailure?: boolean;
+  trafficQualityIssue?: boolean;
 };
 
 export function evaluateScaling(inputs: Inputs): ScalingDecision {
-  let confidence = 100;
+  if (
+    inputs.trackingMismatch ||
+    inputs.businessTruthFailure ||
+    inputs.checkoutFailure
+  ) {
+    return {
+      status: "danger",
+      confidence: 20,
+      riskLevel: "Critical",
+      recommendedScalePercent: 0,
+      summary: "Scaling is blocked until the highest-impact issue is fixed.",
+      recommendation:
+        "Fix tracking, business-truth, or checkout issues before any budget increase.",
+    };
+  }
+
+  let confidence = 70;
 
   if (inputs.merStatus === "warning") {
     confidence -= 20;
@@ -35,12 +55,18 @@ export function evaluateScaling(inputs: Inputs): ScalingDecision {
     confidence -= 20;
   }
 
+  if (inputs.trafficQualityIssue) {
+    confidence -= 15;
+  }
+
   if (inputs.spendGrowth > inputs.revenueGrowth) {
     confidence -= 15;
   }
 
-  if (inputs.priorityScore >= 100) {
+  if (inputs.priorityScore >= 85) {
     confidence -= 20;
+  } else if (inputs.priorityScore >= 65) {
+    confidence -= 10;
   }
 
   confidence = Math.max(0, Math.min(100, confidence));
@@ -50,10 +76,10 @@ export function evaluateScaling(inputs: Inputs): ScalingDecision {
       status: "safe",
       confidence,
       riskLevel: "Low",
-      recommendedScalePercent: 15,
-      summary: "System confidence supports scaling.",
+      recommendedScalePercent: 20,
+      summary: "System confidence supports controlled scaling.",
       recommendation:
-        "Scale gradually while monitoring MER and creative stability.",
+        "Increase budget 20-30% only if efficiency remains stable for multiple days.",
     };
   }
 
@@ -61,19 +87,19 @@ export function evaluateScaling(inputs: Inputs): ScalingDecision {
     return {
       status: "cautious",
       confidence,
-      riskLevel: "Low",
-      recommendedScalePercent: 15,
+      riskLevel: "Medium",
+      recommendedScalePercent: 10,
       summary: "Scaling is possible but risk signals exist.",
       recommendation:
-        "Stabilize efficiency and creative performance before aggressive scaling.",
+        "Hold aggressive scale. If you add budget, keep it to 10-15% and monitor closely.",
     };
   }
 
   return {
     status: "danger",
     confidence,
-    riskLevel: "Low",
-    recommendedScalePercent: 15,
+    riskLevel: "High",
+    recommendedScalePercent: 0,
     summary: "Scaling conditions are unsafe.",
     recommendation:
       "Focus on stabilization before increasing budgets.",
