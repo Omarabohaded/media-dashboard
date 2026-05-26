@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
   const config = getShopifyConfig();
   const storeDomain = connection?.storeDomain ?? "";
   const accessToken = connection?.accessToken ?? "";
+  const clientDeclinedAccess = Boolean(client.storeAccessDeclined);
   let connectionError = connection?.lastError ?? null;
   let previewReady = false;
   let shopName = connection?.shopName ?? null;
@@ -31,18 +32,21 @@ export async function GET(request: NextRequest) {
     client,
     platform: "shopify",
     configured: config.missingEnv.length === 0,
-    connected: Boolean(storeDomain && accessToken) && !connectionError,
-    previewReady,
+    connected:
+      Boolean(storeDomain && accessToken) && !connectionError && !clientDeclinedAccess,
+    previewReady: previewReady && !clientDeclinedAccess,
     storeDomain,
     apiVersion: config.apiVersion,
     requestedScopes: config.requestedScopes,
     missingEnv: config.missingEnv,
     usesMockData: false,
     shopName,
-    connectionError,
+    connectionError: clientDeclinedAccess && !storeDomain ? null : connectionError,
     recommendedNextStep:
       config.missingEnv.length > 0
         ? "Add Shopify app credentials before connecting client stores."
+        : clientDeclinedAccess && !storeDomain
+        ? "This client has not granted website access. Keep Shopify optional unless they choose to share it later."
         : !storeDomain || !accessToken
         ? "Start the Shopify install flow for this client store."
         : connectionError
