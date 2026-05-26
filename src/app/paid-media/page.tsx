@@ -162,7 +162,6 @@ export default function PaidMediaPage() {
                 </thead>
                 <tbody>
                   {sortedRows.map((row) => {
-                    const rowCpc = row.cpc ?? (row.ctr > 0 && row.spend > 0 ? row.spend / Math.max((row.ctr / 100) * row.spend, 1) : null);
                     const rowRoas = row.spend > 0 ? row.purchaseValue / row.spend : 0;
                     return (
                       <tr key={row.campaignId} className="border-b border-[var(--line)]">
@@ -185,7 +184,7 @@ export default function PaidMediaPage() {
                           {formatNumber(row.frequency, 2)}
                         </td>
                         <td className="px-3 py-4 text-sm text-[var(--muted)]">
-                          {rowCpc !== null ? formatMoney(rowCpc, currency) : "-"}
+                          {typeof row.cpc === "number" ? formatMoney(row.cpc, currency) : "-"}
                         </td>
                         <td className="px-3 py-4 text-sm text-[var(--muted)]">
                           {formatNumber(rowRoas, 2)}x
