@@ -9,6 +9,12 @@ import {
 } from "@/components/AppShell";
 import { getCurrencyMeta } from "@/lib/clientTypes";
 import { useDashboardReadiness } from "@/lib/useDashboardReadiness";
+import {
+  evaluateTrackingGap,
+  formatPercent,
+  getMetricBenchmarkBasis,
+  getMetricPairing,
+} from "@/lib/workbookSignals";
 
 function formatMoney(value: number, currencyCode: string) {
   const locale =
@@ -45,6 +51,16 @@ export default function HealthPage() {
 
   const hasBusinessTruth = Boolean(storePreview);
   const hasMetaSpend = Boolean(metaPreview && metaStatus?.selectedAccountId);
+  const trackingGap = evaluateTrackingGap({
+    storeRevenue: hasBusinessTruth ? storeRevenue : undefined,
+    platformRevenue: hasMetaSpend ? metaPreview?.totals.purchaseValue : undefined,
+    storeOrders: hasBusinessTruth ? orders : undefined,
+    platformPurchases: hasMetaSpend ? metaPreview?.totals.purchases : undefined,
+  });
+  const revenuePerClick =
+    hasBusinessTruth && metaPreview && metaPreview.totals.clicks > 0
+      ? storeRevenue / metaPreview.totals.clicks
+      : null;
 
   return (
     <AppShell>
@@ -61,6 +77,24 @@ export default function HealthPage() {
             <SourcePill
               label={hasMetaSpend ? "Meta spend connected" : "Meta spend missing"}
               tone={hasMetaSpend ? "good" : "warn"}
+            />
+            <SourcePill
+              label={
+                trackingGap.ready
+                  ? trackingGap.active
+                    ? "Tracking gap needs review"
+                    : "Tracking gap within range"
+                  : "Tracking gap not ready yet"
+              }
+              tone={
+                trackingGap.status === "danger"
+                  ? "bad"
+                  : trackingGap.status === "warning"
+                  ? "warn"
+                  : trackingGap.status === "healthy"
+                  ? "good"
+                  : "default"
+              }
             />
             <SourcePill
               label="Sessions still need GA4 or storefront analytics"
@@ -136,6 +170,36 @@ export default function HealthPage() {
                 hint="Workbook source is website analytics, not ad platform only"
                 tone="warn"
               />
+              <MiniMetric
+                label="Revenue per Click"
+                value={
+                  revenuePerClick !== null
+                    ? formatMoney(revenuePerClick, storeCurrency)
+                    : "Needs spend + store truth"
+                }
+                hint="Workbook metric: store revenue divided by clicks"
+                tone={revenuePerClick !== null ? "good" : "warn"}
+              />
+              <MiniMetric
+                label="Tracking Gap Signal"
+                value={
+                  trackingGap.ready
+                    ? trackingGap.active
+                      ? "Review mismatch"
+                      : "Within range"
+                    : "Needs both truths"
+                }
+                hint={trackingGap.summary}
+                tone={
+                  trackingGap.status === "danger"
+                    ? "bad"
+                    : trackingGap.status === "warning"
+                    ? "warn"
+                    : trackingGap.status === "healthy"
+                    ? "good"
+                    : "default"
+                }
+              />
             </div>
           )}
         </Section>
@@ -178,6 +242,44 @@ export default function HealthPage() {
               value={storeStatus?.sourceLabel ?? "Admin setup"}
               hint={message ?? storeStatus?.recommendedNextStep ?? "No issues detected."}
               tone="default"
+            />
+          </div>
+        </Section>
+
+        <Section
+          title="Workbook Rules Applied"
+          subtitle="These are the exact logic notes now shaping the health view."
+        >
+          <div className="grid gap-5 md:grid-cols-3">
+            <MiniMetric
+              label="MER Benchmark Basis"
+              value="Applied"
+              hint={getMetricBenchmarkBasis("mer") ?? "Benchmark basis not found"}
+              tone="good"
+            />
+            <MiniMetric
+              label="Tracking Gap"
+              value={
+                trackingGap.ready
+                  ? `${formatPercent(trackingGap.revenueGapRatio)} revenue gap`
+                  : "Waiting for both truths"
+              }
+              hint={getMetricPairing("tracking_gap_signal") ?? trackingGap.summary}
+              tone={
+                trackingGap.status === "danger"
+                  ? "bad"
+                  : trackingGap.status === "warning"
+                  ? "warn"
+                  : trackingGap.status === "healthy"
+                  ? "good"
+                  : "default"
+              }
+            />
+            <MiniMetric
+              label="Revenue per Session"
+              value="Blocked"
+              hint="The workbook requires website session truth before this metric can be trusted."
+              tone="warn"
             />
           </div>
         </Section>
