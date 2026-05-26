@@ -1,11 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  RefreshCw,
-  ShieldCheck,
-} from "lucide-react";
+import { AlertTriangle, RefreshCw, ShieldCheck } from "lucide-react";
 import {
   AppShell,
   EmptySectionState,
@@ -18,6 +14,7 @@ import {
   type ClientCurrencyCode,
   type ClientRecord,
 } from "@/lib/clientTypes";
+import { getFunnelReadiness } from "@/lib/funnelReadiness";
 import { evaluateTrackingGap } from "@/lib/workbookSignals";
 
 type DateRange =
@@ -59,6 +56,8 @@ type MetaInsightsPreview = {
     frequency: number;
     purchases: number;
     purchaseValue: number;
+    addToCart?: number;
+    checkoutInitiated?: number;
   }>;
   totals: {
     spend: number;
@@ -225,6 +224,31 @@ export default function DashboardPage() {
     storeOrders: hasStoreTruth ? storePreview?.snapshot.ordersCount : undefined,
     platformPurchases: hasMetaPreview ? metaPreview?.totals.purchases : undefined,
   });
+  const funnelReadiness = getFunnelReadiness({
+    storePreview: storePreview
+      ? {
+          platform:
+            activeClient?.websitePlatform === "wordpress" ? "wordpress" : "shopify",
+          storeName:
+            storePreview.snapshot.shopName ??
+            storePreview.snapshot.storeName ??
+            "Store source",
+          currencyCode: storePreview.snapshot.currencyCode,
+          ordersCount: storePreview.snapshot.ordersCount,
+          grossSales: storePreview.snapshot.grossSales,
+          taxTotal: storePreview.snapshot.taxTotal,
+          shippingTotal: storePreview.snapshot.shippingTotal,
+          netSales: storePreview.snapshot.netSales,
+          averageOrderValue: storePreview.snapshot.averageOrderValue,
+          note: storePreview.note,
+        }
+      : null,
+    metaPreview,
+    analyticsConnected: false,
+  });
+  const purchaseCvrMetric = funnelReadiness.find(
+    (metric) => metric.id === "purchase_cvr"
+  );
 
   useEffect(() => {
     async function loadClients() {
@@ -752,6 +776,18 @@ export default function DashboardPage() {
                   : "warn"
               }
             />
+            <MiniMetric
+              label="Purchase CVR"
+              value={purchaseCvrMetric?.value ?? "Blocked"}
+              hint={purchaseCvrMetric?.hint ?? "Needs website session truth"}
+              tone={
+                purchaseCvrMetric?.state === "ready"
+                  ? "good"
+                  : purchaseCvrMetric?.state === "partial"
+                  ? "default"
+                  : "warn"
+              }
+            />
           </div>
         </Section>
 
@@ -800,8 +836,8 @@ export default function DashboardPage() {
             />
             <MiniMetric
               label="Sessions and Funnel"
-              value="Not fully applied yet"
-              hint="Workbook formulas like LPV rate, ATC rate, and purchase CVR still need analytics truth."
+              value="Readiness layer added"
+              hint="The dashboard now distinguishes blocked metrics from partial platform proxies, but final funnel truth still needs analytics."
               tone="warn"
             />
           </div>
