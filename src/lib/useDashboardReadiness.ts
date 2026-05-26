@@ -259,16 +259,23 @@ export function useDashboardReadiness(options: HookOptions = {}) {
     return nextClientId;
   }
 
-  async function loadStoreForPlatform(platform: WebsitePlatform) {
+  async function loadStoreForPlatform(
+    platform: WebsitePlatform,
+    clientId: string
+  ) {
     if (platform !== "shopify" && platform !== "wordpress") {
       setStoreStatus(defaultStoreStatus(platform));
       setStorePreview(null);
       return;
     }
 
-    const statusResponse = await fetch(`/api/integrations/${platform}/status`, {
-      cache: "no-store",
-    });
+    const query = `?clientId=${encodeURIComponent(clientId)}`;
+    const statusResponse = await fetch(
+      `/api/integrations/${platform}/status${query}`,
+      {
+        cache: "no-store",
+      }
+    );
     const statusPayload = (await statusResponse.json()) as
       | ShopifyStatusResponse
       | WordPressStatusResponse;
@@ -281,7 +288,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
     }
 
     const previewResponse = await fetch(
-      `/api/integrations/${platform}/store-truth-preview`,
+      `/api/integrations/${platform}/store-truth-preview${query}`,
       {
         cache: "no-store",
       }
@@ -375,7 +382,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
       }
 
       if (client) {
-        await loadStoreForPlatform(client.websitePlatform);
+        await loadStoreForPlatform(client.websitePlatform, nextClientId);
       }
     } catch {
       setMessage("Could not load the dashboard state.");
