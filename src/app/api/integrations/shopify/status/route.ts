@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     client,
     platform: "shopify",
     configured: config.missingEnv.length === 0,
-    connected: Boolean(storeDomain),
+    connected: Boolean(storeDomain) && !connectionError,
     previewReady,
     storeDomain,
     apiVersion: config.apiVersion,
@@ -49,6 +49,8 @@ export async function GET(request: NextRequest) {
         ? "Add Shopify client credentials before connecting client stores."
         : !storeDomain
         ? "Save the Shopify store domain for this client first."
+        : connectionError
+        ? "Confirm the store domain, make sure the Shopify app is installed on that store, and verify that this store is eligible for the current auth flow."
         : !previewReady
         ? "Validate the Shopify app install, scopes, and saved store domain for this client."
         : "Compare Shopify store truth against Meta before enabling scale recommendations.",
