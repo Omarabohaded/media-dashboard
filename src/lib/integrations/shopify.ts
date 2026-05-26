@@ -57,6 +57,32 @@ export function normalizeShopifyStoreDomain(value: string) {
     .replace(/\.$/, "");
 }
 
+function buildNonJsonShopifyResponseError(storeDomain: string) {
+  return `Shopify returned an HTML response for ${storeDomain} instead of API JSON. This usually means the app is not installed on that store, the store is not eligible for this client-credentials flow, or the store domain is wrong.`;
+}
+
+async function parseShopifyJsonResponse<T>(
+  response: Response,
+  storeDomain: string,
+  fallbackMessage: string
+): Promise<T> {
+  const text = await response.text();
+
+  if (!text.trim()) {
+    throw new Error(fallbackMessage);
+  }
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    if (text.trim().startsWith("<")) {
+      throw new Error(buildNonJsonShopifyResponseError(storeDomain));
+    }
+
+    throw new Error(fallbackMessage);
+  }
+}
+
 export function getShopifyConfig(): ShopifyConfig {
   const clientId = requiredEnv("SHOPIFY_CLIENT_ID");
   const clientSecret = requiredEnv("SHOPIFY_CLIENT_SECRET");
@@ -98,6 +124,7 @@ export async function exchangeShopifyClientCredentials(storeDomain: string) {
     {
       method: "POST",
       headers: {
+        Accept: "application/json",
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: body.toString(),
@@ -105,7 +132,11 @@ export async function exchangeShopifyClientCredentials(storeDomain: string) {
     }
   );
 
-  const payload = (await response.json()) as ShopifyTokenResponse;
+  const payload = await parseShopifyJsonResponse<ShopifyTokenResponse>(
+    response,
+    normalizedStoreDomain,
+    "Shopify token exchange failed."
+  );
 
   if (!response.ok || payload.error || !payload.access_token) {
     throw new Error(
@@ -135,6 +166,7 @@ async function shopifyAdminGraphql<T>(
     {
       method: "POST",
       headers: {
+        Accept: "application/json",
         "Content-Type": "application/json",
         "X-Shopify-Access-Token": accessToken,
       },
@@ -143,7 +175,11 @@ async function shopifyAdminGraphql<T>(
     }
   );
 
-  const payload = (await response.json()) as ShopifyGraphqlResponse<T>;
+  const payload = await parseShopifyJsonResponse<ShopifyGraphqlResponse<T>>(
+    response,
+    normalizedStoreDomain,
+    "Shopify Admin API request failed."
+  );
 
   if (!response.ok || payload.errors?.length) {
     throw new Error(
