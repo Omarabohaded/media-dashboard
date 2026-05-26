@@ -313,7 +313,9 @@ export default function AdminPage() {
       ).label}.`
     );
     setMetaMessage("Client created. You can now connect Meta for this client.");
-    setShopifyMessage("Client created. You can now connect Shopify for this client.");
+    setShopifyMessage(
+      "Client created. Connect Shopify only if this client is willing to share store access."
+    );
   }
 
   async function handleDeleteClient() {
@@ -457,8 +459,50 @@ export default function AdminPage() {
     setShopifyMessage("Shopify was disconnected for this client.");
   }
 
+  async function handleUpdateStoreAccessDeclined(storeAccessDeclined: boolean) {
+    if (!activeClientId) {
+      setShopifyMessage("Choose a client first.");
+      return;
+    }
+
+    const response = await fetch("/api/admin/clients", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        clientId: activeClientId,
+        storeAccessDeclined,
+      }),
+    });
+
+    const payload = (await response.json()) as {
+      error?: string;
+      client?: ClientRecord;
+    };
+
+    if (!response.ok || !payload.client) {
+      setShopifyMessage(payload.error ?? "Could not update store access for this client.");
+      return;
+    }
+
+    await loadClients(payload.client.id);
+    await loadShopifyStatus(payload.client.id);
+    setShopifyMessage(
+      storeAccessDeclined
+        ? "Marked this client as not sharing website access. Shopify is now treated as optional for them."
+        : "Cleared the declined-access state. You can connect Shopify whenever the client is ready."
+    );
+  }
+
   const metaReadyState = metaStatus?.connected ? "Good" : metaStatus?.configured ? "Watch" : "Fix";
-  const shopifyReadyState = shopifyStatus?.previewReady ? "Good" : shopifyStatus?.configured ? "Watch" : "Fix";
+  const shopifyReadyState = shopifyStatus?.previewReady
+    ? "Good"
+    : activeClient?.storeAccessDeclined
+    ? "Optional"
+    : shopifyStatus?.configured
+    ? "Watch"
+    : "Fix";
   const wordpressReadyState = wordpressStatus?.previewReady ? "Good" : wordpressStatus?.configured ? "Watch" : "Fix";
 
   return (
@@ -760,13 +804,21 @@ export default function AdminPage() {
                   <MiniMetric
                     label="Client"
                     value={shopifyStatus?.client.name ?? activeClient?.name ?? "None"}
-                    hint="Shopify is now connected per client through store-owner approval."
+                    hint={
+                      activeClient?.storeAccessDeclined
+                        ? "This client has chosen not to share website access right now."
+                        : "Shopify is now connected per client through store-owner approval."
+                    }
                     tone="good"
                   />
                   <MiniMetric
                     label="Connected Store"
                     value={shopifyStatus?.shopName ?? "Not connected"}
-                    hint={shopifyStatus?.storeDomain ?? "Start the Shopify install flow for this client"}
+                    hint={
+                      activeClient?.storeAccessDeclined
+                        ? "Store truth is optional for this client until they grant access."
+                        : shopifyStatus?.storeDomain ?? "Start the Shopify install flow for this client"
+                    }
                     tone={shopifyStatus?.connected ? "good" : "warn"}
                   />
                 </div>
@@ -775,6 +827,14 @@ export default function AdminPage() {
                   <MissingEnv values={shopifyStatus?.missingEnv ?? []} />
                   <Notice
                     message={shopifyStatus?.connectionError ?? null}
+                    tone="warn"
+                  />
+                  <Notice
+                    message={
+                      activeClient?.storeAccessDeclined && !shopifyStatus?.connected
+                        ? "This client is marked as not sharing website access. Shopify-dependent metrics will stay unavailable until they opt in."
+                        : null
+                    }
                     tone="warn"
                   />
                   <Notice message={shopifyMessage} />
@@ -814,6 +874,19 @@ export default function AdminPage() {
                       className="rounded-xl border border-red-500/40 px-4 py-3 text-sm font-bold text-red-200 transition hover:border-red-400 hover:text-white"
                     >
                       Disconnect
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void handleUpdateStoreAccessDeclined(
+                          !(activeClient?.storeAccessDeclined ?? false)
+                        )
+                      }
+                      className="rounded-xl border border-amber-500/40 px-4 py-3 text-sm font-bold text-amber-200 transition hover:border-amber-400 hover:text-white"
+                    >
+                      {activeClient?.storeAccessDeclined
+                        ? "Clear Declined Access"
+                        : "Mark Access Declined"}
                     </button>
                   </div>
                 </div>
