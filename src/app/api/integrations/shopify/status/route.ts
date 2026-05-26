@@ -3,28 +3,28 @@ import {
   exchangeShopifyClientCredentials,
   fetchShopifyStoreTruthPreview,
   getShopifyConfig,
-  SHOPIFY_TOKEN_COOKIE,
 } from "@/lib/integrations/shopify";
+import { getClientById, getShopifyConnection } from "@/lib/clientStore";
 
 export async function GET(request: NextRequest) {
+  const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+  const connection = await getShopifyConnection(client.id);
   const config = getShopifyConfig();
-  let accessToken = request.cookies.get(SHOPIFY_TOKEN_COOKIE)?.value ?? null;
-  let connectionError: string | null = null;
+  const storeDomain = connection?.storeDomain ?? "";
+  let connectionError = connection?.lastError ?? null;
   let previewReady = false;
-  let shopName: string | null = null;
+  let shopName = connection?.shopName ?? null;
 
-  if (config.missingEnv.length === 0) {
+  if (config.missingEnv.length === 0 && storeDomain) {
     try {
-      if (!accessToken) {
-        const token = await exchangeShopifyClientCredentials();
-        accessToken = token.access_token ?? null;
-      }
-
-      if (accessToken) {
-        const preview = await fetchShopifyStoreTruthPreview(accessToken);
-        previewReady = true;
-        shopName = preview.snapshot.shopName;
-      }
+      const token = await exchangeShopifyClientCredentials(storeDomain);
+      const preview = await fetchShopifyStoreTruthPreview(
+        token.access_token!,
+        storeDomain
+      );
+      previewReady = true;
+      shopName = preview.snapshot.shopName;
+      connectionError = null;
     } catch (error) {
       connectionError =
         error instanceof Error ? error.message : "Shopify connection failed.";
@@ -32,11 +32,12 @@ export async function GET(request: NextRequest) {
   }
 
   return NextResponse.json({
+    client,
     platform: "shopify",
     configured: config.missingEnv.length === 0,
-    connected: Boolean(accessToken) && !connectionError,
+    connected: Boolean(storeDomain),
     previewReady,
-    storeDomain: config.storeDomain,
+    storeDomain,
     apiVersion: config.apiVersion,
     requestedScopes: config.requestedScopes,
     missingEnv: config.missingEnv,
@@ -45,9 +46,18 @@ export async function GET(request: NextRequest) {
     connectionError,
     recommendedNextStep:
       config.missingEnv.length > 0
-        ? "Add Shopify client credentials for the store-truth source."
+        ? "Add Shopify client credentials before connecting client stores."
+        : !storeDomain
+        ? "Save the Shopify store domain for this client first."
         : !previewReady
-        ? "Validate the Shopify app install, scopes, and token grant."
+        ? "Validate the Shopify app install, scopes, and saved store domain for this client."
         : "Compare Shopify store truth against Meta before enabling scale recommendations.",
   });
+}
+
+export async function DELETE(request: NextRequest) {
+  const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+  const { clearShopifyConnection } = await import("@/lib/clientStore");
+  await clearShopifyConnection(client.id);
+  return NextResponse.json({ ok: true, clientId: client.id });
 }
