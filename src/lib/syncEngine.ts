@@ -4,7 +4,6 @@ import {
   getMetaConfig,
 } from "./integrations/meta";
 import {
-  exchangeShopifyClientCredentials,
   fetchShopifyStoreTruthPreview,
   getShopifyConfig,
 } from "./integrations/shopify";
@@ -175,20 +174,19 @@ export async function runShopifySync(input: { clientId: string }) {
     return failed;
   }
 
-  if (!connection?.storeDomain) {
+  if (!connection?.storeDomain || !connection.accessToken) {
     const failed = finalizeRun(run, {
       status: "failed",
       error: "Shopify is not connected for this client.",
-      notes: ["Save and validate the Shopify store domain in Admin first."],
+      notes: ["Run the Shopify install flow in Admin first."],
     });
     await appendSyncRun(failed);
     return failed;
   }
 
   try {
-    const token = await exchangeShopifyClientCredentials(connection.storeDomain);
     const preview = await fetchShopifyStoreTruthPreview(
-      token.access_token!,
+      connection.accessToken,
       connection.storeDomain
     );
     const snapshot: BusinessTruthSnapshot = {
@@ -239,7 +237,7 @@ export async function runShopifySync(input: { clientId: string }) {
     const failed = finalizeRun(run, {
       status: "failed",
       error: message,
-      notes: ["Check the Shopify app install, scopes, and saved store domain."],
+      notes: ["Reconnect Shopify and have the store owner approve app access again if needed."],
     });
     await appendSyncRun(failed);
     return failed;
