@@ -4,18 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  BarChart3,
   Bell,
-  BookOpen,
   Database,
   Gauge,
-  Globe2,
   Home,
-  Megaphone,
   Rocket,
-  Settings,
   ShieldCheck,
-  Zap,
 } from "lucide-react";
 import { getCurrencyMeta, type ClientRecord } from "@/lib/clientTypes";
 
@@ -127,14 +121,7 @@ function Sidebar() {
     [ShieldCheck, "Business Health", "/health"],
     [Rocket, "Scaling Engine", "/scaling"],
     [Bell, "What Needs Action", "/action"],
-    [BarChart3, "Platform Breakdown", "/platforms"],
-    [Globe2, "Funnel Intelligence", "/funnel"],
-    [Zap, "Creative Intelligence", "/creatives"],
-    [Megaphone, "Campaigns", "/campaigns"],
-    [Gauge, "Benchmarks", "/benchmarks"],
-    [BookOpen, "Reports", "/reports"],
     [Database, "Admin Panel", "/admin"],
-    [Settings, "Settings", "/admin"],
   ];
 
   return (
@@ -146,7 +133,7 @@ function Sidebar() {
           </div>
           <div>
             <h2 className="text-xl font-black">Performance OS</h2>
-            <p className="text-sm text-slate-400">Multi-page prototype</p>
+            <p className="text-sm text-slate-400">Live client workspace</p>
           </div>
         </div>
       </div>
@@ -173,9 +160,9 @@ function Sidebar() {
         <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
           <div className="flex items-center gap-2 text-emerald-400">
             <Bell size={16} />
-            <span className="font-black">Prototype Live</span>
+            <span className="font-black">Connection Aware</span>
           </div>
-          <p className="mt-2 text-xs text-slate-400">Mock data now · API mapping later</p>
+          <p className="mt-2 text-xs text-slate-400">Live data where connected · honest empty states where it is not</p>
         </div>
       </div>
     </aside>
@@ -215,4 +202,58 @@ export function StatusPill({ status }: { status: string }) {
     Fix: "bg-red-500/20 text-red-300 border-red-500/30",
   };
   return <span className={`rounded-lg border px-3 py-1 text-xs font-black uppercase ${styles[status] || styles.Stable}`}>{status}</span>;
+}
+
+export function EmptySectionState({
+  title,
+  description,
+  bullets = [],
+}: {
+  title: string;
+  description: string;
+  bullets?: string[];
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/40 p-5">
+      <div className="text-lg font-black text-white">{title}</div>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+        {description}
+      </p>
+      {bullets.length ? (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {bullets.map((bullet) => (
+            <div
+              key={bullet}
+              className="rounded-xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-sm text-slate-300"
+            >
+              {bullet}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function SourcePill({
+  label,
+  tone = "default",
+}: {
+  label: string;
+  tone?: "good" | "warn" | "bad" | "default";
+}) {
+  const color =
+    tone === "good"
+      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+      : tone === "warn"
+      ? "border-amber-500/30 bg-amber-500/10 text-amber-200"
+      : tone === "bad"
+      ? "border-red-500/30 bg-red-500/10 text-red-200"
+      : "border-slate-700 bg-slate-900 text-slate-200";
+
+  return (
+    <span className={`rounded-full border px-3 py-1 text-xs font-bold ${color}`}>
+      {label}
+    </span>
+  );
 }
