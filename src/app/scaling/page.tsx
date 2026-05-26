@@ -7,6 +7,7 @@ import {
   Section,
   SourcePill,
 } from "@/components/AppShell";
+import { getFunnelReadiness } from "@/lib/funnelReadiness";
 import { evaluateScaling } from "@/lib/scalingEngine";
 import { useDashboardReadiness } from "@/lib/useDashboardReadiness";
 import { evaluateTrackingGap, formatPercent } from "@/lib/workbookSignals";
@@ -70,6 +71,17 @@ export default function ScalingPage() {
     storeOrders: hasStoreTruth ? storePreview?.ordersCount : undefined,
     platformPurchases: hasMeta ? metaPreview?.totals.purchases : undefined,
   });
+  const funnelReadiness = getFunnelReadiness({
+    storePreview,
+    metaPreview,
+    analyticsConnected: hasStoreAnalytics,
+  });
+  const checkoutCompletionMetric = funnelReadiness.find(
+    (metric) => metric.id === "checkout_completion_rate"
+  );
+  const purchaseCvrMetric = funnelReadiness.find(
+    (metric) => metric.id === "purchase_cvr"
+  );
 
   const scalingDecision = evaluateScaling({
     merStatus:
@@ -110,6 +122,14 @@ export default function ScalingPage() {
             />
             <SourcePill
               label={
+                checkoutCompletionMetric?.state === "partial"
+                  ? "Checkout proxy available"
+                  : "No funnel proxy yet"
+              }
+              tone={checkoutCompletionMetric?.state === "partial" ? "default" : "warn"}
+            />
+            <SourcePill
+              label={
                 trackingGap.ready
                   ? trackingGap.active
                     ? "Tracking gap active"
@@ -143,7 +163,9 @@ export default function ScalingPage() {
                 trackingGap.ready
                   ? trackingGap.summary
                   : "Tracking-gap logic becomes available after both store truth and platform attribution are connected.",
-                "Sessions, LPV, ATC, checkout rate, and purchase CVR still need analytics truth before scaling can be trusted.",
+                checkoutCompletionMetric?.state === "partial"
+                  ? "Meta is giving a checkout proxy, but the workbook still requires site analytics truth before green-lighting scale."
+                  : "Sessions, LPV, ATC, checkout rate, and purchase CVR still need analytics truth before scaling can be trusted.",
               ]}
             />
           ) : null}
@@ -272,6 +294,30 @@ export default function ScalingPage() {
                   ? "warn"
                   : trackingGap.status === "healthy"
                   ? "good"
+                  : "warn"
+              }
+            />
+            <MiniMetric
+              label="Checkout Completion"
+              value={checkoutCompletionMetric?.value ?? "Blocked"}
+              hint={checkoutCompletionMetric?.hint ?? "Needs website funnel truth"}
+              tone={
+                checkoutCompletionMetric?.state === "ready"
+                  ? "good"
+                  : checkoutCompletionMetric?.state === "partial"
+                  ? "default"
+                  : "warn"
+              }
+            />
+            <MiniMetric
+              label="Purchase CVR"
+              value={purchaseCvrMetric?.value ?? "Blocked"}
+              hint={purchaseCvrMetric?.hint ?? "Needs sessions truth"}
+              tone={
+                purchaseCvrMetric?.state === "ready"
+                  ? "good"
+                  : purchaseCvrMetric?.state === "partial"
+                  ? "default"
                   : "warn"
               }
             />
