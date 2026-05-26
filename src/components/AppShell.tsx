@@ -421,9 +421,11 @@ export function StatusPill({ status }: { status: string }) {
 export function EmptySectionState({
   title,
   description,
+  bullets = [],
 }: {
   title: string;
   description: string;
+  bullets?: string[];
 }) {
   return (
     <div className="rounded-[24px] border border-dashed border-[var(--line)] bg-[rgba(255,255,255,0.4)] p-5">
@@ -431,6 +433,18 @@ export function EmptySectionState({
       <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
         {description}
       </p>
+      {bullets.length ? (
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {bullets.map((bullet) => (
+            <div
+              key={bullet}
+              className="rounded-[18px] border border-[var(--line)] bg-[rgba(255,255,255,0.52)] px-4 py-3 text-sm text-[var(--muted)]"
+            >
+              {bullet}
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
