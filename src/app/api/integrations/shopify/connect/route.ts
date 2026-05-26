@@ -1,77 +1,59 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  exchangeShopifyClientCredentials,
-  fetchShopifyStoreTruthPreview,
+  buildShopifyOauthUrl,
+  getSecureCookieFlag,
   getShopifyConfig,
+  isValidShopifyStoreDomain,
   normalizeShopifyStoreDomain,
+  SHOPIFY_OAUTH_CLIENT_COOKIE,
+  SHOPIFY_STATE_COOKIE,
 } from "@/lib/integrations/shopify";
-import {
-  clearShopifyConnection,
-  getClientById,
-  getShopifyConnection,
-  upsertShopifyConnection,
-} from "@/lib/clientStore";
+import { getClientById } from "@/lib/clientStore";
 
-export async function POST(request: NextRequest) {
+export async function GET(request: NextRequest) {
   const config = getShopifyConfig();
-  const body = (await request.json().catch(() => ({}))) as {
-    clientId?: string;
-    storeDomain?: string;
-  };
-  const client = await getClientById(body.clientId);
-  const existingConnection = await getShopifyConnection(client.id);
-  const storeDomain = normalizeShopifyStoreDomain(body.storeDomain ?? "");
+  const origin = request.nextUrl.origin;
+  const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+  const storeDomain = normalizeShopifyStoreDomain(
+    request.nextUrl.searchParams.get("storeDomain") ?? ""
+  );
 
   if (config.missingEnv.length > 0) {
-    return NextResponse.json(
-      { error: "Missing Shopify configuration." },
-      { status: 400 }
+    return NextResponse.redirect(
+      new URL(`/admin?clientId=${client.id}&shopify_error=missing_config`, origin)
     );
   }
 
-  if (!storeDomain) {
-    return NextResponse.json(
-      { error: "Shopify store domain is required." },
-      { status: 400 }
+  if (!isValidShopifyStoreDomain(storeDomain)) {
+    return NextResponse.redirect(
+      new URL(
+        `/admin?clientId=${client.id}&shopify_error=${encodeURIComponent(
+          "Enter a valid .myshopify.com store domain."
+        )}`,
+        origin
+      )
     );
   }
 
-  try {
-    const token = await exchangeShopifyClientCredentials(storeDomain);
-    const preview = await fetchShopifyStoreTruthPreview(
-      token.access_token!,
-      storeDomain
-    );
+  const state = crypto.randomUUID();
+  const response = NextResponse.redirect(
+    buildShopifyOauthUrl(origin, storeDomain, state)
+  );
 
-    await upsertShopifyConnection({
-      clientId: client.id,
-      storeDomain,
-      connectedAt: new Date().toISOString(),
-      shopName: preview.snapshot.shopName,
-      lastError: null,
-    });
+  response.cookies.set(SHOPIFY_STATE_COOKIE, state, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: getSecureCookieFlag(),
+    path: "/",
+    maxAge: 60 * 15,
+  });
+  response.cookies.set(SHOPIFY_OAUTH_CLIENT_COOKIE, client.id, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: getSecureCookieFlag(),
+    path: "/",
+    maxAge: 60 * 15,
+  });
 
-    return NextResponse.json({
-      ok: true,
-      clientId: client.id,
-      storeDomain,
-      shopName: preview.snapshot.shopName,
-      expiresIn: token.expires_in ?? 0,
-      scope: token.scope ?? "",
-    });
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Could not connect Shopify.";
-
-    if (!existingConnection?.shopName) {
-      await clearShopifyConnection(client.id);
-    }
-
-    return NextResponse.json(
-      {
-        error: message,
-      },
-      { status: 500 }
-    );
-  }
+  return response;
 }
