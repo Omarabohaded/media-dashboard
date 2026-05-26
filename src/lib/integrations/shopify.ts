@@ -1,7 +1,4 @@
-export const SHOPIFY_TOKEN_COOKIE = "shopify_admin_access_token";
-
 export type ShopifyConfig = {
-  storeDomain: string;
   clientId: string;
   clientSecret: string;
   apiVersion: string;
@@ -51,26 +48,29 @@ function requiredEnv(name: string): string {
   return process.env[name]?.trim() ?? "";
 }
 
+export function normalizeShopifyStoreDomain(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/\/.*$/, "")
+    .replace(/\.$/, "");
+}
+
 export function getShopifyConfig(): ShopifyConfig {
-  const storeDomain = requiredEnv("SHOPIFY_STORE_DOMAIN");
   const clientId = requiredEnv("SHOPIFY_CLIENT_ID");
   const clientSecret = requiredEnv("SHOPIFY_CLIENT_SECRET");
   const apiVersion = requiredEnv("SHOPIFY_API_VERSION") || "2026-01";
-  const requestedScopes = (
-    requiredEnv("SHOPIFY_SCOPES") || "read_orders"
-  )
+  const requestedScopes = (requiredEnv("SHOPIFY_SCOPES") || "read_orders")
     .split(",")
     .map((value) => value.trim())
     .filter(Boolean);
 
-  const missingEnv = [
-    "SHOPIFY_STORE_DOMAIN",
-    "SHOPIFY_CLIENT_ID",
-    "SHOPIFY_CLIENT_SECRET",
-  ].filter((key) => !requiredEnv(key));
+  const missingEnv = ["SHOPIFY_CLIENT_ID", "SHOPIFY_CLIENT_SECRET"].filter(
+    (key) => !requiredEnv(key)
+  );
 
   return {
-    storeDomain,
     clientId,
     clientSecret,
     apiVersion,
@@ -79,7 +79,13 @@ export function getShopifyConfig(): ShopifyConfig {
   };
 }
 
-export async function exchangeShopifyClientCredentials() {
+export async function exchangeShopifyClientCredentials(storeDomain: string) {
+  const normalizedStoreDomain = normalizeShopifyStoreDomain(storeDomain);
+
+  if (!normalizedStoreDomain) {
+    throw new Error("Shopify store domain is required.");
+  }
+
   const config = getShopifyConfig();
   const body = new URLSearchParams({
     client_id: config.clientId,
@@ -88,7 +94,7 @@ export async function exchangeShopifyClientCredentials() {
   });
 
   const response = await fetch(
-    `https://${config.storeDomain}/admin/oauth/access_token`,
+    `https://${normalizedStoreDomain}/admin/oauth/access_token`,
     {
       method: "POST",
       headers: {
@@ -112,10 +118,20 @@ export async function exchangeShopifyClientCredentials() {
   return payload;
 }
 
-async function shopifyAdminGraphql<T>(query: string, accessToken: string) {
+async function shopifyAdminGraphql<T>(
+  query: string,
+  accessToken: string,
+  storeDomain: string
+) {
+  const normalizedStoreDomain = normalizeShopifyStoreDomain(storeDomain);
+
+  if (!normalizedStoreDomain) {
+    throw new Error("Shopify store domain is required.");
+  }
+
   const config = getShopifyConfig();
   const response = await fetch(
-    `https://${config.storeDomain}/admin/api/${config.apiVersion}/graphql.json`,
+    `https://${normalizedStoreDomain}/admin/api/${config.apiVersion}/graphql.json`,
     {
       method: "POST",
       headers: {
@@ -139,7 +155,10 @@ async function shopifyAdminGraphql<T>(query: string, accessToken: string) {
   return payload.data as T;
 }
 
-export async function fetchShopifyStoreTruthPreview(accessToken: string) {
+export async function fetchShopifyStoreTruthPreview(
+  accessToken: string,
+  storeDomain: string
+) {
   const sinceDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
@@ -215,7 +234,8 @@ export async function fetchShopifyStoreTruthPreview(accessToken: string) {
         }
       }
     }`,
-    accessToken
+    accessToken,
+    storeDomain
   );
 
   const orders = data.orders.nodes.map<ShopifyOrderPreviewRow>((order) => ({
