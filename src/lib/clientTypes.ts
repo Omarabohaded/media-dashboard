@@ -14,6 +14,8 @@ export type ClientRecord = {
   currencyCode: ClientCurrencyCode;
   notes: string | null;
   createdAt: string;
+  storeAccessDeclined?: boolean;
+  storeAccessDeclinedAt?: string | null;
 };
 
 export const SUPPORTED_CLIENT_CURRENCIES: Array<{
