@@ -5,6 +5,7 @@ import {
   getClientStoreMeta,
   getClientById,
   listClients,
+  updateClientStoreAccess,
 } from "@/lib/clientStore";
 import {
   type ClientCurrencyCode,
@@ -73,6 +74,48 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ client }, { status: 201 });
+}
+
+export async function PATCH(request: NextRequest) {
+  const body = (await request.json().catch(() => ({}))) as {
+    clientId?: string;
+    storeAccessDeclined?: boolean;
+  };
+
+  const clientId = body.clientId?.trim() ?? "";
+
+  if (!clientId) {
+    return NextResponse.json(
+      { error: "Client ID is required." },
+      { status: 400 }
+    );
+  }
+
+  if (typeof body.storeAccessDeclined !== "boolean") {
+    return NextResponse.json(
+      { error: "storeAccessDeclined must be true or false." },
+      { status: 400 }
+    );
+  }
+
+  try {
+    const client = await updateClientStoreAccess({
+      clientId,
+      storeAccessDeclined: body.storeAccessDeclined,
+    });
+
+    return NextResponse.json({ client });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Could not update the client access state.",
+      },
+      { status: 400 }
+    );
+  }
 }
 
 export async function DELETE(request: NextRequest) {
