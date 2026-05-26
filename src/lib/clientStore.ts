@@ -21,6 +21,7 @@ export type MetaClientConnection = {
 export type ShopifyClientConnection = {
   clientId: string;
   storeDomain: string;
+  accessToken: string;
   connectedAt: string;
   shopName: string | null;
   lastError: string | null;
@@ -79,7 +80,10 @@ export async function readClientStore(): Promise<ClientStoreState> {
   }));
 
   state.metaConnections = state.metaConnections ?? [];
-  state.shopifyConnections = state.shopifyConnections ?? [];
+  state.shopifyConnections = (state.shopifyConnections ?? []).map((connection) => ({
+    ...connection,
+    accessToken: connection.accessToken ?? "",
+  }));
 
   return state;
 }
