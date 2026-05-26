@@ -12,7 +12,7 @@ import {
   fetchWordPressStoreTruthPreview,
   getWordPressConfig,
 } from "./integrations/wordpress";
-import { getClientById } from "./clientStore";
+import { getClientById, getShopifyConnection } from "./clientStore";
 import {
   appendBusinessTruthSnapshot,
   appendMediaSnapshot,
@@ -159,36 +159,41 @@ export async function runMetaSync(input: {
   }
 }
 
-export async function runShopifySync(input: { accessToken: string | null }) {
-  const run = buildRun("shopify");
+export async function runShopifySync(input: { clientId: string }) {
+  const client = await getClientById(input.clientId);
+  const run = buildRun("shopify", client);
   const config = getShopifyConfig();
+  const connection = await getShopifyConnection(client.id);
 
   if (config.missingEnv.length > 0) {
     const failed = finalizeRun(run, {
       status: "failed",
       error: `Missing Shopify config: ${config.missingEnv.join(", ")}`,
-      notes: ["Add Shopify store credentials in Vercel before syncing."],
+      notes: ["Add Shopify app credentials in Vercel before syncing."],
+    });
+    await appendSyncRun(failed);
+    return failed;
+  }
+
+  if (!connection?.storeDomain) {
+    const failed = finalizeRun(run, {
+      status: "failed",
+      error: "Shopify is not connected for this client.",
+      notes: ["Save and validate the Shopify store domain in Admin first."],
     });
     await appendSyncRun(failed);
     return failed;
   }
 
   try {
-    let accessToken = input.accessToken;
-
-    if (!accessToken) {
-      const token = await exchangeShopifyClientCredentials();
-      accessToken = token.access_token ?? null;
-    }
-
-    if (!accessToken) {
-      throw new Error("Shopify access token was not available.");
-    }
-
-    const preview = await fetchShopifyStoreTruthPreview(accessToken);
+    const token = await exchangeShopifyClientCredentials(connection.storeDomain);
+    const preview = await fetchShopifyStoreTruthPreview(
+      token.access_token!,
+      connection.storeDomain
+    );
     const snapshot: BusinessTruthSnapshot = {
-      clientId: "global-shopify",
-      clientName: "Shopify Truth Layer",
+      clientId: client.id,
+      clientName: client.name,
       source: "shopify",
       capturedAt: new Date().toISOString(),
       grossSales: preview.snapshot.grossSales,
@@ -199,16 +204,16 @@ export async function runShopifySync(input: { accessToken: string | null }) {
       averageOrderValue: preview.snapshot.averageOrderValue,
     };
 
-    const connection: IntegrationConnectionRecord = {
-      clientId: "global-shopify",
-      clientName: "Shopify Truth Layer",
+    const connectionRecord: IntegrationConnectionRecord = {
+      clientId: client.id,
+      clientName: client.name,
       platform: "shopify",
       accountLabel: preview.snapshot.shopName,
       accountId: null,
       health: "sync_ready",
       scopes: config.requestedScopes,
       lastError: null,
-      connectedAt: run.startedAt,
+      connectedAt: connection.connectedAt ?? run.startedAt,
       lastSyncedAt: snapshot.capturedAt,
       sourceMode: "ephemeral",
       recommendedNextStep:
@@ -216,13 +221,13 @@ export async function runShopifySync(input: { accessToken: string | null }) {
     };
 
     await appendBusinessTruthSnapshot(snapshot);
-    await upsertConnectionRecord(connection);
+    await upsertConnectionRecord(connectionRecord);
 
     const succeeded = finalizeRun(run, {
       status: "succeeded",
       recordsProcessed: preview.orders.length,
       notes: [
-        `${preview.orders.length} Shopify orders captured for the last 7 days.`,
+        `${preview.orders.length} Shopify orders captured for ${client.name} in the last 7 days.`,
         "Sessions and funnel-stage metrics still need GA4 or storefront analytics.",
       ],
     });
@@ -234,7 +239,7 @@ export async function runShopifySync(input: { accessToken: string | null }) {
     const failed = finalizeRun(run, {
       status: "failed",
       error: message,
-      notes: ["Check the Shopify app install, scopes, and credentials."],
+      notes: ["Check the Shopify app install, scopes, and saved store domain."],
     });
     await appendSyncRun(failed);
     return failed;
