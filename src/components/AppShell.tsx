@@ -5,11 +5,9 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Bell,
-  BookOpenText,
   Database,
   Gauge,
   LayoutDashboard,
-  Layers3,
   Rocket,
   ShieldCheck,
   Target,
@@ -47,15 +45,13 @@ const DashboardDisplayContext =
   createContext<DashboardDisplayContextValue | null>(null);
 
 const NAV_ITEMS = [
-  { icon: LayoutDashboard, label: "Command Center", href: "/#command-center" },
-  { icon: ShieldCheck, label: "Business Health", href: "/#business-health" },
-  { icon: Target, label: "Funnel", href: "/#funnel" },
-  { icon: BarChart3, label: "Channel Breakdown", href: "/#channel-breakdown" },
-  { icon: Rocket, label: "Scaling", href: "/#scaling" },
-  { icon: Bell, label: "Actions", href: "/#actions" },
-  { icon: Layers3, label: "Portfolio Overview", href: "/#portfolio-overview" },
-  { icon: BookOpenText, label: "Metric Guide", href: "/#metric-guide" },
-  { icon: Database, label: "Admin", href: "/#admin" },
+  { icon: LayoutDashboard, label: "Command Center", href: "/" },
+  { icon: ShieldCheck, label: "Business Health", href: "/health" },
+  { icon: Target, label: "Funnel", href: "/funnel" },
+  { icon: BarChart3, label: "Paid Media", href: "/paid-media" },
+  { icon: Rocket, label: "Scaling", href: "/scaling" },
+  { icon: Bell, label: "Actions", href: "/action" },
+  { icon: Database, label: "Admin", href: "/admin" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -244,7 +240,7 @@ function Sidebar({
 
       <nav className="mt-6 flex-1 space-y-2 overflow-y-auto pr-2">
         {NAV_ITEMS.map(({ icon: Icon, label, href }) => {
-          const active = pathname === "/" && href === "/#command-center";
+          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link
               key={href}
@@ -269,7 +265,7 @@ function Sidebar({
               Owner Access
             </div>
             <p className="mt-1 text-sm text-[var(--muted)]">
-              Reveal the portfolio-level overview page.
+              Keep portfolio-level views behind owner mode as we expand them.
             </p>
           </div>
           <button
@@ -405,9 +401,9 @@ export function DisplayValue({ value }: { value: string }) {
 
 export function StatusPill({ status }: { status: string }) {
   const tone =
-    /(scale|good|strong|protect|stable)/i.test(status)
+    /(scale|good|strong|protect|stable|ready|connected|healthy)/i.test(status)
       ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-900"
-      : /(watch|actionable|review|weak|hold)/i.test(status)
+      : /(watch|actionable|review|weak|hold|blocked|fix|missing|risk)/i.test(status)
       ? "border-amber-500/25 bg-amber-500/10 text-amber-900"
       : "border-[var(--line)] bg-[rgba(255,255,255,0.58)] text-[var(--ink)]";
 
