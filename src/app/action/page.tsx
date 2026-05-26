@@ -2,6 +2,7 @@
 
 import {
   AppShell,
+  DashboardLoadingState,
   EmptySectionState,
   MiniMetric,
   Section,
@@ -16,8 +17,14 @@ import { useDashboardReadiness } from "@/lib/useDashboardReadiness";
 import { evaluateTrackingGap } from "@/lib/workbookSignals";
 
 export default function ActionPage() {
-  const { activeClient, metaPreview, metaStatus, storePreview, storeStatus } =
-    useDashboardReadiness();
+  const {
+    activeClient,
+    isLoading,
+    metaPreview,
+    metaStatus,
+    storePreview,
+    storeStatus,
+  } = useDashboardReadiness();
 
   const hasMeta = Boolean(metaPreview && metaStatus?.selectedAccountId);
   const hasStoreTruth = Boolean(storePreview);
@@ -118,6 +125,17 @@ export default function ActionPage() {
         platformConversions: hasMeta ? metaPreview?.totals.purchases : undefined,
       })
     : [];
+
+  if (isLoading) {
+    return (
+      <AppShell>
+        <DashboardLoadingState
+          title="Loading action triage"
+          description="Pulling live signals, relationship checks, and risk-vs-opportunity priorities for the active client."
+        />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
