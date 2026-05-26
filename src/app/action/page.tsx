@@ -12,6 +12,7 @@ import { detectRootCauses } from "@/lib/crossMetricEngine";
 import { prioritizeSignals } from "@/lib/priorityEngine";
 import { evaluateRelationships } from "@/lib/relationshipEngine";
 import { useDashboardReadiness } from "@/lib/useDashboardReadiness";
+import { evaluateTrackingGap } from "@/lib/workbookSignals";
 
 export default function ActionPage() {
   const { activeClient, metaPreview, metaStatus, storePreview, storeStatus } =
@@ -54,6 +55,22 @@ export default function ActionPage() {
           Math.max(metaPreview.rows.reduce((sum, row) => sum + (row.addToCart ?? 0), 0), 1)) *
         100
       : 0;
+  const checkoutCompletionRate =
+    metaPreview &&
+    metaPreview.rows.reduce((sum, row) => sum + (row.checkoutInitiated ?? 0), 0) > 0
+      ? (metaPreview.totals.purchases /
+          Math.max(
+            metaPreview.rows.reduce((sum, row) => sum + (row.checkoutInitiated ?? 0), 0),
+            1
+          )) *
+        100
+      : null;
+  const trackingGap = evaluateTrackingGap({
+    storeRevenue: hasStoreTruth ? storePreview?.grossSales : undefined,
+    platformRevenue: hasMeta ? metaPreview?.totals.purchaseValue : undefined,
+    storeOrders: hasStoreTruth ? storePreview?.ordersCount : undefined,
+    platformPurchases: hasMeta ? metaPreview?.totals.purchases : undefined,
+  });
 
   const relationshipSignals = hasMeta
     ? evaluateRelationships({
@@ -63,9 +80,12 @@ export default function ActionPage() {
         roas,
         ncac,
         frequency: averageFrequency,
-        checkoutCompletionRate: checkoutRate || undefined,
-        trackingMismatch: !hasStoreTruth,
-        checkoutFailure: !hasStoreTruth,
+        checkoutCompletionRate: checkoutCompletionRate || undefined,
+        backendConversions: hasStoreTruth ? storePreview?.ordersCount : undefined,
+        platformConversions: hasMeta ? metaPreview?.totals.purchases : undefined,
+        trackingMismatch: trackingGap.active,
+        checkoutFailure:
+          typeof checkoutCompletionRate === "number" && checkoutCompletionRate < 35,
         merBelowThreshold: hasStoreTruth ? mer < 2.2 : true,
       })
     : [];
@@ -85,6 +105,8 @@ export default function ActionPage() {
         cvr: purchaseCvr,
         checkoutRate: checkoutRate || undefined,
         purchaseCvr,
+        backendConversions: hasStoreTruth ? storePreview?.ordersCount : undefined,
+        platformConversions: hasMeta ? metaPreview?.totals.purchases : undefined,
       })
     : [];
 
@@ -103,6 +125,24 @@ export default function ActionPage() {
             <SourcePill
               label={hasStoreTruth ? "Business truth connected" : "Business truth missing"}
               tone={hasStoreTruth ? "good" : "warn"}
+            />
+            <SourcePill
+              label={
+                trackingGap.ready
+                  ? trackingGap.active
+                    ? "Tracking gap needs review"
+                    : "Tracking gap within range"
+                  : "Tracking gap not ready yet"
+              }
+              tone={
+                trackingGap.status === "danger"
+                  ? "bad"
+                  : trackingGap.status === "warning"
+                  ? "warn"
+                  : trackingGap.status === "healthy"
+                  ? "good"
+                  : "default"
+              }
             />
             <SourcePill
               label="Risk lane ranks above opportunity lane"
