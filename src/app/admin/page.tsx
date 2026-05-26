@@ -405,9 +405,11 @@ export default function AdminPage() {
       <div className="space-y-5">
         <Notice
           message={
-            clientStorage?.durable
-              ? `Client storage is durable now. Data is stored through ${clientStorage.location}, so refreshes and future deployments should not wipe your clients.`
-              : `Client storage is still temporary right now. It is using ${clientStorage?.location ?? "server tmp storage"}, which can reset after refreshes or deployments until durable storage is configured.`
+            clientStorage
+              ? clientStorage.durable
+                ? `Client storage is durable now. Data is stored through ${clientStorage.location}, so refreshes and future deployments should not wipe your clients.`
+                : `Client storage is still temporary right now. It is using ${clientStorage.location}, which can reset after refreshes or deployments until durable storage is configured.`
+              : null
           }
           tone={clientStorage?.durable ? "info" : "warn"}
         />
