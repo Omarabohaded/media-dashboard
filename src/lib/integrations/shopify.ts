@@ -1,3 +1,8 @@
+import crypto from "crypto";
+
+export const SHOPIFY_STATE_COOKIE = "shopify_oauth_state";
+export const SHOPIFY_OAUTH_CLIENT_COOKIE = "shopify_oauth_client_id";
+
 export type ShopifyConfig = {
   clientId: string;
   clientSecret: string;
@@ -48,6 +53,10 @@ function requiredEnv(name: string): string {
   return process.env[name]?.trim() ?? "";
 }
 
+export function getSecureCookieFlag() {
+  return process.env.NODE_ENV === "production";
+}
+
 export function normalizeShopifyStoreDomain(value: string) {
   return value
     .trim()
@@ -57,8 +66,14 @@ export function normalizeShopifyStoreDomain(value: string) {
     .replace(/\.$/, "");
 }
 
+export function isValidShopifyStoreDomain(value: string) {
+  return /^[a-zA-Z0-9][a-zA-Z0-9-]*\.myshopify\.com$/.test(
+    normalizeShopifyStoreDomain(value)
+  );
+}
+
 function buildNonJsonShopifyResponseError(storeDomain: string) {
-  return `Shopify returned an HTML response for ${storeDomain} instead of API JSON. This usually means the app is not installed on that store, the store is not eligible for this client-credentials flow, or the store domain is wrong.`;
+  return `Shopify returned an HTML response for ${storeDomain} instead of API JSON. This usually means the app install or OAuth flow is not set up correctly for that store.`;
 }
 
 async function parseShopifyJsonResponse<T>(
@@ -105,7 +120,61 @@ export function getShopifyConfig(): ShopifyConfig {
   };
 }
 
-export async function exchangeShopifyClientCredentials(storeDomain: string) {
+export function buildShopifyRedirectUri(origin: string) {
+  return `${origin}/api/integrations/shopify/callback`;
+}
+
+export function buildShopifyOauthUrl(
+  origin: string,
+  storeDomain: string,
+  state: string
+) {
+  const normalizedStoreDomain = normalizeShopifyStoreDomain(storeDomain);
+  const config = getShopifyConfig();
+  const params = new URLSearchParams({
+    client_id: config.clientId,
+    scope: config.requestedScopes.join(","),
+    redirect_uri: buildShopifyRedirectUri(origin),
+    state,
+  });
+
+  return `https://${normalizedStoreDomain}/admin/oauth/authorize?${params.toString()}`;
+}
+
+export function verifyShopifyHmac(searchParams: URLSearchParams) {
+  const providedHmac = searchParams.get("hmac") ?? "";
+  const clientSecret = getShopifyConfig().clientSecret;
+
+  if (!providedHmac || !clientSecret) {
+    return false;
+  }
+
+  const message = [...searchParams.entries()]
+    .filter(([key]) => key !== "hmac" && key !== "signature")
+    .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("&");
+
+  const digest = crypto
+    .createHmac("sha256", clientSecret)
+    .update(message)
+    .digest("hex");
+
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(digest, "utf8"),
+      Buffer.from(providedHmac, "utf8")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export async function exchangeShopifyAuthorizationCode(
+  origin: string,
+  storeDomain: string,
+  code: string
+) {
   const normalizedStoreDomain = normalizeShopifyStoreDomain(storeDomain);
 
   if (!normalizedStoreDomain) {
@@ -116,7 +185,7 @@ export async function exchangeShopifyClientCredentials(storeDomain: string) {
   const body = new URLSearchParams({
     client_id: config.clientId,
     client_secret: config.clientSecret,
-    grant_type: "client_credentials",
+    code,
   });
 
   const response = await fetch(
@@ -135,14 +204,14 @@ export async function exchangeShopifyClientCredentials(storeDomain: string) {
   const payload = await parseShopifyJsonResponse<ShopifyTokenResponse>(
     response,
     normalizedStoreDomain,
-    "Shopify token exchange failed."
+    "Shopify authorization code exchange failed."
   );
 
   if (!response.ok || payload.error || !payload.access_token) {
     throw new Error(
       payload.error_description ||
         payload.error ||
-        "Shopify token exchange failed."
+        "Shopify authorization code exchange failed."
     );
   }
 
