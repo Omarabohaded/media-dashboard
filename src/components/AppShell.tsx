@@ -22,6 +22,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [activeClientId, setActiveClientId] = useState("");
+  const [isLoadingClients, setIsLoadingClients] = useState(true);
 
   const activeClient = useMemo(
     () =>
@@ -31,6 +32,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function loadClients() {
+      setIsLoadingClients(true);
       const preferredClientId =
         typeof window !== "undefined"
           ? window.localStorage.getItem("media-dashboard-active-client")
@@ -44,11 +46,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           cache: "no-store",
         });
         const payload = (await response.json()) as ClientDirectoryResponse;
+        const nextClientId =
+          preferredClientId &&
+          payload.clients.some((entry) => entry.id === preferredClientId)
+            ? preferredClientId
+            : payload.activeClientId;
         setClients(payload.clients);
-        setActiveClientId(payload.activeClientId);
+        setActiveClientId(nextClientId);
       } catch {
         setClients([]);
         setActiveClientId("");
+      } finally {
+        setIsLoadingClients(false);
       }
     }
 
@@ -76,10 +85,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div>
               <div className="mb-3 flex flex-wrap gap-2">
                 <span className="rounded-full border border-blue-500/40 bg-blue-500/10 px-4 py-1 text-sm font-bold text-blue-200">
-                  {activeClient?.name ?? "Client not selected"}
+                  {isLoadingClients
+                    ? "Loading client..."
+                    : activeClient?.name ?? (clients.length ? "Select client" : "No client yet")}
                 </span>
                 <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-4 py-1 text-sm font-bold text-amber-200">
-                  {activeClient
+                  {isLoadingClients
+                    ? "Currency loading"
+                    : activeClient
                     ? getCurrencyMeta(activeClient.currencyCode).label
                     : "Currency pending"}
                 </span>
@@ -96,13 +109,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <select
                 value={activeClientId}
                 onChange={(event) => handleClientSwitch(event.target.value)}
+                disabled={isLoadingClients || clients.length === 0}
                 className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-sm font-semibold text-white outline-none"
               >
-                {clients.map((entry) => (
-                  <option key={entry.id} value={entry.id}>
-                    {entry.name} · {entry.currencyCode}
-                  </option>
-                ))}
+                {isLoadingClients ? (
+                  <option value="">Loading clients...</option>
+                ) : clients.length ? (
+                  clients.map((entry) => (
+                    <option key={entry.id} value={entry.id}>
+                      {entry.name} · {entry.currencyCode}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">Create a client in Admin first</option>
+                )}
               </select>
             </div>
           </div>
@@ -255,5 +275,27 @@ export function SourcePill({
     <span className={`rounded-full border px-3 py-1 text-xs font-bold ${color}`}>
       {label}
     </span>
+  );
+}
+
+export function DashboardLoadingState({
+  title = "Loading dashboard state",
+  description = "Pulling the active client, connection status, and source readiness now.",
+}: {
+  title?: string;
+  description?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-800 bg-slate-900/65 p-5 shadow-xl shadow-black/20">
+      <div className="text-lg font-black text-white">{title}</div>
+      <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+        {description}
+      </p>
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="h-20 animate-pulse rounded-xl border border-slate-800 bg-slate-950/60" />
+        <div className="h-20 animate-pulse rounded-xl border border-slate-800 bg-slate-950/60" />
+        <div className="h-20 animate-pulse rounded-xl border border-slate-800 bg-slate-950/60" />
+      </div>
+    </div>
   );
 }
