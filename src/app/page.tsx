@@ -1,8 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, RefreshCw, ShieldCheck } from "lucide-react";
-import { AppShell, MiniMetric, Section, StatusPill } from "@/components/AppShell";
+import {
+  AlertTriangle,
+  RefreshCw,
+  ShieldCheck,
+} from "lucide-react";
+import {
+  AppShell,
+  EmptySectionState,
+  MiniMetric,
+  Section,
+  SourcePill,
+} from "@/components/AppShell";
 import {
   getCurrencyMeta,
   type ClientCurrencyCode,
@@ -59,6 +69,33 @@ type MetaInsightsPreview = {
   note: string;
 };
 
+type StoreStatus = {
+  platform: string;
+  configured: boolean;
+  connected: boolean;
+  previewReady: boolean;
+  storeDomain?: string;
+  siteUrl?: string;
+  missingEnv: string[];
+  connectionError: string | null;
+  recommendedNextStep: string;
+};
+
+type StorePreview = {
+  note: string;
+  snapshot: {
+    shopName?: string;
+    storeName?: string;
+    currencyCode: string;
+    ordersCount: number;
+    grossSales: number;
+    taxTotal: number;
+    shippingTotal: number;
+    netSales: number;
+    averageOrderValue: number;
+  };
+};
+
 const RANGE_OPTIONS: DateRange[] = [
   "Today",
   "Yesterday",
@@ -68,37 +105,6 @@ const RANGE_OPTIONS: DateRange[] = [
   "QTD",
   "Last 90 Days",
   "Custom",
-];
-
-const PLATFORM_SNAPSHOT = [
-  {
-    platform: "Meta",
-    recommendation: "Scale the strongest prospecting campaigns only after store truth agrees.",
-    status: "Scale" as const,
-    mer: 3.65,
-    cpa: 34.4,
-  },
-  {
-    platform: "Google",
-    recommendation: "Keep watch on search quality and brand overlap before more spend.",
-    status: "Watch" as const,
-    mer: 2.55,
-    cpa: 44.9,
-  },
-  {
-    platform: "TikTok",
-    recommendation: "Refresh hooks first. Hold new scale until conversion quality improves.",
-    status: "Watch" as const,
-    mer: 3.16,
-    cpa: 52.11,
-  },
-  {
-    platform: "Snap",
-    recommendation: "Support channel only for now. Plan for currency conversion underneath client truth.",
-    status: "Hold" as const,
-    mer: 2.73,
-    cpa: 33.21,
-  },
 ];
 
 function toISODate(value: Date) {
@@ -190,6 +196,8 @@ export default function DashboardPage() {
   const [activeClientId, setActiveClientId] = useState("");
   const [metaStatus, setMetaStatus] = useState<MetaStatus | null>(null);
   const [metaPreview, setMetaPreview] = useState<MetaInsightsPreview | null>(null);
+  const [storeStatus, setStoreStatus] = useState<StoreStatus | null>(null);
+  const [storePreview, setStorePreview] = useState<StorePreview | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
@@ -204,6 +212,12 @@ export default function DashboardPage() {
   const accountCurrency =
     (metaStatus?.selectedAccount?.currency as ClientCurrencyCode | undefined) ??
     "USD";
+
+  const hasStoreTruth = Boolean(storePreview);
+  const hasMetaPreview = Boolean(metaPreview);
+  const storeCurrency =
+    (storePreview?.snapshot.currencyCode as ClientCurrencyCode | undefined) ??
+    clientCurrency;
 
   useEffect(() => {
     async function loadClients() {
@@ -245,6 +259,46 @@ export default function DashboardPage() {
       );
       const statusPayload = (await statusResponse.json()) as MetaStatus;
       setMetaStatus(statusPayload);
+
+      const client =
+        clients.find((entry) => entry.id === clientId) ??
+        activeClient ??
+        null;
+
+      if (client?.websitePlatform === "shopify" || client?.websitePlatform === "wordpress") {
+        const websitePlatform = client.websitePlatform;
+        const storeStatusResponse = await fetch(
+          `/api/integrations/${websitePlatform}/status`,
+          {
+            cache: "no-store",
+          }
+        );
+        const nextStoreStatus = (await storeStatusResponse.json()) as StoreStatus;
+        setStoreStatus(nextStoreStatus);
+
+        if (nextStoreStatus.previewReady) {
+          const storePreviewResponse = await fetch(
+            `/api/integrations/${websitePlatform}/store-truth-preview`,
+            {
+              cache: "no-store",
+            }
+          );
+          const nextStorePreview = (await storePreviewResponse.json()) as
+            | StorePreview
+            | { error?: string };
+
+          if (storePreviewResponse.ok && "snapshot" in nextStorePreview) {
+            setStorePreview(nextStorePreview);
+          } else {
+            setStorePreview(null);
+          }
+        } else {
+          setStorePreview(null);
+        }
+      } else {
+        setStoreStatus(null);
+        setStorePreview(null);
+      }
 
       if (!statusPayload.connected || !statusPayload.selectedAccountId) {
         setMetaPreview(null);
@@ -304,16 +358,10 @@ export default function DashboardPage() {
     void refreshMeta(activeClientId);
   }, [activeClientId, range, customStart, customEnd]);
 
-  function handleClientChange(nextClientId: string) {
-    setActiveClientId(nextClientId);
-
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("media-dashboard-active-client", nextClientId);
-    }
-  }
-
   const safeScale = metaPreview?.totals.purchaseValue
-    ? metaPreview.totals.purchaseValue >= metaPreview.totals.spend * 3
+    ? hasStoreTruth
+      ? storePreview!.snapshot.grossSales >= metaPreview.totals.spend * 2.2
+      : false
     : false;
 
   return (
@@ -418,8 +466,22 @@ export default function DashboardPage() {
         <div className="grid gap-5 xl:grid-cols-[1.15fr,0.85fr]">
           <Section
             title="Live Meta Preview"
-            subtitle="This section now follows the selected client and date range."
+            subtitle="This section follows the selected client and date range, and it now stays honest about whether live media data is available."
           >
+            <div className="mb-4 flex flex-wrap gap-2">
+              <SourcePill
+                label={metaStatus?.connected ? "Meta connected" : "Meta not connected"}
+                tone={metaStatus?.connected ? "good" : "warn"}
+              />
+              <SourcePill
+                label={hasMetaPreview ? "Live preview loaded" : "No live preview yet"}
+                tone={hasMetaPreview ? "good" : "warn"}
+              />
+              <SourcePill
+                label={hasStoreTruth ? "Store truth connected" : "Store truth still missing"}
+                tone={hasStoreTruth ? "good" : "warn"}
+              />
+            </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <MiniMetric
                 label="Connection"
@@ -440,57 +502,68 @@ export default function DashboardPage() {
                 value={
                   metaPreview
                     ? formatMoney(metaPreview.totals.spend, accountCurrency)
-                    : "Waiting"
+                    : "Waiting for live data"
                 }
                 hint={`Meta account currency: ${accountCurrency}`}
                 tone={metaPreview ? "good" : "warn"}
               />
               <MiniMetric
                 label="Live Purchases"
-                value={metaPreview ? formatNumber(metaPreview.totals.purchases) : "0"}
+                value={
+                  metaPreview ? formatNumber(metaPreview.totals.purchases) : "Waiting"
+                }
                 hint="Pulled from Meta insights preview"
-                tone={metaPreview ? "good" : "default"}
+                tone={metaPreview ? "good" : "warn"}
               />
               <MiniMetric
                 label="Live Revenue"
                 value={
                   metaPreview
                     ? formatMoney(metaPreview.totals.purchaseValue, accountCurrency)
-                    : "Waiting"
+                    : "Waiting for live data"
                 }
                 hint="Platform-attributed value only"
                 tone={metaPreview ? "good" : "warn"}
               />
             </div>
 
-            <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[720px] text-left text-sm">
-                <thead className="text-xs uppercase text-slate-400">
-                  <tr>
-                    <th className="pb-3">Campaign</th>
-                    <th>Spend</th>
-                    <th>CTR</th>
-                    <th>Frequency</th>
-                    <th>Purchases</th>
-                    <th>Revenue</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(metaPreview?.rows ?? []).slice(0, 8).map((row) => (
-                    <tr key={row.campaignId} className="border-t border-slate-800">
-                      <td className="py-4 font-semibold text-white">
-                        {row.campaignName}
-                      </td>
-                      <td>{formatMoney(row.spend, accountCurrency)}</td>
-                      <td>{formatNumber(row.ctr, 2)}%</td>
-                      <td>{formatNumber(row.frequency, 2)}</td>
-                      <td>{formatNumber(row.purchases)}</td>
-                      <td>{formatMoney(row.purchaseValue, accountCurrency)}</td>
+            {metaPreview?.rows.length ? (
+              <div className="mt-5 overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead className="text-xs uppercase text-slate-400">
+                    <tr>
+                      <th className="pb-3">Campaign</th>
+                      <th>Spend</th>
+                      <th>CTR</th>
+                      <th>Frequency</th>
+                      <th>Purchases</th>
+                      <th>Revenue</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {metaPreview.rows.slice(0, 8).map((row) => (
+                      <tr key={row.campaignId} className="border-t border-slate-800">
+                        <td className="py-4 font-semibold text-white">
+                          {row.campaignName}
+                        </td>
+                        <td>{formatMoney(row.spend, accountCurrency)}</td>
+                        <td>{formatNumber(row.ctr, 2)}%</td>
+                        <td>{formatNumber(row.frequency, 2)}</td>
+                        <td>{formatNumber(row.purchases)}</td>
+                        <td>{formatMoney(row.purchaseValue, accountCurrency)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="mt-5">
+                <EmptySectionState
+                  title="No live Meta rows are ready for this client yet"
+                  description="This table stays empty until the selected client has a connected Meta account and a saved ad account. It no longer falls back to believable demo campaign data."
+                />
+              </div>
+            )}
           </Section>
 
           <Section
@@ -506,7 +579,13 @@ export default function DashboardPage() {
               />
               <MiniMetric
                 label="Scale Readiness"
-                value={safeScale ? "Safe to review" : "Watch carefully"}
+                value={
+                  hasMetaPreview && hasStoreTruth
+                    ? safeScale
+                      ? "Safe to review"
+                      : "Watch carefully"
+                    : "Not decision-ready"
+                }
                 hint="Store truth still remains the final gate."
                 tone={safeScale ? "good" : "warn"}
               />
@@ -535,13 +614,28 @@ export default function DashboardPage() {
                   currency.
                 </p>
               </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                <div className="font-black text-white">Source Status</div>
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  {hasStoreTruth
+                    ? `Store truth is currently coming from ${
+                        storePreview?.snapshot.shopName ||
+                        storePreview?.snapshot.storeName ||
+                        storeStatus?.storeDomain ||
+                        storeStatus?.siteUrl ||
+                        "the website source"
+                      }.`
+                    : storeStatus?.recommendedNextStep ||
+                      "Connect the website source to unlock MER, AOV, and business-health metrics."}
+                </p>
+              </div>
             </div>
           </Section>
         </div>
 
         <Section
           title="Command Summary"
-          subtitle="A quick daily view while the deeper pages continue to use the shared Lamba decision layer."
+          subtitle="A quick daily view with honest live, partial, and not-connected states."
         >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MiniMetric
@@ -551,20 +645,24 @@ export default function DashboardPage() {
               tone="good"
             />
             <MiniMetric
-              label="Blended Spend"
+              label="Ad Spend"
               value={
                 metaPreview
                   ? formatMoney(metaPreview.totals.spend, clientCurrency)
-                  : formatMoney(45620, clientCurrency)
+                  : "Waiting for live data"
               }
-              hint="Shown in the client reporting currency"
+              hint="Shown only when the platform source is connected"
               tone="warn"
             />
             <MiniMetric
-              label="Scale Goal"
-              value="Protect MER first"
-              hint="Business truth overrides platform-only optimism"
-              tone="good"
+              label="Store Revenue"
+              value={
+                hasStoreTruth
+                  ? formatMoney(storePreview!.snapshot.grossSales, storeCurrency)
+                  : "Waiting for store truth"
+              }
+              hint="Website/store truth only"
+              tone={hasStoreTruth ? "good" : "warn"}
             />
             <MiniMetric
               label="Refresh State"
@@ -576,83 +674,75 @@ export default function DashboardPage() {
         </Section>
 
         <Section
-          title="Platform Priorities"
-          subtitle="Use this as the operator view until more channels are connected."
+          title="Source Readiness"
+          subtitle="The workbook expects business truth and platform truth to be separated clearly."
         >
-          <div className="space-y-4">
-            {PLATFORM_SNAPSHOT.map((row) => (
-              <div
-                key={row.platform}
-                className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-lg font-black text-white">{row.platform}</div>
-                    <p className="mt-1 text-sm text-slate-400">{row.recommendation}</p>
-                  </div>
-                  <StatusPill status={row.status} />
-                </div>
-                <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <MiniMetric
-                    label="MER"
-                    value={`${formatNumber(row.mer, 2)}x`}
-                    tone={row.mer >= 3 ? "good" : "warn"}
-                  />
-                  <MiniMetric
-                    label="CPA"
-                    value={formatMoney(row.cpa, clientCurrency)}
-                    tone={row.cpa <= 40 ? "good" : "warn"}
-                  />
-                  <MiniMetric
-                    label="Primary Read"
-                    value={row.platform === "Meta" ? "Live preview" : "Prototype"}
-                    tone={row.platform === "Meta" ? "good" : "default"}
-                  />
-                  <MiniMetric
-                    label="Next Move"
-                    value={row.status}
-                    tone={
-                      row.status === "Scale"
-                        ? "good"
-                        : row.status === "Watch"
-                        ? "warn"
-                        : "default"
-                    }
-                  />
-                </div>
-              </div>
-            ))}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <MiniMetric
+              label="Meta"
+              value={hasMetaPreview ? "Live preview active" : "Waiting"}
+              hint={
+                metaStatus?.connected
+                  ? metaStatus.selectedAccount?.name ?? "Ad account still needs saving"
+                  : "Connect Meta in Admin"
+              }
+              tone={hasMetaPreview ? "good" : "warn"}
+            />
+            <MiniMetric
+              label="Store Truth"
+              value={hasStoreTruth ? "Live website truth" : "Waiting"}
+              hint={
+                hasStoreTruth
+                  ? storePreview?.snapshot.shopName ||
+                    storePreview?.snapshot.storeName ||
+                    "Connected source"
+                  : storeStatus?.recommendedNextStep || "Connect the website source"
+              }
+              tone={hasStoreTruth ? "good" : "warn"}
+            />
+            <MiniMetric
+              label="MER Readiness"
+              value={hasMetaPreview && hasStoreTruth ? "Ready" : "Blocked"}
+              hint="Needs both spend and store revenue"
+              tone={hasMetaPreview && hasStoreTruth ? "good" : "warn"}
+            />
+            <MiniMetric
+              label="Funnel Metrics"
+              value="Needs analytics source"
+              hint="Sessions, LPV, ATC, and checkout rates still need GA4 or storefront analytics"
+              tone="warn"
+            />
           </div>
         </Section>
 
         <Section
-          title="What Changed"
-          subtitle="These were the key fixes you asked for."
+          title="Workbook Logic"
+          subtitle="This is how the current dashboard maps to the uploaded metric dictionary."
         >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MiniMetric
-              label="Client Switching"
-              value="Live in dashboard"
-              hint="The selected client now carries through the main dashboard."
+              label="Store Revenue"
+              value="Website truth"
+              hint="Shopify or WordPress/WooCommerce should own this metric."
               tone="good"
             />
             <MiniMetric
-              label="Date Range"
-              value="Now wired"
-              hint="Refresh uses the selected date window against Meta."
+              label="Ad Spend"
+              value="Platform truth"
+              hint="This is currently coming from the connected Meta account."
               tone="good"
             />
             <MiniMetric
-              label="Client Currency"
-              value={getCurrencyMeta(clientCurrency).code}
-              hint="USD, AED, SAR, and EGP are supported."
-              tone="good"
+              label="MER"
+              value={hasMetaPreview && hasStoreTruth ? "Applied" : "Waiting on both sources"}
+              hint="Store revenue divided by total ad spend"
+              tone={hasMetaPreview && hasStoreTruth ? "good" : "warn"}
             />
             <MiniMetric
-              label="Refresh Button"
-              value="Working"
-              hint="It now reloads the live Meta preview path."
-              tone="good"
+              label="Sessions and Funnel"
+              value="Not fully applied yet"
+              hint="Workbook formulas like LPV rate, ATC rate, and purchase CVR still need analytics truth."
+              tone="warn"
             />
           </div>
         </Section>
