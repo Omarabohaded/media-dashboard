@@ -9,6 +9,7 @@ import {
 } from "@/components/AppShell";
 import { evaluateScaling } from "@/lib/scalingEngine";
 import { useDashboardReadiness } from "@/lib/useDashboardReadiness";
+import { evaluateTrackingGap, formatPercent } from "@/lib/workbookSignals";
 
 function formatMoney(value: number, currencyCode: string) {
   return new Intl.NumberFormat("en-US", {
@@ -51,6 +52,24 @@ export default function ScalingPage() {
     metaPreview && metaPreview.totals.clicks > 0
       ? (metaPreview.totals.purchases / metaPreview.totals.clicks) * 100
       : 0;
+  const checkoutCompletionRate =
+    metaPreview && metaPreview.rows.length
+      ? (metaPreview.rows.reduce((sum, row) => sum + row.purchases, 0) /
+          Math.max(
+            metaPreview.rows.reduce(
+              (sum, row) => sum + (row.checkoutInitiated ?? 0),
+              0
+            ),
+            1
+          )) *
+        100
+      : null;
+  const trackingGap = evaluateTrackingGap({
+    storeRevenue: hasStoreTruth ? storeRevenue : undefined,
+    platformRevenue: hasMeta ? metaPreview?.totals.purchaseValue : undefined,
+    storeOrders: hasStoreTruth ? storePreview?.ordersCount : undefined,
+    platformPurchases: hasMeta ? metaPreview?.totals.purchases : undefined,
+  });
 
   const scalingDecision = evaluateScaling({
     merStatus:
@@ -60,8 +79,9 @@ export default function ScalingPage() {
     revenueGrowth: 0,
     spendGrowth: 0,
     priorityScore: !hasStoreTruth ? 90 : mer >= 2.2 ? 72 : 88,
-    trackingMismatch: !hasStoreTruth,
-    checkoutFailure: !hasStoreAnalytics,
+    trackingMismatch: trackingGap.active,
+    checkoutFailure:
+      typeof checkoutCompletionRate === "number" && checkoutCompletionRate < 35,
     businessTruthFailure: !hasStoreTruth,
     trafficQualityIssue: averageCtr > 2 && purchaseCvr < 1,
   });
@@ -88,6 +108,24 @@ export default function ScalingPage() {
               label={hasStoreAnalytics ? "Sessions and funnel truth connected" : "Sessions and funnel truth still missing"}
               tone={hasStoreAnalytics ? "good" : "warn"}
             />
+            <SourcePill
+              label={
+                trackingGap.ready
+                  ? trackingGap.active
+                    ? "Tracking gap active"
+                    : "Tracking gap within range"
+                  : "Tracking gap not ready"
+              }
+              tone={
+                trackingGap.status === "danger"
+                  ? "bad"
+                  : trackingGap.status === "warning"
+                  ? "warn"
+                  : trackingGap.status === "healthy"
+                  ? "good"
+                  : "default"
+              }
+            />
           </div>
 
           {blockScaling ? (
@@ -102,6 +140,9 @@ export default function ScalingPage() {
                   ? "Store revenue and orders are available."
                   : storeStatus?.recommendedNextStep ??
                     "Connect Shopify or WordPress/WooCommerce for store truth.",
+                trackingGap.ready
+                  ? trackingGap.summary
+                  : "Tracking-gap logic becomes available after both store truth and platform attribution are connected.",
                 "Sessions, LPV, ATC, checkout rate, and purchase CVR still need analytics truth before scaling can be trusted.",
               ]}
             />
@@ -208,6 +249,31 @@ export default function ScalingPage() {
               value={activeClient?.name ?? "No client selected"}
               hint={activeClient?.websitePlatform ?? "Create a client in Admin"}
               tone="default"
+            />
+            <MiniMetric
+              label="Tracking Gap"
+              value={
+                trackingGap.ready
+                  ? trackingGap.active
+                    ? formatPercent(
+                        Math.max(
+                          trackingGap.revenueGapRatio ?? 0,
+                          trackingGap.orderGapRatio ?? 0
+                        )
+                      )
+                    : "Within range"
+                  : "Waiting"
+              }
+              hint="Workbook rule: compare platform attribution vs website/store truth before trusting scale."
+              tone={
+                trackingGap.status === "danger"
+                  ? "bad"
+                  : trackingGap.status === "warning"
+                  ? "warn"
+                  : trackingGap.status === "healthy"
+                  ? "good"
+                  : "warn"
+              }
             />
           </div>
         </Section>
