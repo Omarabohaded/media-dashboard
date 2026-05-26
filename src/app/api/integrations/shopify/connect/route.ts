@@ -5,7 +5,12 @@ import {
   getShopifyConfig,
   normalizeShopifyStoreDomain,
 } from "@/lib/integrations/shopify";
-import { getClientById, upsertShopifyConnection } from "@/lib/clientStore";
+import {
+  clearShopifyConnection,
+  getClientById,
+  getShopifyConnection,
+  upsertShopifyConnection,
+} from "@/lib/clientStore";
 
 export async function POST(request: NextRequest) {
   const config = getShopifyConfig();
@@ -14,6 +19,7 @@ export async function POST(request: NextRequest) {
     storeDomain?: string;
   };
   const client = await getClientById(body.clientId);
+  const existingConnection = await getShopifyConnection(client.id);
   const storeDomain = normalizeShopifyStoreDomain(body.storeDomain ?? "");
 
   if (config.missingEnv.length > 0) {
@@ -57,13 +63,9 @@ export async function POST(request: NextRequest) {
     const message =
       error instanceof Error ? error.message : "Could not connect Shopify.";
 
-    await upsertShopifyConnection({
-      clientId: client.id,
-      storeDomain,
-      connectedAt: new Date().toISOString(),
-      shopName: null,
-      lastError: message,
-    });
+    if (!existingConnection?.shopName) {
+      await clearShopifyConnection(client.id);
+    }
 
     return NextResponse.json(
       {
