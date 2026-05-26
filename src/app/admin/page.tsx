@@ -54,10 +54,12 @@ type MetaInsightsPreview = {
 };
 
 type ShopifyStatus = {
+  client: ClientRecord;
   configured: boolean;
   connected: boolean;
   previewReady: boolean;
   storeDomain: string;
+  shopName: string | null;
   missingEnv: string[];
   connectionError: string | null;
   recommendedNextStep: string;
@@ -149,6 +151,7 @@ export default function AdminPage() {
   const [shopifyMessage, setShopifyMessage] = useState<string | null>(null);
   const [wordpressMessage, setWordpressMessage] = useState<string | null>(null);
   const [accountDraft, setAccountDraft] = useState("");
+  const [shopifyStoreDomainDraft, setShopifyStoreDomainDraft] = useState("");
   const [metaStatus, setMetaStatus] = useState<MetaStatus | null>(null);
   const [metaPreview, setMetaPreview] = useState<MetaInsightsPreview | null>(null);
   const [shopifyStatus, setShopifyStatus] = useState<ShopifyStatus | null>(null);
@@ -196,14 +199,24 @@ export default function AdminPage() {
     setAccountDraft(payload.selectedAccountId ?? payload.accounts[0]?.id ?? "");
   }
 
+  async function loadShopifyStatus(clientId: string) {
+    const response = await fetch(
+      `/api/integrations/shopify/status?clientId=${encodeURIComponent(clientId)}`,
+      {
+        cache: "no-store",
+      }
+    );
+    const payload = (await response.json()) as ShopifyStatus;
+    setShopifyStatus(payload);
+    setShopifyStoreDomainDraft(payload.storeDomain ?? "");
+  }
+
   async function loadReadiness() {
-    const [shopifyResponse, wordpressResponse, syncResponse] = await Promise.all([
-      fetch("/api/integrations/shopify/status", { cache: "no-store" }),
+    const [wordpressResponse, syncResponse] = await Promise.all([
       fetch("/api/integrations/wordpress/status", { cache: "no-store" }),
       fetch("/api/sync/state", { cache: "no-store" }),
     ]);
 
-    setShopifyStatus((await shopifyResponse.json()) as ShopifyStatus);
     setWordpressStatus((await wordpressResponse.json()) as WordPressStatus);
     setSyncState((await syncResponse.json()) as SyncStateResponse);
   }
@@ -233,8 +246,11 @@ export default function AdminPage() {
       return;
     }
 
-    void loadMetaStatus(activeClientId).catch(() => {
-      setMetaMessage("Could not load Meta status.");
+    void Promise.all([
+      loadMetaStatus(activeClientId),
+      loadShopifyStatus(activeClientId),
+    ]).catch(() => {
+      setMetaMessage("Could not load integration status.");
     });
   }, [activeClientId]);
 
@@ -287,6 +303,7 @@ export default function AdminPage() {
       ).label}.`
     );
     setMetaMessage("Client created. You can now connect Meta for this client.");
+    setShopifyMessage("Client created. You can now connect Shopify for this client.");
   }
 
   async function handleDeleteClient() {
@@ -326,6 +343,7 @@ export default function AdminPage() {
     setMetaPreview(null);
     await loadClients(nextClientId);
     setMetaMessage(null);
+    setShopifyMessage(null);
     setClientMessage(`${activeClient.name} was removed from the dashboard.`);
   }
 
@@ -396,6 +414,61 @@ export default function AdminPage() {
     setMetaPreview(payload);
   }
 
+  async function handleConnectShopify() {
+    const storeDomain = shopifyStoreDomainDraft.trim();
+
+    if (!storeDomain) {
+      setShopifyMessage("Enter the Shopify store domain first.");
+      return;
+    }
+
+    const response = await fetch("/api/integrations/shopify/connect", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        clientId: activeClientId,
+        storeDomain,
+      }),
+    });
+
+    const payload = (await response.json()) as {
+      error?: string;
+      shopName?: string;
+      storeDomain?: string;
+    };
+
+    if (!response.ok) {
+      setShopifyMessage(payload.error ?? "Could not connect Shopify.");
+      return;
+    }
+
+    await loadShopifyStatus(activeClientId);
+    setShopifyMessage(
+      payload.shopName
+        ? `Shopify connected for ${activeClient?.name ?? "this client"}: ${payload.shopName}.`
+        : `Shopify connected for ${activeClient?.name ?? "this client"}.`
+    );
+  }
+
+  async function handleDisconnectShopify() {
+    const response = await fetch(
+      `/api/integrations/shopify/status?clientId=${encodeURIComponent(activeClientId)}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    if (!response.ok) {
+      setShopifyMessage("Could not disconnect Shopify.");
+      return;
+    }
+
+    await loadShopifyStatus(activeClientId);
+    setShopifyMessage("Shopify was disconnected for this client.");
+  }
+
   const metaReadyState = metaStatus?.connected ? "Good" : metaStatus?.configured ? "Watch" : "Fix";
   const shopifyReadyState = shopifyStatus?.previewReady ? "Good" : shopifyStatus?.configured ? "Watch" : "Fix";
   const wordpressReadyState = wordpressStatus?.previewReady ? "Good" : wordpressStatus?.configured ? "Watch" : "Fix";
@@ -452,7 +525,7 @@ export default function AdminPage() {
                 <MiniMetric
                   label="Saved Clients"
                   value={`${clients.length}`}
-                  hint="Each client keeps its own Meta account selection."
+                  hint="Each client keeps its own Meta and Shopify connection state."
                   tone="good"
                 />
                 <MiniMetric
@@ -694,9 +767,67 @@ export default function AdminPage() {
                   </div>
                   <StatusPill status={shopifyReadyState} />
                 </div>
+
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  <MiniMetric
+                    label="Client"
+                    value={shopifyStatus?.client.name ?? activeClient?.name ?? "None"}
+                    hint="Shopify is now saved per client, not globally."
+                    tone="good"
+                  />
+                  <MiniMetric
+                    label="Connected Store"
+                    value={shopifyStatus?.shopName ?? "Not connected"}
+                    hint={shopifyStatus?.storeDomain ?? "Save the Shopify domain for this client"}
+                    tone={shopifyStatus?.connected ? "good" : "warn"}
+                  />
+                </div>
+
                 <div className="mt-3 space-y-3">
                   <MissingEnv values={shopifyStatus?.missingEnv ?? []} />
-                  <Notice message={shopifyStatus?.connectionError ?? shopifyMessage} tone="warn" />
+                  <Notice
+                    message={shopifyStatus?.connectionError ?? null}
+                    tone="warn"
+                  />
+                  <Notice message={shopifyMessage} />
+                </div>
+
+                <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
+                  <div className="text-xs font-black uppercase text-slate-400">
+                    Save Store To Client
+                  </div>
+                  <input
+                    value={shopifyStoreDomainDraft}
+                    onChange={(event) => setShopifyStoreDomainDraft(event.target.value)}
+                    placeholder="your-store.myshopify.com"
+                    className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                  />
+                  <div className="mt-3 text-xs text-slate-500">
+                    This saves the Shopify store domain to the active client and validates it with the shared Shopify app credentials.
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleConnectShopify()}
+                      className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-500"
+                    >
+                      {shopifyStatus?.connected ? "Reconnect Shopify" : "Connect Shopify"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void loadShopifyStatus(activeClientId)}
+                      className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-slate-500 hover:text-white"
+                    >
+                      Refresh Status
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDisconnectShopify()}
+                      className="rounded-xl border border-red-500/40 px-4 py-3 text-sm font-bold text-red-200 transition hover:border-red-400 hover:text-white"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -816,7 +947,7 @@ export default function AdminPage() {
             <MiniMetric
               label="Client Scope"
               value="Per client"
-              hint="Meta selection is now tied to the chosen client."
+              hint="Meta and Shopify connections are now tied to the chosen client."
               tone="good"
             />
           </div>
