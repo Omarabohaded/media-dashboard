@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const token = await exchangeShopifyAuthorizationCode(origin, shop, code);
+    const token = await exchangeShopifyAuthorizationCode(shop, code);
     const preview = await fetchShopifyStoreTruthPreview(token.access_token!, shop);
     const response = NextResponse.redirect(
       new URL(`/admin?clientId=${client.id}&shopify_connected=1`, origin)
