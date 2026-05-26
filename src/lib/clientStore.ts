@@ -18,11 +18,20 @@ export type MetaClientConnection = {
   lastError: string | null;
 };
 
+export type ShopifyClientConnection = {
+  clientId: string;
+  storeDomain: string;
+  connectedAt: string;
+  shopName: string | null;
+  lastError: string | null;
+};
+
 type ClientStoreState = {
   version: 1;
   updatedAt: string | null;
   clients: ClientRecord[];
   metaConnections: MetaClientConnection[];
+  shopifyConnections: ShopifyClientConnection[];
 };
 
 const CLIENT_STORE_KEY = "media-dashboard:client-state";
@@ -45,6 +54,7 @@ function defaultState(): ClientStoreState {
     updatedAt: null,
     clients: [buildDefaultClient()],
     metaConnections: [],
+    shopifyConnections: [],
   };
 }
 
@@ -67,6 +77,9 @@ export async function readClientStore(): Promise<ClientStoreState> {
     ...client,
     currencyCode: client.currencyCode ?? "USD",
   }));
+
+  state.metaConnections = state.metaConnections ?? [];
+  state.shopifyConnections = state.shopifyConnections ?? [];
 
   return state;
 }
@@ -153,6 +166,38 @@ export async function clearMetaConnection(clientId: string) {
   }));
 }
 
+export async function getShopifyConnection(clientId: string) {
+  const state = await readClientStore();
+  return (
+    state.shopifyConnections.find(
+      (connection) => connection.clientId === clientId
+    ) ?? null
+  );
+}
+
+export async function upsertShopifyConnection(connection: ShopifyClientConnection) {
+  await updateClientStore((state) => ({
+    ...state,
+    shopifyConnections: [
+      connection,
+      ...state.shopifyConnections.filter(
+        (item) => item.clientId !== connection.clientId
+      ),
+    ],
+  }));
+
+  return connection;
+}
+
+export async function clearShopifyConnection(clientId: string) {
+  await updateClientStore((state) => ({
+    ...state,
+    shopifyConnections: state.shopifyConnections.filter(
+      (connection) => connection.clientId !== clientId
+    ),
+  }));
+}
+
 export async function deleteClient(clientId: string) {
   const state = await readClientStore();
 
@@ -170,6 +215,9 @@ export async function deleteClient(clientId: string) {
     ...current,
     clients: current.clients.filter((client) => client.id !== clientId),
     metaConnections: current.metaConnections.filter(
+      (connection) => connection.clientId !== clientId
+    ),
+    shopifyConnections: current.shopifyConnections.filter(
       (connection) => connection.clientId !== clientId
     ),
   }));
