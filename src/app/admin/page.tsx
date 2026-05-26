@@ -231,13 +231,23 @@ export default function AdminPage() {
       .then(() => loadReadiness())
       .catch(() => setClientMessage("Could not load the admin state."));
 
-    const connected = params.get("meta_connected");
-    const error = params.get("meta_error");
+    const metaConnected = params.get("meta_connected");
+    const metaError = params.get("meta_error");
+    const shopifyConnected = params.get("shopify_connected");
+    const shopifyError = params.get("shopify_error");
 
-    if (connected === "1") {
+    if (metaConnected === "1") {
       setMetaMessage("Meta connected. Choose the ad account you want to save to this client.");
-    } else if (error) {
-      setMetaMessage(decodeURIComponent(error));
+    } else if (metaError) {
+      setMetaMessage(decodeURIComponent(metaError));
+    }
+
+    if (shopifyConnected === "1") {
+      setShopifyMessage(
+        "Shopify connected. The store owner approved access for this client store."
+      );
+    } else if (shopifyError) {
+      setShopifyMessage(decodeURIComponent(shopifyError));
     }
   }, []);
 
@@ -414,7 +424,7 @@ export default function AdminPage() {
     setMetaPreview(payload);
   }
 
-  async function handleConnectShopify() {
+  function handleConnectShopify() {
     const storeDomain = shopifyStoreDomainDraft.trim();
 
     if (!storeDomain) {
@@ -422,34 +432,12 @@ export default function AdminPage() {
       return;
     }
 
-    const response = await fetch("/api/integrations/shopify/connect", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        clientId: activeClientId,
-        storeDomain,
-      }),
+    const params = new URLSearchParams({
+      clientId: activeClientId,
+      storeDomain,
     });
 
-    const payload = (await response.json()) as {
-      error?: string;
-      shopName?: string;
-      storeDomain?: string;
-    };
-
-    if (!response.ok) {
-      setShopifyMessage(payload.error ?? "Could not connect Shopify.");
-      return;
-    }
-
-    await loadShopifyStatus(activeClientId);
-    setShopifyMessage(
-      payload.shopName
-        ? `Shopify connected for ${activeClient?.name ?? "this client"}: ${payload.shopName}.`
-        : `Shopify connected for ${activeClient?.name ?? "this client"}.`
-    );
+    window.location.href = `/api/integrations/shopify/connect?${params.toString()}`;
   }
 
   async function handleDisconnectShopify() {
@@ -772,13 +760,13 @@ export default function AdminPage() {
                   <MiniMetric
                     label="Client"
                     value={shopifyStatus?.client.name ?? activeClient?.name ?? "None"}
-                    hint="Shopify is now saved per client, not globally."
+                    hint="Shopify is now connected per client through store-owner approval."
                     tone="good"
                   />
                   <MiniMetric
                     label="Connected Store"
                     value={shopifyStatus?.shopName ?? "Not connected"}
-                    hint={shopifyStatus?.storeDomain ?? "Save the Shopify domain for this client"}
+                    hint={shopifyStatus?.storeDomain ?? "Start the Shopify install flow for this client"}
                     tone={shopifyStatus?.connected ? "good" : "warn"}
                   />
                 </div>
@@ -794,7 +782,7 @@ export default function AdminPage() {
 
                 <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
                   <div className="text-xs font-black uppercase text-slate-400">
-                    Save Store To Client
+                    Install Store To Client
                   </div>
                   <input
                     value={shopifyStoreDomainDraft}
@@ -803,12 +791,12 @@ export default function AdminPage() {
                     className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
                   />
                   <div className="mt-3 text-xs text-slate-500">
-                    This saves the Shopify store domain to the active client and validates it with the shared Shopify app credentials.
+                    This opens Shopify&apos;s approval screen so the store owner can install and approve access for this client store.
                   </div>
                   <div className="mt-4 flex flex-wrap gap-3">
                     <button
                       type="button"
-                      onClick={() => void handleConnectShopify()}
+                      onClick={handleConnectShopify}
                       className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-500"
                     >
                       {shopifyStatus?.connected ? "Reconnect Shopify" : "Connect Shopify"}
