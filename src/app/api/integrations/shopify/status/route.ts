@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  exchangeShopifyClientCredentials,
   fetchShopifyStoreTruthPreview,
   getShopifyConfig,
 } from "@/lib/integrations/shopify";
@@ -11,17 +10,14 @@ export async function GET(request: NextRequest) {
   const connection = await getShopifyConnection(client.id);
   const config = getShopifyConfig();
   const storeDomain = connection?.storeDomain ?? "";
+  const accessToken = connection?.accessToken ?? "";
   let connectionError = connection?.lastError ?? null;
   let previewReady = false;
   let shopName = connection?.shopName ?? null;
 
-  if (config.missingEnv.length === 0 && storeDomain) {
+  if (config.missingEnv.length === 0 && storeDomain && accessToken) {
     try {
-      const token = await exchangeShopifyClientCredentials(storeDomain);
-      const preview = await fetchShopifyStoreTruthPreview(
-        token.access_token!,
-        storeDomain
-      );
+      const preview = await fetchShopifyStoreTruthPreview(accessToken, storeDomain);
       previewReady = true;
       shopName = preview.snapshot.shopName;
       connectionError = null;
@@ -35,24 +31,22 @@ export async function GET(request: NextRequest) {
     client,
     platform: "shopify",
     configured: config.missingEnv.length === 0,
-    connected: Boolean(storeDomain) && !connectionError,
+    connected: Boolean(storeDomain && accessToken) && !connectionError,
     previewReady,
     storeDomain,
     apiVersion: config.apiVersion,
     requestedScopes: config.requestedScopes,
     missingEnv: config.missingEnv,
-    usesMockData: true,
+    usesMockData: false,
     shopName,
     connectionError,
     recommendedNextStep:
       config.missingEnv.length > 0
-        ? "Add Shopify client credentials before connecting client stores."
-        : !storeDomain
-        ? "Save the Shopify store domain for this client first."
+        ? "Add Shopify app credentials before connecting client stores."
+        : !storeDomain || !accessToken
+        ? "Start the Shopify install flow for this client store."
         : connectionError
-        ? "Confirm the store domain, make sure the Shopify app is installed on that store, and verify that this store is eligible for the current auth flow."
-        : !previewReady
-        ? "Validate the Shopify app install, scopes, and saved store domain for this client."
+        ? "Reconnect Shopify so the store owner can approve the latest app access."
         : "Compare Shopify store truth against Meta before enabling scale recommendations.",
   });
 }
