@@ -177,8 +177,15 @@ export async function runShopifySync(input: { clientId: string }) {
   if (!connection?.storeDomain || !connection.accessToken) {
     const failed = finalizeRun(run, {
       status: "failed",
-      error: "Shopify is not connected for this client.",
-      notes: ["Run the Shopify install flow in Admin first."],
+      error: client.storeAccessDeclined
+        ? "This client has not granted website access."
+        : "Shopify is not connected for this client.",
+      notes: client.storeAccessDeclined
+        ? [
+            "Shopify remains optional for this client until they choose to share store access.",
+            "Use connected paid-media sources only, or collect manual exports later if needed.",
+          ]
+        : ["Run the Shopify install flow in Admin first."],
     });
     await appendSyncRun(failed);
     return failed;
