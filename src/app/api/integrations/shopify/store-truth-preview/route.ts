@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  exchangeShopifyClientCredentials,
   fetchShopifyStoreTruthPreview,
   getShopifyConfig,
 } from "@/lib/integrations/shopify";
@@ -23,7 +22,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (!connection?.storeDomain) {
+    if (!connection?.storeDomain || !connection.accessToken) {
       return NextResponse.json(
         {
           error: "Connect Shopify for this client before loading store truth preview.",
@@ -32,9 +31,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const token = await exchangeShopifyClientCredentials(connection.storeDomain);
     const preview = await fetchShopifyStoreTruthPreview(
-      token.access_token!,
+      connection.accessToken,
       connection.storeDomain
     );
 
