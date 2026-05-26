@@ -2,6 +2,7 @@
 
 import {
   AppShell,
+  DashboardLoadingState,
   EmptySectionState,
   MiniMetric,
   Section,
@@ -28,8 +29,14 @@ function formatNumber(value: number, digits = 0) {
 }
 
 export default function ScalingPage() {
-  const { activeClient, metaPreview, metaStatus, storePreview, storeStatus } =
-    useDashboardReadiness();
+  const {
+    activeClient,
+    isLoading,
+    metaPreview,
+    metaStatus,
+    storePreview,
+    storeStatus,
+  } = useDashboardReadiness();
 
   const hasMeta = Boolean(metaPreview && metaStatus?.selectedAccountId);
   const hasStoreTruth = Boolean(storePreview);
@@ -99,6 +106,17 @@ export default function ScalingPage() {
   });
 
   const blockScaling = !hasStoreTruth || !hasMeta || !hasStoreAnalytics;
+
+  if (isLoading) {
+    return (
+      <AppShell>
+        <DashboardLoadingState
+          title="Loading scaling inputs"
+          description="Checking source truth, funnel readiness, tracking alignment, and scaling blockers."
+        />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
