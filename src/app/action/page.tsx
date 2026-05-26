@@ -9,6 +9,7 @@ import {
 } from "@/components/AppShell";
 import { generateActions } from "@/lib/actionEngine";
 import { detectRootCauses } from "@/lib/crossMetricEngine";
+import { getFunnelReadiness } from "@/lib/funnelReadiness";
 import { prioritizeSignals } from "@/lib/priorityEngine";
 import { evaluateRelationships } from "@/lib/relationshipEngine";
 import { useDashboardReadiness } from "@/lib/useDashboardReadiness";
@@ -71,6 +72,14 @@ export default function ActionPage() {
     storeOrders: hasStoreTruth ? storePreview?.ordersCount : undefined,
     platformPurchases: hasMeta ? metaPreview?.totals.purchases : undefined,
   });
+  const funnelReadiness = getFunnelReadiness({
+    storePreview,
+    metaPreview,
+    analyticsConnected: false,
+  });
+  const checkoutCompletionMetric = funnelReadiness.find(
+    (metric) => metric.id === "checkout_completion_rate"
+  );
 
   const relationshipSignals = hasMeta
     ? evaluateRelationships({
@@ -147,6 +156,16 @@ export default function ActionPage() {
             <SourcePill
               label="Risk lane ranks above opportunity lane"
               tone="default"
+            />
+            <SourcePill
+              label={
+                checkoutCompletionMetric?.state === "partial"
+                  ? "Funnel proxy is partial only"
+                  : "Funnel truth still blocked"
+              }
+              tone={
+                checkoutCompletionMetric?.state === "partial" ? "default" : "warn"
+              }
             />
           </div>
 
@@ -305,6 +324,29 @@ export default function ActionPage() {
               )}
             </div>
           )}
+        </Section>
+
+        <Section
+          title="Funnel Truth Status"
+          subtitle="These metrics follow the workbook rule that platform funnel events are only directional until website analytics truth is connected."
+        >
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {funnelReadiness.map((metric) => (
+              <MiniMetric
+                key={metric.id}
+                label={metric.label}
+                value={metric.value}
+                hint={`${metric.source} · ${metric.hint}`}
+                tone={
+                  metric.state === "ready"
+                    ? "good"
+                    : metric.state === "partial"
+                    ? "default"
+                    : "warn"
+                }
+              />
+            ))}
+          </div>
         </Section>
 
         <Section
