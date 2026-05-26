@@ -171,7 +171,6 @@ export function verifyShopifyHmac(searchParams: URLSearchParams) {
 }
 
 export async function exchangeShopifyAuthorizationCode(
-  origin: string,
   storeDomain: string,
   code: string
 ) {
