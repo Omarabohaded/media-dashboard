@@ -18,6 +18,7 @@ import {
   type ClientCurrencyCode,
   type ClientRecord,
 } from "@/lib/clientTypes";
+import { evaluateTrackingGap } from "@/lib/workbookSignals";
 
 type DateRange =
   | "Today"
@@ -218,6 +219,12 @@ export default function DashboardPage() {
   const storeCurrency =
     (storePreview?.snapshot.currencyCode as ClientCurrencyCode | undefined) ??
     clientCurrency;
+  const trackingGap = evaluateTrackingGap({
+    storeRevenue: hasStoreTruth ? storePreview?.snapshot.grossSales : undefined,
+    platformRevenue: hasMetaPreview ? metaPreview?.totals.purchaseValue : undefined,
+    storeOrders: hasStoreTruth ? storePreview?.snapshot.ordersCount : undefined,
+    platformPurchases: hasMetaPreview ? metaPreview?.totals.purchases : undefined,
+  });
 
   useEffect(() => {
     async function loadClients() {
@@ -360,7 +367,8 @@ export default function DashboardPage() {
 
   const safeScale = metaPreview?.totals.purchaseValue
     ? hasStoreTruth
-      ? storePreview!.snapshot.grossSales >= metaPreview.totals.spend * 2.2
+      ? storePreview!.snapshot.grossSales >= metaPreview.totals.spend * 2.2 &&
+        !trackingGap.active
       : false
     : false;
 
@@ -480,6 +488,24 @@ export default function DashboardPage() {
               <SourcePill
                 label={hasStoreTruth ? "Store truth connected" : "Store truth still missing"}
                 tone={hasStoreTruth ? "good" : "warn"}
+              />
+              <SourcePill
+                label={
+                  trackingGap.ready
+                    ? trackingGap.active
+                      ? "Tracking gap active"
+                      : "Tracking gap within range"
+                    : "Tracking gap not ready"
+                }
+                tone={
+                  trackingGap.status === "danger"
+                    ? "bad"
+                    : trackingGap.status === "warning"
+                    ? "warn"
+                    : trackingGap.status === "healthy"
+                    ? "good"
+                    : "default"
+                }
               />
             </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -707,10 +733,24 @@ export default function DashboardPage() {
               tone={hasMetaPreview && hasStoreTruth ? "good" : "warn"}
             />
             <MiniMetric
-              label="Funnel Metrics"
-              value="Needs analytics source"
-              hint="Sessions, LPV, ATC, and checkout rates still need GA4 or storefront analytics"
-              tone="warn"
+              label="Tracking Gap"
+              value={
+                trackingGap.ready
+                  ? trackingGap.active
+                    ? "Review"
+                    : "Within range"
+                  : "Waiting"
+              }
+              hint={trackingGap.summary}
+              tone={
+                trackingGap.status === "danger"
+                  ? "bad"
+                  : trackingGap.status === "warning"
+                  ? "warn"
+                  : trackingGap.status === "healthy"
+                  ? "good"
+                  : "warn"
+              }
             />
           </div>
         </Section>
@@ -737,6 +777,26 @@ export default function DashboardPage() {
               value={hasMetaPreview && hasStoreTruth ? "Applied" : "Waiting on both sources"}
               hint="Store revenue divided by total ad spend"
               tone={hasMetaPreview && hasStoreTruth ? "good" : "warn"}
+            />
+            <MiniMetric
+              label="Tracking Gap Signal"
+              value={
+                trackingGap.ready
+                  ? trackingGap.active
+                    ? "Applied and warning"
+                    : "Applied and healthy"
+                  : "Waiting on both truths"
+              }
+              hint="Workbook rule: compare platform attribution against store truth before trusting scale."
+              tone={
+                trackingGap.status === "danger"
+                  ? "bad"
+                  : trackingGap.status === "warning"
+                  ? "warn"
+                  : trackingGap.status === "healthy"
+                  ? "good"
+                  : "warn"
+              }
             />
             <MiniMetric
               label="Sessions and Funnel"
