@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, RefreshCw, ShieldCheck } from "lucide-react";
+import {
+  AlertTriangle,
+  RefreshCw,
+  ShieldCheck,
+} from "lucide-react";
 import {
   AppShell,
+  DashboardLoadingState,
   EmptySectionState,
   MiniMetric,
   Section,
@@ -108,7 +113,10 @@ const RANGE_OPTIONS: DateRange[] = [
 ];
 
 function toISODate(value: Date) {
-  return value.toISOString().slice(0, 10);
+  const year = value.getFullYear();
+  const month = `${value.getMonth() + 1}`.padStart(2, "0");
+  const day = `${value.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function startOfQuarter(value: Date) {
@@ -146,10 +154,7 @@ function buildMetaRangeQuery(range: DateRange, customStart: string, customEnd: s
   }
 
   if (range === "MTD") {
-    params.set(
-      "since",
-      toISODate(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)))
-    );
+    params.set("since", toISODate(new Date(now.getFullYear(), now.getMonth(), 1)));
     params.set("until", toISODate(now));
     return params.toString();
   }
@@ -199,6 +204,7 @@ export default function DashboardPage() {
   const [storeStatus, setStoreStatus] = useState<StoreStatus | null>(null);
   const [storePreview, setStorePreview] = useState<StorePreview | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isBooting, setIsBooting] = useState(true);
   const [refreshMessage, setRefreshMessage] = useState<string | null>(null);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
 
@@ -264,10 +270,19 @@ export default function DashboardPage() {
           cache: "no-store",
         });
         const payload = (await response.json()) as ClientDirectoryResponse;
+        const nextClientId =
+          preferredClientId &&
+          payload.clients.some((entry) => entry.id === preferredClientId)
+            ? preferredClientId
+            : payload.activeClientId;
         setClients(payload.clients);
-        setActiveClientId(payload.activeClientId);
+        setActiveClientId(nextClientId);
+        if (!nextClientId) {
+          setIsBooting(false);
+        }
       } catch {
         setRefreshMessage("Could not load the client list.");
+        setIsBooting(false);
       }
     }
 
@@ -276,6 +291,7 @@ export default function DashboardPage() {
 
   async function refreshMeta(clientId: string, manual = false) {
     setIsRefreshing(manual);
+    setRefreshMessage(null);
 
     try {
       if (range === "Custom" && customStart > customEnd) {
@@ -378,6 +394,7 @@ export default function DashboardPage() {
       setLastRefreshedAt(new Date().toISOString());
     } finally {
       setIsRefreshing(false);
+      setIsBooting(false);
     }
   }
 
@@ -395,6 +412,17 @@ export default function DashboardPage() {
         !trackingGap.active
       : false
     : false;
+
+  if (isBooting) {
+    return (
+      <AppShell>
+        <DashboardLoadingState
+          title="Loading command center"
+          description="Pulling the active client, live Meta preview, date range state, and source readiness."
+        />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
