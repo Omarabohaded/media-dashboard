@@ -81,6 +81,7 @@ export type DashboardStoreStatus = {
   missingEnv: string[];
   connectionError: string | null;
   recommendedNextStep: string;
+  clientDeclinedAccess: boolean;
 };
 
 export type DashboardStorePreview = {
@@ -128,18 +129,33 @@ type HookOptions = {
   metaPreviewQuery?: string;
 };
 
-function defaultStoreStatus(platform: WebsitePlatform): DashboardStoreStatus {
+function getDeclinedStoreMessage(platform: WebsitePlatform) {
+  return platform === "shopify" || platform === "wordpress"
+    ? "This client has not granted website access. Keep storefront truth optional unless they choose to share it later."
+    : "This client has not granted website access, so storefront truth is intentionally unavailable right now.";
+}
+
+function defaultStoreStatus(
+  platform: WebsitePlatform,
+  client?: ClientRecord | null
+): DashboardStoreStatus {
+  const clientDeclinedAccess = Boolean(client?.storeAccessDeclined);
+
   if (platform === "custom" || platform === "salla" || platform === "wix") {
     return {
       platform,
       configured: false,
       connected: false,
       previewReady: false,
-      sourceLabel: "Store truth not wired yet",
+      sourceLabel: clientDeclinedAccess
+        ? "Client declined website access"
+        : "Store truth not wired yet",
       missingEnv: [],
       connectionError: null,
-      recommendedNextStep:
-        "This client website type is not connected yet. Start with Shopify or WordPress/WooCommerce first.",
+      recommendedNextStep: clientDeclinedAccess
+        ? getDeclinedStoreMessage(platform)
+        : "This client website type is not connected yet. Start with Shopify or WordPress/WooCommerce first.",
+      clientDeclinedAccess,
     };
   }
 
@@ -148,39 +164,65 @@ function defaultStoreStatus(platform: WebsitePlatform): DashboardStoreStatus {
     configured: false,
     connected: false,
     previewReady: false,
-    sourceLabel: platform === "shopify" ? "Shopify" : "WordPress / WooCommerce",
+    sourceLabel: clientDeclinedAccess
+      ? "Client declined website access"
+      : platform === "shopify"
+      ? "Shopify"
+      : "WordPress / WooCommerce",
     missingEnv: [],
     connectionError: null,
-    recommendedNextStep: "Connect the store-truth source before using business-health logic.",
+    recommendedNextStep: clientDeclinedAccess
+      ? getDeclinedStoreMessage(platform)
+      : "Connect the store-truth source before using business-health logic.",
+    clientDeclinedAccess,
   };
 }
 
 function normalizeStoreStatus(
   platform: WebsitePlatform,
-  payload: ShopifyStatusResponse | WordPressStatusResponse
+  payload: ShopifyStatusResponse | WordPressStatusResponse,
+  client?: ClientRecord | null
 ): DashboardStoreStatus {
+  const clientDeclinedAccess = Boolean(client?.storeAccessDeclined);
+
   if (payload.platform === "shopify") {
+    const connected = payload.connected && !clientDeclinedAccess;
+    const previewReady = payload.previewReady && !clientDeclinedAccess;
     return {
       platform,
       configured: payload.configured,
-      connected: payload.connected,
-      previewReady: payload.previewReady,
-      sourceLabel: payload.storeDomain || "Shopify",
+      connected,
+      previewReady,
+      sourceLabel: clientDeclinedAccess && !connected
+        ? "Client declined website access"
+        : payload.storeDomain || "Shopify",
       missingEnv: payload.missingEnv,
-      connectionError: payload.connectionError,
-      recommendedNextStep: payload.recommendedNextStep,
+      connectionError: clientDeclinedAccess && !connected ? null : payload.connectionError,
+      recommendedNextStep:
+        clientDeclinedAccess && !connected
+          ? getDeclinedStoreMessage(platform)
+          : payload.recommendedNextStep,
+      clientDeclinedAccess,
     };
   }
 
+  const connected = payload.connected && !clientDeclinedAccess;
+  const previewReady = payload.previewReady && !clientDeclinedAccess;
   return {
     platform,
     configured: payload.configured,
-    connected: payload.connected,
-    previewReady: payload.previewReady,
-    sourceLabel: payload.siteUrl || "WordPress / WooCommerce",
+    connected,
+    previewReady,
+    sourceLabel: clientDeclinedAccess && !connected
+      ? "Client declined website access"
+      : payload.siteUrl || "WordPress / WooCommerce",
     missingEnv: payload.missingEnv,
-    connectionError: payload.connectionError,
-    recommendedNextStep: payload.recommendedNextStep,
+    connectionError: clientDeclinedAccess && !connected ? null : payload.connectionError,
+    recommendedNextStep:
+      clientDeclinedAccess && !connected
+        ? getDeclinedStoreMessage(platform)
+        : payload.recommendedNextStep,
+    clientDeclinedAccess,
   };
 }
 
@@ -256,15 +298,20 @@ export function useDashboardReadiness(options: HookOptions = {}) {
 
     setClients(payload.clients);
     setActiveClientIdState(nextClientId);
-    return nextClientId;
+    return {
+      clientId: nextClientId,
+      client:
+        payload.clients.find((entry) => entry.id === nextClientId) ??
+        payload.clients[0] ??
+        null,
+    };
   }
 
-  async function loadStoreForPlatform(
-    platform: WebsitePlatform,
-    clientId: string
-  ) {
+  async function loadStoreForPlatform(client: ClientRecord) {
+    const { websitePlatform: platform, id: clientId } = client;
+
     if (platform !== "shopify" && platform !== "wordpress") {
-      setStoreStatus(defaultStoreStatus(platform));
+      setStoreStatus(defaultStoreStatus(platform, client));
       setStorePreview(null);
       return;
     }
@@ -279,10 +326,14 @@ export function useDashboardReadiness(options: HookOptions = {}) {
     const statusPayload = (await statusResponse.json()) as
       | ShopifyStatusResponse
       | WordPressStatusResponse;
-    const nextStoreStatus = normalizeStoreStatus(platform, statusPayload);
+    const nextStoreStatus = normalizeStoreStatus(platform, statusPayload, client);
     setStoreStatus(nextStoreStatus);
 
-    if (!includeStorePreview || !nextStoreStatus.previewReady) {
+    if (
+      !includeStorePreview ||
+      !nextStoreStatus.previewReady ||
+      nextStoreStatus.clientDeclinedAccess
+    ) {
       setStorePreview(null);
       return;
     }
@@ -319,9 +370,9 @@ export function useDashboardReadiness(options: HookOptions = {}) {
         (typeof window !== "undefined"
           ? window.localStorage.getItem("media-dashboard-active-client")
           : null);
-      const nextClientId = await loadClients(clientId);
+      const { clientId: nextClientId, client } = await loadClients(clientId);
 
-      if (!nextClientId) {
+      if (!nextClientId || !client) {
         setMessage("Create a client in Admin first.");
         setMetaStatus(null);
         setMetaPreview(null);
@@ -329,19 +380,6 @@ export function useDashboardReadiness(options: HookOptions = {}) {
         setStorePreview(null);
         return;
       }
-
-      const client =
-        clients.find((entry) => entry.id === nextClientId) ??
-        (await fetch(
-          `/api/admin/clients?clientId=${encodeURIComponent(nextClientId)}`,
-          {
-            cache: "no-store",
-          }
-        )
-          .then((response) => response.json())
-          .then((payload: ClientDirectoryResponse) =>
-            payload.clients.find((entry) => entry.id === nextClientId) ?? null
-          ));
 
       const metaStatusResponse = await fetch(
         `/api/integrations/meta/status?clientId=${encodeURIComponent(nextClientId)}`,
@@ -381,9 +419,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
         setMetaPreview(null);
       }
 
-      if (client) {
-        await loadStoreForPlatform(client.websitePlatform, nextClientId);
-      }
+      await loadStoreForPlatform(client);
     } catch {
       setMessage("Could not load the dashboard state.");
       setMetaStatus(null);
