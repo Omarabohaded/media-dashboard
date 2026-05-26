@@ -1,12 +1,20 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import {
   exchangeShopifyClientCredentials,
+  fetchShopifyStoreTruthPreview,
   getShopifyConfig,
-  SHOPIFY_TOKEN_COOKIE,
+  normalizeShopifyStoreDomain,
 } from "@/lib/integrations/shopify";
+import { getClientById, upsertShopifyConnection } from "@/lib/clientStore";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   const config = getShopifyConfig();
+  const body = (await request.json().catch(() => ({}))) as {
+    clientId?: string;
+    storeDomain?: string;
+  };
+  const client = await getClientById(body.clientId);
+  const storeDomain = normalizeShopifyStoreDomain(body.storeDomain ?? "");
 
   if (config.missingEnv.length > 0) {
     return NextResponse.json(
@@ -15,30 +23,51 @@ export async function POST() {
     );
   }
 
+  if (!storeDomain) {
+    return NextResponse.json(
+      { error: "Shopify store domain is required." },
+      { status: 400 }
+    );
+  }
+
   try {
-    const token = await exchangeShopifyClientCredentials();
-    const response = NextResponse.json({
+    const token = await exchangeShopifyClientCredentials(storeDomain);
+    const preview = await fetchShopifyStoreTruthPreview(
+      token.access_token!,
+      storeDomain
+    );
+
+    await upsertShopifyConnection({
+      clientId: client.id,
+      storeDomain,
+      connectedAt: new Date().toISOString(),
+      shopName: preview.snapshot.shopName,
+      lastError: null,
+    });
+
+    return NextResponse.json({
       ok: true,
+      clientId: client.id,
+      storeDomain,
+      shopName: preview.snapshot.shopName,
       expiresIn: token.expires_in ?? 0,
       scope: token.scope ?? "",
     });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Could not connect Shopify.";
 
-    response.cookies.set(SHOPIFY_TOKEN_COOKIE, token.access_token!, {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: Math.max(60 * 30, token.expires_in ?? 60 * 60),
+    await upsertShopifyConnection({
+      clientId: client.id,
+      storeDomain,
+      connectedAt: new Date().toISOString(),
+      shopName: null,
+      lastError: message,
     });
 
-    return response;
-  } catch (error) {
     return NextResponse.json(
       {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Could not connect Shopify.",
+        error: message,
       },
       { status: 500 }
     );
