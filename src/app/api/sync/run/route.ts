@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { SHOPIFY_TOKEN_COOKIE } from "@/lib/integrations/shopify";
 import { runMetaSync, runShopifySync, runWordPressSync } from "@/lib/syncEngine";
 import { getClientById, getMetaConnection } from "@/lib/clientStore";
 
@@ -24,8 +23,9 @@ export async function POST(request: NextRequest) {
   }
 
   if (body.platform === "shopify") {
+    const client = await getClientById(body.clientId);
     const run = await runShopifySync({
-      accessToken: request.cookies.get(SHOPIFY_TOKEN_COOKIE)?.value ?? null,
+      clientId: client.id,
     });
 
     return NextResponse.json(run, {
