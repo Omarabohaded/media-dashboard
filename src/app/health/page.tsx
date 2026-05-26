@@ -2,6 +2,7 @@
 
 import {
   AppShell,
+  DashboardLoadingState,
   EmptySectionState,
   MiniMetric,
   Section,
@@ -38,8 +39,15 @@ function formatNumber(value: number, digits = 0) {
 }
 
 export default function HealthPage() {
-  const { activeClient, metaPreview, metaStatus, storePreview, storeStatus, message } =
-    useDashboardReadiness();
+  const {
+    activeClient,
+    isLoading,
+    metaPreview,
+    metaStatus,
+    storePreview,
+    storeStatus,
+    message,
+  } = useDashboardReadiness();
 
   const storeCurrency = storePreview?.currencyCode ?? activeClient?.currencyCode ?? "USD";
   const totalSpend = metaPreview?.totals.spend ?? 0;
@@ -73,6 +81,17 @@ export default function HealthPage() {
   const purchaseCvrMetric = funnelReadiness.find(
     (metric) => metric.id === "purchase_cvr"
   );
+
+  if (isLoading) {
+    return (
+      <AppShell>
+        <DashboardLoadingState
+          title="Loading business health"
+          description="Checking the active client, website truth, Meta spend, and workbook readiness."
+        />
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>
