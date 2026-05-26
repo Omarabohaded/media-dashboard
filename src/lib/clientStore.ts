@@ -46,6 +46,8 @@ function buildDefaultClient(): ClientRecord {
     currencyCode: "USD",
     notes: "Prototype seed client",
     createdAt: new Date().toISOString(),
+    storeAccessDeclined: false,
+    storeAccessDeclinedAt: null,
   };
 }
 
@@ -77,6 +79,8 @@ export async function readClientStore(): Promise<ClientStoreState> {
   state.clients = state.clients.map((client) => ({
     ...client,
     currencyCode: client.currencyCode ?? "USD",
+    storeAccessDeclined: client.storeAccessDeclined ?? false,
+    storeAccessDeclinedAt: client.storeAccessDeclinedAt ?? null,
   }));
 
   state.metaConnections = state.metaConnections ?? [];
@@ -131,6 +135,8 @@ export async function createClient(input: {
     currencyCode: input.currencyCode,
     notes: input.notes?.trim() || null,
     createdAt: new Date().toISOString(),
+    storeAccessDeclined: false,
+    storeAccessDeclinedAt: null,
   };
 
   await updateClientStore((state) => ({
@@ -139,6 +145,38 @@ export async function createClient(input: {
   }));
 
   return client;
+}
+
+export async function updateClientStoreAccess(input: {
+  clientId: string;
+  storeAccessDeclined: boolean;
+}) {
+  const nextState = await updateClientStore((state) => {
+    const exists = state.clients.some((client) => client.id === input.clientId);
+
+    if (!exists) {
+      throw new Error("Client was not found.");
+    }
+
+    return {
+      ...state,
+      clients: state.clients.map((client) =>
+        client.id === input.clientId
+          ? {
+              ...client,
+              storeAccessDeclined: input.storeAccessDeclined,
+              storeAccessDeclinedAt: input.storeAccessDeclined
+                ? new Date().toISOString()
+                : null,
+            }
+          : client
+      ),
+    };
+  });
+
+  return (
+    nextState.clients.find((client) => client.id === input.clientId) ?? null
+  );
 }
 
 export async function getMetaConnection(clientId: string) {
@@ -182,6 +220,15 @@ export async function getShopifyConnection(clientId: string) {
 export async function upsertShopifyConnection(connection: ShopifyClientConnection) {
   await updateClientStore((state) => ({
     ...state,
+    clients: state.clients.map((client) =>
+      client.id === connection.clientId
+        ? {
+            ...client,
+            storeAccessDeclined: false,
+            storeAccessDeclinedAt: null,
+          }
+        : client
+    ),
     shopifyConnections: [
       connection,
       ...state.shopifyConnections.filter(
