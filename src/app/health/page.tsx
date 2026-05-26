@@ -8,6 +8,7 @@ import {
   SourcePill,
 } from "@/components/AppShell";
 import { getCurrencyMeta } from "@/lib/clientTypes";
+import { getFunnelReadiness } from "@/lib/funnelReadiness";
 import { useDashboardReadiness } from "@/lib/useDashboardReadiness";
 import {
   evaluateTrackingGap,
@@ -61,6 +62,17 @@ export default function HealthPage() {
     hasBusinessTruth && metaPreview && metaPreview.totals.clicks > 0
       ? storeRevenue / metaPreview.totals.clicks
       : null;
+  const funnelReadiness = getFunnelReadiness({
+    storePreview,
+    metaPreview,
+    analyticsConnected: false,
+  });
+  const checkoutCompletionMetric = funnelReadiness.find(
+    (metric) => metric.id === "checkout_completion_rate"
+  );
+  const purchaseCvrMetric = funnelReadiness.find(
+    (metric) => metric.id === "purchase_cvr"
+  );
 
   return (
     <AppShell>
@@ -166,9 +178,15 @@ export default function HealthPage() {
               />
               <MiniMetric
                 label="Purchase CVR"
-                value="Needs sessions"
-                hint="Workbook source is website analytics, not ad platform only"
-                tone="warn"
+                value={purchaseCvrMetric?.value ?? "Blocked"}
+                hint={purchaseCvrMetric?.hint ?? "Workbook source is website analytics, not ad platform only"}
+                tone={
+                  purchaseCvrMetric?.state === "partial"
+                    ? "default"
+                    : purchaseCvrMetric?.state === "ready"
+                    ? "good"
+                    : "warn"
+                }
               />
               <MiniMetric
                 label="Revenue per Click"
@@ -247,6 +265,29 @@ export default function HealthPage() {
         </Section>
 
         <Section
+          title="Funnel Readiness"
+          subtitle="These funnel metrics now follow the workbook rule that some can show as platform proxies, but they are not yet business-truth complete."
+        >
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {funnelReadiness.map((metric) => (
+              <MiniMetric
+                key={metric.id}
+                label={metric.label}
+                value={metric.value}
+                hint={`${metric.source} · ${metric.hint}`}
+                tone={
+                  metric.state === "ready"
+                    ? "good"
+                    : metric.state === "partial"
+                    ? "default"
+                    : "warn"
+                }
+              />
+            ))}
+          </div>
+        </Section>
+
+        <Section
           title="Workbook Rules Applied"
           subtitle="These are the exact logic notes now shaping the health view."
         >
@@ -276,10 +317,16 @@ export default function HealthPage() {
               }
             />
             <MiniMetric
-              label="Revenue per Session"
-              value="Blocked"
-              hint="The workbook requires website session truth before this metric can be trusted."
-              tone="warn"
+              label="Checkout Completion"
+              value={checkoutCompletionMetric?.value ?? "Blocked"}
+              hint={checkoutCompletionMetric?.hint ?? "The workbook requires site funnel truth before final trust."}
+              tone={
+                checkoutCompletionMetric?.state === "ready"
+                  ? "good"
+                  : checkoutCompletionMetric?.state === "partial"
+                  ? "default"
+                  : "warn"
+              }
             />
           </div>
         </Section>
