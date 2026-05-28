@@ -174,6 +174,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   function setDatePreset(nextValue: DashboardDatePreset) {
     setDatePresetState(nextValue);
     window.localStorage.setItem(DASHBOARD_DATE_PRESET_KEY, nextValue);
+    window.location.reload();
   }
 
   const ownerContext = useMemo(
