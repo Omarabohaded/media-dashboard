@@ -1,0 +1,534 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import {
+  AppShell,
+  DashboardLoadingState,
+  EmptySectionState,
+  MiniMetric,
+  PageLead,
+  Section,
+  SourcePill,
+  StatusPill,
+  useDashboardDate,
+  useOwnerMode,
+} from "@/components/AppShell";
+import { getCurrencyMeta, type ClientCurrencyCode } from "@/lib/clientTypes";
+import { useMultiStoreView, type MultiStoreCard } from "@/lib/useMultiStoreView";
+
+type SortKey =
+  | "websiteSales"
+  | "adSpend"
+  | "roas"
+  | "orders"
+  | "costPerOrder"
+  | "aov"
+  | "storeName";
+
+type StatusFilter = "all" | "ready" | "partial" | "blocked";
+type CurrencyFilter = "all" | ClientCurrencyCode;
+
+const SORT_OPTIONS: Array<{ value: SortKey; label: string }> = [
+  { value: "websiteSales", label: "Website sales" },
+  { value: "adSpend", label: "Ad spend" },
+  { value: "roas", label: "ROAS" },
+  { value: "orders", label: "Orders" },
+  { value: "costPerOrder", label: "Cost per order" },
+  { value: "aov", label: "AOV" },
+  { value: "storeName", label: "Store name" },
+];
+
+export default function PortfolioPage() {
+  return (
+    <AppShell portfolioMode>
+      <PortfolioContent />
+    </AppShell>
+  );
+}
+
+function PortfolioContent() {
+  const { ownerMode, setOwnerMode } = useOwnerMode();
+  const { activeSummary } = useDashboardDate();
+  const { cards, summary, isLoading, error, refresh } = useMultiStoreView();
+  const [sortBy, setSortBy] = useState<SortKey>("websiteSales");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [currencyFilter, setCurrencyFilter] = useState<CurrencyFilter>("all");
+
+  const visibleCards = useMemo(() => {
+    const filtered = cards.filter((card) => {
+      if (statusFilter !== "all" && card.status !== statusFilter) {
+        return false;
+      }
+
+      if (currencyFilter !== "all" && card.currencyCode !== currencyFilter) {
+        return false;
+      }
+
+      return true;
+    });
+
+    return filtered.sort((left, right) => compareCards(left, right, sortBy));
+  }, [cards, currencyFilter, sortBy, statusFilter]);
+
+  const mixedCurrencies = summary.currencies.length > 1;
+
+  if (!ownerMode) {
+    return (
+      <div className="space-y-5">
+        <PageLead
+          eyebrow="Portfolio"
+          title="Multi-store view is reserved for owner mode"
+          summary="This page compares stores side by side, so it stays behind owner mode instead of showing up in every client-facing workflow."
+        />
+        <Section
+          title="Owner access required"
+          subtitle="Turn owner mode on to compare store performance across the full portfolio."
+        >
+          <div className="rounded-[24px] border border-[var(--line)] bg-[rgba(255,255,255,0.58)] p-5">
+            <p className="max-w-3xl text-sm leading-6 text-[var(--muted)]">
+              Once owner mode is on, this page uses the same reporting window from the header and shows one comparison card per store with spend, website sales, ROAS, orders, AOV, and cost per order.
+            </p>
+            <button
+              type="button"
+              onClick={() => setOwnerMode(true)}
+              className="mt-4 rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+            >
+              Turn on owner mode
+            </button>
+          </div>
+        </Section>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <DashboardLoadingState
+        title="Loading multi-store overview"
+        description="Pulling portfolio-level spend, storefront truth, and connection health across all stores."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      <PageLead
+        eyebrow="Portfolio"
+        title="Multi-store overview"
+        summary="Compare spend, website sales, ROAS, orders, AOV, and cost per order across the portfolio without losing the same reporting-window and metric-logic rules used everywhere else in the dashboard."
+      />
+
+      <div className="flex flex-wrap gap-2">
+        <SourcePill label={`Window: ${activeSummary}`} tone="good" />
+        <SourcePill label="Metric logic from Admin" tone="default" />
+        <SourcePill
+          label={mixedCurrencies ? "Multiple currencies detected" : "Single currency view"}
+          tone={mixedCurrencies ? "warn" : "good"}
+        />
+        <SourcePill label="Each card opens the store dashboard" tone="default" />
+      </div>
+
+      {error ? (
+        <Section
+          title="Portfolio view unavailable"
+          subtitle="The route is in place, but the comparison payload did not load cleanly."
+        >
+          <div className="rounded-[24px] border border-amber-300 bg-amber-50 p-5 text-amber-950">
+            <div className="text-sm font-semibold">{error}</div>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-amber-900">
+              This usually means one of the source previews failed before the portfolio payload could be assembled.
+            </p>
+            <button
+              type="button"
+              onClick={refresh}
+              className="mt-4 rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+            >
+              Try again
+            </button>
+          </div>
+        </Section>
+      ) : null}
+
+      <Section
+        title="Portfolio Snapshot"
+        subtitle="Use this strip to see how many stores are truly comparison-ready before you trust the rankings below."
+      >
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <MiniMetric
+            label="Stores in scope"
+            value={String(summary.totalStores)}
+            hint={`${visibleCards.length} visible after filters`}
+            tone="default"
+          />
+          <MiniMetric
+            label="Ready"
+            value={String(summary.readyStores)}
+            hint="Store truth and Meta both connected"
+            tone="good"
+          />
+          <MiniMetric
+            label="Partial"
+            value={String(summary.partialStores)}
+            hint="Only one truth layer is connected"
+            tone="warn"
+          />
+          <MiniMetric
+            label="Blocked"
+            value={String(summary.blockedStores)}
+            hint="Neither storefront nor Meta is ready"
+            tone="bad"
+          />
+          <MiniMetric
+            label="Currencies"
+            value={summary.currencies.length ? summary.currencies.join(" / ") : "Waiting"}
+            hint={mixedCurrencies ? "Money rankings span mixed currencies" : "Money metrics are directly comparable"}
+            tone={mixedCurrencies ? "warn" : "good"}
+          />
+        </div>
+      </Section>
+
+      <Section
+        title="Comparison Controls"
+        subtitle="Sort for the question you are asking, then filter to the stores that are fair to compare."
+      >
+        <div className="grid gap-4 lg:grid-cols-[1fr,1fr,1fr]">
+          <label className="text-sm text-[var(--ink)]">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+              Sort stores by
+            </span>
+            <select
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value as SortKey)}
+              className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-3 py-3 text-sm font-medium text-[var(--ink)] outline-none"
+            >
+              {SORT_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="text-sm text-[var(--ink)]">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+              Filter by readiness
+            </span>
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as StatusFilter)}
+              className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-3 py-3 text-sm font-medium text-[var(--ink)] outline-none"
+            >
+              <option value="all">All stores</option>
+              <option value="ready">Ready only</option>
+              <option value="partial">Partial only</option>
+              <option value="blocked">Blocked only</option>
+            </select>
+          </label>
+
+          <label className="text-sm text-[var(--ink)]">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+              Filter by currency
+            </span>
+            <select
+              value={currencyFilter}
+              onChange={(event) => setCurrencyFilter(event.target.value as CurrencyFilter)}
+              className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-3 py-3 text-sm font-medium text-[var(--ink)] outline-none"
+            >
+              <option value="all">All currencies</option>
+              {summary.currencies.map((currencyCode) => (
+                <option key={currencyCode} value={currencyCode}>
+                  {currencyCode}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {mixedCurrencies ? (
+          <div className="mt-4 rounded-[22px] border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+            Money-based sorting is still useful for directional scanning, but it is not apples-to-apples across mixed currencies because this codebase does not have an FX normalization layer yet.
+          </div>
+        ) : null}
+      </Section>
+
+      {!visibleCards.length ? (
+        <EmptySectionState
+          title="No stores match the current filters"
+          description="Try widening the readiness or currency filters so the portfolio grid can show the available stores again."
+        />
+      ) : (
+        <div className="grid gap-5 xl:grid-cols-2 2xl:grid-cols-3">
+          {visibleCards.map((card) => (
+            <StoreCard key={card.clientId} card={card} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StoreCard({ card }: { card: MultiStoreCard }) {
+  return (
+    <div className="rounded-[28px] border border-[var(--line)] bg-[rgba(255,255,255,0.58)] p-5 shadow-[var(--shadow)]">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+            {getPlatformLabel(card.websitePlatform)}
+          </div>
+          <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--ink)]">
+            {card.storeName}
+          </h3>
+        </div>
+        <StatusPill status={getStatusLabel(card.status)} />
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <SourcePill
+          label={card.storeConnected ? "Store truth connected" : "Store truth missing"}
+          tone={card.storeConnected ? "good" : "warn"}
+        />
+        <SourcePill
+          label={card.metaConnected ? "Meta connected" : "Meta missing"}
+          tone={card.metaConnected ? "good" : "warn"}
+        />
+        <SourcePill label={card.currencyCode} tone="default" />
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <PortfolioMetric
+          label="Ad Spend"
+          value={formatMoney(card.adSpend, card.currencyCode)}
+          hint="Connected paid-media spend"
+        />
+        <PortfolioMetric
+          label="Website Sales"
+          value={formatMoney(card.websiteSales, card.currencyCode)}
+          hint="Store-truth revenue"
+        />
+        <PortfolioMetric
+          label="ROAS"
+          value={formatRatio(card.roas)}
+          hint="Website sales divided by spend"
+        />
+        <PortfolioMetric
+          label="Orders"
+          value={formatWholeNumber(card.orders)}
+          hint="Website/store orders"
+        />
+        <PortfolioMetric
+          label="AOV"
+          value={formatMoney(card.aov, card.currencyCode, 2)}
+          hint="Website sales divided by orders"
+        />
+        <PortfolioMetric
+          label="Cost per Order"
+          value={formatMoney(card.costPerOrder, card.currencyCode, 2)}
+          hint="Spend divided by orders"
+        />
+      </div>
+
+      <div className="mt-5 grid gap-3">
+        <SourceRow label="Store source" value={card.storeSourceLabel} />
+        <SourceRow label="Paid media source" value={card.metaSourceLabel} />
+      </div>
+
+      {card.issues.length ? (
+        <div className="mt-5 rounded-[22px] border border-amber-300 bg-amber-50 p-4">
+          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-900">
+            Issues to watch
+          </div>
+          <div className="mt-2 space-y-2 text-sm leading-6 text-amber-900">
+            {card.issues.map((issue) => (
+              <div key={issue}>{issue}</div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="mt-5 flex items-center justify-between gap-3">
+        <div className="text-sm text-[var(--muted)]">
+          Open this store to inspect campaign, funnel, and health views in more detail.
+        </div>
+        <button
+          type="button"
+          onClick={() => openStoreDashboard(card.clientId)}
+          className="shrink-0 rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+        >
+          Open store dashboard
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function PortfolioMetric({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+}) {
+  return (
+    <div className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.62)] p-4">
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-semibold tracking-tight text-[var(--ink)]">
+        {value}
+      </div>
+      <div className="mt-2 text-sm text-[var(--muted)]">{hint}</div>
+    </div>
+  );
+}
+
+function SourceRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-[18px] border border-[var(--line)] bg-[rgba(255,255,255,0.62)] px-4 py-3">
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+        {label}
+      </div>
+      <div className="text-right text-sm font-medium text-[var(--ink)]">{value}</div>
+    </div>
+  );
+}
+
+function compareCards(left: MultiStoreCard, right: MultiStoreCard, sortBy: SortKey) {
+  if (sortBy === "storeName") {
+    return left.storeName.localeCompare(right.storeName);
+  }
+
+  const leftValue = getSortableValue(left, sortBy);
+  const rightValue = getSortableValue(right, sortBy);
+
+  if (leftValue === null && rightValue === null) {
+    return left.storeName.localeCompare(right.storeName);
+  }
+
+  if (leftValue === null) {
+    return 1;
+  }
+
+  if (rightValue === null) {
+    return -1;
+  }
+
+  if (rightValue === leftValue) {
+    return left.storeName.localeCompare(right.storeName);
+  }
+
+  return rightValue - leftValue;
+}
+
+function getSortableValue(card: MultiStoreCard, sortBy: Exclude<SortKey, "storeName">) {
+  if (sortBy === "websiteSales") {
+    return card.websiteSales;
+  }
+
+  if (sortBy === "adSpend") {
+    return card.adSpend;
+  }
+
+  if (sortBy === "roas") {
+    return card.roas;
+  }
+
+  if (sortBy === "orders") {
+    return card.orders;
+  }
+
+  if (sortBy === "costPerOrder") {
+    return card.costPerOrder;
+  }
+
+  return card.aov;
+}
+
+function getPlatformLabel(platform: MultiStoreCard["websitePlatform"]) {
+  if (platform === "shopify") {
+    return "Shopify";
+  }
+
+  if (platform === "wordpress") {
+    return "WordPress / WooCommerce";
+  }
+
+  if (platform === "salla") {
+    return "Salla";
+  }
+
+  if (platform === "wix") {
+    return "Wix";
+  }
+
+  return "Custom website";
+}
+
+function getStatusLabel(status: MultiStoreCard["status"]) {
+  if (status === "ready") {
+    return "Ready";
+  }
+
+  if (status === "partial") {
+    return "Partial";
+  }
+
+  return "Blocked";
+}
+
+function formatMoney(
+  value: number | null,
+  currencyCode: ClientCurrencyCode,
+  minimumFractionDigits = 0
+) {
+  if (value === null) {
+    return "Waiting";
+  }
+
+  const { locale } = getCurrencyMeta(currencyCode);
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: currencyCode,
+    minimumFractionDigits,
+    maximumFractionDigits: minimumFractionDigits,
+  }).format(value);
+}
+
+function formatRatio(value: number | null) {
+  if (value === null) {
+    return "Waiting";
+  }
+
+  return `${formatNumber(value, 2)}x`;
+}
+
+function formatWholeNumber(value: number | null) {
+  if (value === null) {
+    return "Waiting";
+  }
+
+  return formatNumber(value, 0);
+}
+
+function formatNumber(value: number, digits: number) {
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(value);
+}
+
+function openStoreDashboard(clientId: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem("media-dashboard-active-client", clientId);
+  window.location.href = "/";
+}
