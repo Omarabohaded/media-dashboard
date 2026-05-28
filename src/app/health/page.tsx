@@ -9,6 +9,12 @@ import {
   SourcePill,
 } from "@/components/AppShell";
 import { getCurrencyMeta } from "@/lib/clientTypes";
+import {
+  getEffectiveAov,
+  getEffectiveMer,
+  getEffectiveStoreRevenue,
+  getRevenueBasisLabel,
+} from "@/lib/dashboardMetricLogic";
 import { getFunnelReadiness } from "@/lib/funnelReadiness";
 import { useDashboardReadiness } from "@/lib/useDashboardReadiness";
 import {
@@ -46,17 +52,18 @@ export default function HealthPage() {
     metaStatus,
     storePreview,
     storeStatus,
+    metricLogic,
     message,
   } = useDashboardReadiness();
 
   const storeCurrency = storePreview?.currencyCode ?? activeClient?.currencyCode ?? "USD";
   const totalSpend = metaPreview?.totals.spend ?? 0;
-  const storeRevenue = storePreview?.grossSales ?? 0;
+  const storeRevenue = getEffectiveStoreRevenue(storePreview, metricLogic);
   const orders = storePreview?.ordersCount ?? 0;
-  const mer = totalSpend > 0 ? storeRevenue / totalSpend : 0;
+  const mer = getEffectiveMer(storePreview, metaPreview, metricLogic) ?? 0;
   const blendedRoas =
     totalSpend > 0 && metaPreview ? metaPreview.totals.purchaseValue / totalSpend : 0;
-  const aov = orders > 0 ? storeRevenue / orders : 0;
+  const aov = getEffectiveAov(storePreview, metricLogic) ?? 0;
 
   const hasBusinessTruth = Boolean(storePreview);
   const hasMetaSpend = Boolean(metaPreview && metaStatus?.selectedAccountId);
@@ -150,7 +157,7 @@ export default function HealthPage() {
               <MiniMetric
                 label="Store Revenue"
                 value={formatMoney(storeRevenue, storeCurrency)}
-                hint={`Website truth from ${storePreview?.storeName ?? storeStatus?.sourceLabel ?? "store source"}`}
+                hint={`${getRevenueBasisLabel(metricLogic.storeRevenueBasis)} from ${storePreview?.storeName ?? storeStatus?.sourceLabel ?? "store source"}`}
                 tone="good"
               />
               <MiniMetric
@@ -162,7 +169,7 @@ export default function HealthPage() {
               <MiniMetric
                 label="AOV"
                 value={formatMoney(aov, storeCurrency)}
-                hint="Revenue divided by orders"
+                hint={`${getRevenueBasisLabel(metricLogic.aovRevenueBasis)} divided by orders`}
                 tone="good"
               />
               <MiniMetric
@@ -184,7 +191,7 @@ export default function HealthPage() {
               <MiniMetric
                 label="MER"
                 value={hasMetaSpend ? `${formatNumber(mer, 2)}x` : "Needs spend source"}
-                hint="Store revenue divided by total ad spend"
+                hint={`${getRevenueBasisLabel(metricLogic.merRevenueBasis)} divided by total ad spend`}
                 tone={hasMetaSpend ? (mer >= 2 ? "good" : "warn") : "warn"}
               />
               <MiniMetric
