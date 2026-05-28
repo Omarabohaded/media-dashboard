@@ -9,6 +9,7 @@ import {
   getShopifyConnection,
   listClients,
 } from "@/lib/clientStore";
+import type { ClientCurrencyCode } from "@/lib/clientTypes";
 import { fetchMetaInsightsPreviewForRange } from "@/lib/integrations/meta";
 import {
   fetchShopifyStoreTruthPreview,
@@ -24,7 +25,7 @@ type MultiStoreCard = {
   clientId: string;
   storeName: string;
   websitePlatform: string;
-  currencyCode: string;
+  currencyCode: ClientCurrencyCode;
   adSpend: number | null;
   websiteSales: number | null;
   roas: number | null;
@@ -38,6 +39,17 @@ type MultiStoreCard = {
   metaSourceLabel: string;
   issues: string[];
 };
+
+function toClientCurrencyCode(
+  value: string | null | undefined,
+  fallback: ClientCurrencyCode
+): ClientCurrencyCode {
+  if (value === "USD" || value === "AED" || value === "SAR" || value === "EGP") {
+    return value;
+  }
+
+  return fallback;
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -69,7 +81,7 @@ export async function GET(request: NextRequest) {
         let orders: number | null = null;
         let aov: number | null = null;
         let costPerOrder: number | null = null;
-        let currencyCode = client.currencyCode;
+        let currencyCode: ClientCurrencyCode = client.currencyCode;
         let storeConnected = false;
         let metaConnected = false;
         let storeSourceLabel = "Store truth unavailable";
@@ -79,7 +91,7 @@ export async function GET(request: NextRequest) {
               grossSales: number;
               netSales: number;
               ordersCount: number;
-              currencyCode: string;
+              currencyCode: ClientCurrencyCode;
             }
           | null = null;
 
@@ -105,9 +117,15 @@ export async function GET(request: NextRequest) {
                 grossSales: preview.snapshot.grossSales,
                 netSales: preview.snapshot.netSales,
                 ordersCount: preview.snapshot.ordersCount,
-                currencyCode: preview.snapshot.currencyCode,
+                currencyCode: toClientCurrencyCode(
+                  preview.snapshot.currencyCode,
+                  currencyCode
+                ),
               };
-              currencyCode = preview.snapshot.currencyCode || currencyCode;
+              currencyCode = toClientCurrencyCode(
+                preview.snapshot.currencyCode,
+                currencyCode
+              );
               storeConnected = true;
               storeSourceLabel = connection.storeDomain;
             } catch (error) {
@@ -136,9 +154,15 @@ export async function GET(request: NextRequest) {
               grossSales: sharedWordPressPreview.snapshot.grossSales,
               netSales: sharedWordPressPreview.snapshot.netSales,
               ordersCount: sharedWordPressPreview.snapshot.ordersCount,
-              currencyCode: sharedWordPressPreview.snapshot.currencyCode,
+              currencyCode: toClientCurrencyCode(
+                sharedWordPressPreview.snapshot.currencyCode,
+                currencyCode
+              ),
             };
-            currencyCode = sharedWordPressPreview.snapshot.currencyCode || currencyCode;
+            currencyCode = toClientCurrencyCode(
+              sharedWordPressPreview.snapshot.currencyCode,
+              currencyCode
+            );
             storeConnected = true;
             storeSourceLabel = sharedWordPressPreview.snapshot.storeName;
           }
