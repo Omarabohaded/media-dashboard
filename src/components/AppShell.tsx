@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Bell,
+  Building2,
   CalendarRange,
   Database,
   Gauge,
@@ -63,6 +64,13 @@ type DashboardDateContextValue = {
   setDatePreset: (value: DashboardDatePreset) => void;
 };
 
+type NavItem = {
+  icon: typeof LayoutDashboard;
+  label: string;
+  href: string;
+  ownerOnly?: boolean;
+};
+
 const OwnerModeContext = createContext<OwnerModeContextValue | null>(null);
 const DashboardDisplayContext =
   createContext<DashboardDisplayContextValue | null>(null);
@@ -72,7 +80,8 @@ const DASHBOARD_DATE_PRESET_KEY = "media-dashboard-date-preset";
 const DASHBOARD_CUSTOM_START_KEY = "media-dashboard-custom-start";
 const DASHBOARD_CUSTOM_END_KEY = "media-dashboard-custom-end";
 
-const NAV_ITEMS = [
+const NAV_ITEMS: NavItem[] = [
+  { icon: Building2, label: "Portfolio", href: "/portfolio", ownerOnly: true },
   { icon: LayoutDashboard, label: "Command Center", href: "/" },
   { icon: ShieldCheck, label: "Business Health", href: "/health" },
   { icon: Target, label: "Funnel", href: "/funnel" },
@@ -95,7 +104,13 @@ const DATE_PRESET_OPTIONS: Array<{
   { value: "custom", label: "Custom" },
 ];
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  portfolioMode = false,
+}: {
+  children: React.ReactNode;
+  portfolioMode?: boolean;
+}) {
   const pathname = usePathname();
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [activeClientId, setActiveClientId] = useState("");
@@ -260,12 +275,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <div>
                     <div className="mb-3 flex flex-wrap gap-2">
                       <InfoChip tone="default">
-                        {isLoadingClients
+                        {portfolioMode
+                          ? "All stores in portfolio scope"
+                          : isLoadingClients
                           ? "Loading client..."
                           : activeClient?.name ?? "No client selected"}
                       </InfoChip>
                       <InfoChip tone="warn">
-                        {isLoadingClients
+                        {portfolioMode
+                          ? "Portfolio comparison view"
+                          : isLoadingClients
                           ? "Currency loading"
                           : activeClient
                           ? getCurrencyMeta(activeClient.currencyCode).label
@@ -302,29 +321,43 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         onApplyCustomRange={applyCustomRange}
                       />
                     ) : null}
-                    <div className="min-w-[280px] rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.5)] p-3 shadow-[var(--shadow)]">
-                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-                        Active Client
+                    {portfolioMode ? (
+                      <div className="min-w-[280px] rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.5)] p-3 shadow-[var(--shadow)]">
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                          Portfolio Scope
+                        </div>
+                        <div className="mt-2 text-sm font-semibold text-[var(--ink)]">
+                          All configured stores
+                        </div>
+                        <div className="mt-2 text-sm leading-6 text-[var(--muted)]">
+                          Open a store card below to jump into the deeper single-store dashboard with that client set as active.
+                        </div>
                       </div>
-                      <select
-                        value={activeClientId}
-                        onChange={(event) => handleClientSwitch(event.target.value)}
-                        disabled={isLoadingClients || clients.length === 0}
-                        className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-3 py-3 text-sm font-medium text-[var(--ink)] outline-none"
-                      >
-                        {isLoadingClients ? (
-                          <option value="">Loading clients...</option>
-                        ) : clients.length ? (
-                          clients.map((entry) => (
-                            <option key={entry.id} value={entry.id}>
-                              {entry.name} · {entry.currencyCode}
-                            </option>
-                          ))
-                        ) : (
-                          <option value="">Create a client in Admin first</option>
-                        )}
-                      </select>
-                    </div>
+                    ) : (
+                      <div className="min-w-[280px] rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.5)] p-3 shadow-[var(--shadow)]">
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                          Active Client
+                        </div>
+                        <select
+                          value={activeClientId}
+                          onChange={(event) => handleClientSwitch(event.target.value)}
+                          disabled={isLoadingClients || clients.length === 0}
+                          className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-3 py-3 text-sm font-medium text-[var(--ink)] outline-none"
+                        >
+                          {isLoadingClients ? (
+                            <option value="">Loading clients...</option>
+                          ) : clients.length ? (
+                            clients.map((entry) => (
+                              <option key={entry.id} value={entry.id}>
+                                {entry.name} · {entry.currencyCode}
+                              </option>
+                            ))
+                          ) : (
+                            <option value="">Create a client in Admin first</option>
+                          )}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
               </header>
@@ -480,6 +513,7 @@ function Sidebar({
   onToggleOwnerMode: (value: boolean) => void;
 }) {
   const pathname = usePathname();
+  const visibleNavItems = NAV_ITEMS.filter((item) => !item.ownerOnly || ownerMode);
 
   return (
     <aside className="fixed left-0 top-0 hidden h-screen w-[300px] border-r border-[var(--line)] bg-[rgba(251,248,242,0.86)] px-5 py-6 text-[var(--ink)] backdrop-blur xl:flex xl:flex-col">
@@ -500,7 +534,7 @@ function Sidebar({
       </div>
 
       <nav className="mt-6 flex-1 space-y-2 overflow-y-auto pr-2">
-        {NAV_ITEMS.map(({ icon: Icon, label, href }) => {
+        {visibleNavItems.map(({ icon: Icon, label, href }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link
@@ -664,7 +698,7 @@ export function StatusPill({ status }: { status: string }) {
   const tone =
     /(scale|good|strong|protect|stable|ready|connected|healthy|live)/i.test(status)
       ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-900"
-      : /(watch|actionable|review|weak|hold|blocked|fix|missing|risk)/i.test(status)
+      : /(watch|actionable|review|weak|hold|blocked|fix|missing|risk|partial)/i.test(status)
       ? "border-amber-500/25 bg-amber-500/10 text-amber-900"
       : "border-[var(--line)] bg-[rgba(255,255,255,0.58)] text-[var(--ink)]";
 
