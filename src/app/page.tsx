@@ -21,6 +21,7 @@ import { getFunnelReadiness } from "@/lib/funnelReadiness";
 import { useDashboardReadiness } from "@/lib/useDashboardReadiness";
 import { evaluateTrackingGap } from "@/lib/workbookSignals";
 
+// Fresh deploy trigger after clearing queued production jobs.
 function formatMoney(value: number, currencyCode: string, digits = 0) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
