@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ClientRecord, WebsitePlatform } from "@/lib/clientTypes";
+import {
+  DEFAULT_DASHBOARD_METRIC_LOGIC,
+  type DashboardMetricLogicConfig,
+} from "@/lib/dashboardMetricLogic";
 
 type ClientDirectoryResponse = {
   clients: ClientRecord[];
@@ -70,6 +74,10 @@ type WordPressPreviewResponse = {
     averageOrderValue: number;
   };
   note: string;
+};
+
+type DashboardMetricLogicResponse = {
+  metricLogic: DashboardMetricLogicConfig;
 };
 
 export type DashboardStoreStatus = {
@@ -289,6 +297,9 @@ export function useDashboardReadiness(options: HookOptions = {}) {
   const [metaPreview, setMetaPreview] = useState<DashboardMetaPreview | null>(null);
   const [storeStatus, setStoreStatus] = useState<DashboardStoreStatus | null>(null);
   const [storePreview, setStorePreview] = useState<DashboardStorePreview | null>(null);
+  const [metricLogic, setMetricLogic] = useState<DashboardMetricLogicConfig>(
+    DEFAULT_DASHBOARD_METRIC_LOGIC
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -321,6 +332,18 @@ export function useDashboardReadiness(options: HookOptions = {}) {
         payload.clients[0] ??
         null,
     };
+  }
+
+  async function loadMetricLogic() {
+    try {
+      const response = await fetch("/api/dashboard/metric-logic", {
+        cache: "no-store",
+      });
+      const payload = (await response.json()) as DashboardMetricLogicResponse;
+      setMetricLogic(payload.metricLogic ?? DEFAULT_DASHBOARD_METRIC_LOGIC);
+    } catch {
+      setMetricLogic(DEFAULT_DASHBOARD_METRIC_LOGIC);
+    }
   }
 
   async function loadStoreForPlatform(client: ClientRecord) {
@@ -387,6 +410,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
           ? window.localStorage.getItem("media-dashboard-active-client")
           : null);
       const { clientId: nextClientId, client } = await loadClients(clientId);
+      await loadMetricLogic();
 
       if (!nextClientId || !client) {
         setMessage("Create a client in Admin first.");
@@ -442,6 +466,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
       setMetaPreview(null);
       setStoreStatus(null);
       setStorePreview(null);
+      setMetricLogic(DEFAULT_DASHBOARD_METRIC_LOGIC);
     } finally {
       setIsLoading(false);
     }
@@ -476,6 +501,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
     metaPreview,
     storeStatus,
     storePreview,
+    metricLogic,
     isLoading,
     message,
     setMessage,
