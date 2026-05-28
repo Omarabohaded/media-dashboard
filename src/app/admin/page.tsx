@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Workflow } from "lucide-react";
 import { AppShell, StatusPill } from "@/components/AppShell";
 import {
   getCurrencyMeta,
@@ -91,6 +90,20 @@ type SyncStateResponse = {
     durable: boolean;
   };
   note: string;
+};
+
+type ConnectionTone = "connected" | "needs-action" | "not-connected" | "optional" | "planned";
+
+type ConnectionItem = {
+  id: string;
+  name: string;
+  status: string;
+  tone: ConnectionTone;
+  context: string;
+  nextAction: string;
+  actionHref?: string;
+  actionLabel?: string;
+  targetId?: string;
 };
 
 const fieldClass =
@@ -360,6 +373,90 @@ function MetaAccountSearchPicker({
   );
 }
 
+function connectionCardToneClass(tone: ConnectionTone) {
+  if (tone === "connected") {
+    return "border-emerald-200 bg-emerald-50/85";
+  }
+  if (tone === "optional") {
+    return "border-amber-200 bg-amber-50/80";
+  }
+  if (tone === "needs-action") {
+    return "border-orange-200 bg-orange-50/80";
+  }
+  if (tone === "planned") {
+    return "border-slate-200 bg-slate-50/80";
+  }
+
+  return "border-[var(--line)] bg-white/62";
+}
+
+function connectionStatusPillClass(tone: ConnectionTone) {
+  if (tone === "connected") {
+    return "border-emerald-200 bg-white/80 text-emerald-900";
+  }
+  if (tone === "optional") {
+    return "border-amber-200 bg-white/80 text-amber-900";
+  }
+  if (tone === "needs-action") {
+    return "border-orange-200 bg-white/80 text-orange-900";
+  }
+  if (tone === "planned") {
+    return "border-slate-200 bg-white/80 text-slate-700";
+  }
+
+  return "border-[var(--line)] bg-white/80 text-[var(--muted)]";
+}
+
+function ConnectionOverviewCard({ item }: { item: ConnectionItem }) {
+  const content = (
+    <div
+      className={`group flex h-full flex-col rounded-[16px] border p-3.5 transition hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(20,34,24,0.07)] ${connectionCardToneClass(
+        item.tone
+      )}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-[var(--ink)]">{item.name}</div>
+          <div className="mt-1 truncate text-xs text-[var(--muted)]">{item.context}</div>
+        </div>
+        <span
+          className={`shrink-0 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] ${connectionStatusPillClass(
+            item.tone
+          )}`}
+        >
+          {item.status}
+        </span>
+      </div>
+      <div className="mt-3 flex items-end justify-between gap-3 border-t border-black/5 pt-3">
+        <div className="text-xs leading-5 text-[var(--muted)]">{item.nextAction}</div>
+        {item.actionLabel ? (
+          <span className="shrink-0 text-xs font-semibold text-[var(--accent)] group-hover:underline">
+            {item.actionLabel}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  if (item.actionHref) {
+    return (
+      <a href={item.actionHref} className="block h-full">
+        {content}
+      </a>
+    );
+  }
+
+  if (item.targetId) {
+    return (
+      <a href={`#${item.targetId}`} className="block h-full">
+        {content}
+      </a>
+    );
+  }
+
+  return content;
+}
+
 export default function AdminPage() {
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [activeClientId, setActiveClientId] = useState("");
@@ -374,7 +471,7 @@ export default function AdminPage() {
   const [clientMessage, setClientMessage] = useState<string | null>(null);
   const [metaMessage, setMetaMessage] = useState<string | null>(null);
   const [shopifyMessage, setShopifyMessage] = useState<string | null>(null);
-  const [wordpressMessage, setWordpressMessage] = useState<string | null>(null);
+  const [wordpressMessage] = useState<string | null>(null);
   const [accountDraft, setAccountDraft] = useState("");
   const [accountSearchDraft, setAccountSearchDraft] = useState("");
   const [shopifyStoreDomainDraft, setShopifyStoreDomainDraft] = useState("");
@@ -493,6 +590,7 @@ export default function AdminPage() {
 
   function handleClientSelection(nextClientId: string) {
     setActiveClientId(nextClientId);
+    setMetaPreview(null);
     window.localStorage.setItem("media-dashboard-active-client", nextClientId);
     const url = new URL(window.location.href);
     url.searchParams.set("clientId", nextClientId);
@@ -722,6 +820,19 @@ export default function AdminPage() {
     );
   }
 
+  const storefrontIsConnected =
+    activeClient?.websitePlatform === "wordpress"
+      ? wordpressStatus?.previewReady
+      : shopifyStatus?.previewReady;
+  const storefrontLabel =
+    activeClient?.websitePlatform === "wordpress" ? "WordPress" : "Shopify / Storefront";
+  const storefrontContext =
+    activeClient?.storeAccessDeclined
+      ? "Client declined website access"
+      : activeClient?.websitePlatform === "wordpress"
+      ? wordpressStatus?.siteUrl || "WooCommerce source"
+      : shopifyStatus?.shopName || shopifyStatus?.storeDomain || "Store approval required";
+
   const metaReadyState = metaStatus?.connected ? "Good" : metaStatus?.configured ? "Watch" : "Fix";
   const shopifyReadyState = shopifyStatus?.previewReady
     ? "Good"
@@ -731,6 +842,76 @@ export default function AdminPage() {
     ? "Watch"
     : "Fix";
   const wordpressReadyState = wordpressStatus?.previewReady ? "Good" : wordpressStatus?.configured ? "Watch" : "Fix";
+
+  const connectionItems: ConnectionItem[] = [
+    {
+      id: "meta",
+      name: "Meta",
+      status: metaStatus?.selectedAccountId ? "Connected" : metaStatus?.connected ? "Needs account" : "Not connected",
+      tone: metaStatus?.selectedAccountId ? "connected" : metaStatus?.connected ? "needs-action" : "not-connected",
+      context: metaStatus?.selectedAccount?.name ?? metaStatus?.recommendedNextStep ?? "Connect Meta first",
+      nextAction: metaStatus?.selectedAccountId
+        ? metaStatus.selectedAccountId
+        : metaStatus?.connected
+        ? "Choose and save an ad account."
+        : "Connect Meta for this client.",
+      targetId: "meta-connection",
+      actionHref: !metaStatus?.connected && activeClientId
+        ? `/api/integrations/meta/connect?clientId=${encodeURIComponent(activeClientId)}`
+        : undefined,
+      actionLabel: metaStatus?.selectedAccountId ? "Review" : metaStatus?.connected ? "Choose" : "Connect",
+    },
+    {
+      id: "storefront",
+      name: storefrontLabel,
+      status: storefrontIsConnected ? "Connected" : activeClient?.storeAccessDeclined ? "Optional" : "Not connected",
+      tone: storefrontIsConnected ? "connected" : activeClient?.storeAccessDeclined ? "optional" : "needs-action",
+      context: storefrontContext,
+      nextAction: storefrontIsConnected
+        ? "Store truth can feed revenue, orders, MER, and AOV."
+        : activeClient?.storeAccessDeclined
+        ? "Store metrics remain unavailable until the client opts in."
+        : "Connect website source or mark access declined.",
+      targetId: "storefront-connections",
+      actionLabel: storefrontIsConnected ? "Review" : "Set up",
+    },
+    {
+      id: "google-ads",
+      name: "Google Ads",
+      status: "Not connected",
+      tone: "planned",
+      context: "Integration not enabled yet",
+      nextAction: "Keep visible as a missing paid channel for onboarding.",
+      targetId: "planned-channels",
+      actionLabel: "Planned",
+    },
+    {
+      id: "tiktok",
+      name: "TikTok",
+      status: "Not connected",
+      tone: "planned",
+      context: "Integration not enabled yet",
+      nextAction: "Add this source when TikTok spend needs to be blended.",
+      targetId: "planned-channels",
+      actionLabel: "Planned",
+    },
+    {
+      id: "snapchat",
+      name: "Snapchat",
+      status: "Not connected",
+      tone: "planned",
+      context: "Integration not enabled yet",
+      nextAction: "Use this as an onboarding checklist item for paid social.",
+      targetId: "planned-channels",
+      actionLabel: "Planned",
+    },
+  ];
+
+  const connectedCount = connectionItems.filter((item) => item.tone === "connected").length;
+  const needsActionCount = connectionItems.filter(
+    (item) => item.tone === "needs-action" || item.tone === "not-connected"
+  ).length;
+  const plannedCount = connectionItems.filter((item) => item.tone === "planned").length;
 
   return (
     <AppShell>
@@ -746,54 +927,63 @@ export default function AdminPage() {
           tone={clientStorage?.durable ? "info" : "warn"}
         />
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr),minmax(420px,1.1fr)]">
-          <AdminPanel
-            eyebrow="Client Setup"
-            title="Active Client"
-            description="Switch client context, confirm reporting basics, and keep onboarding state tied to the right store."
-            action={<StatusPill status={activeClient ? "Selected" : "Choose client"} />}
-          >
-            <div className="rounded-[16px] border border-[var(--line)] bg-[rgba(255,255,255,0.64)] p-4">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-                    Current Workspace
-                  </div>
-                  <div className="mt-1 text-2xl font-semibold tracking-tight text-[var(--ink)]">
-                    {activeClient?.name ?? "No client selected"}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <StatusPill status={activeClient?.websitePlatform ?? "Website pending"} />
-                    <StatusPill
-                      status={
-                        activeClient
-                          ? getCurrencyMeta(activeClient.currencyCode).label
-                          : "Currency pending"
-                      }
-                    />
-                    <StatusPill status={`${clients.length} saved clients`} />
-                  </div>
+        <AdminPanel
+          eyebrow="Client Onboarding"
+          title="Connection Overview"
+          description="See what is already connected and what still needs setup for the selected client before scrolling into detailed configuration."
+          action={<StatusPill status={`${connectedCount}/${connectionItems.length} connected`} />}
+        >
+          <div className="grid gap-3 lg:grid-cols-[minmax(260px,0.75fr),minmax(0,1.25fr)]">
+            <div className="rounded-[16px] border border-[var(--line)] bg-white/62 p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                Selected Client
+              </div>
+              <div className="mt-1 text-2xl font-semibold tracking-tight text-[var(--ink)]">
+                {activeClient?.name ?? "No client selected"}
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <StatusPill status={activeClient?.websitePlatform ?? "Website pending"} />
+                <StatusPill
+                  status={
+                    activeClient
+                      ? getCurrencyMeta(activeClient.currencyCode).label
+                      : "Currency pending"
+                  }
+                />
+                <StatusPill status={`${clients.length} saved clients`} />
+              </div>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-[12px] border border-[var(--line)] bg-white/58 px-2 py-2">
+                  <div className="text-lg font-semibold text-[var(--ink)]">{connectedCount}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">Live</div>
                 </div>
-                <div className="w-full sm:w-72">
-                  <label className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-                    Client Selector
-                  </label>
-                  <select
-                    value={activeClientId}
-                    onChange={(event) => handleClientSelection(event.target.value)}
-                    className={`mt-2 ${fieldClass}`}
-                  >
-                    {clients.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {client.name} · {client.websitePlatform} · {client.currencyCode}
-                      </option>
-                    ))}
-                  </select>
+                <div className="rounded-[12px] border border-orange-200 bg-orange-50 px-2 py-2">
+                  <div className="text-lg font-semibold text-orange-900">{needsActionCount}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-orange-900">Action</div>
+                </div>
+                <div className="rounded-[12px] border border-slate-200 bg-slate-50 px-2 py-2">
+                  <div className="text-lg font-semibold text-slate-800">{plannedCount}</div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-700">Planned</div>
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {connectionItems.map((item) => (
+                <ConnectionOverviewCard key={item.id} item={item} />
+              ))}
+            </div>
+          </div>
+        </AdminPanel>
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr),minmax(420px,1.1fr)]">
+          <AdminPanel
+            eyebrow="Client Setup"
+            title="Client Workspace"
+            description="Switch client context, confirm reporting basics, and keep onboarding state tied to the right store."
+            action={<StatusPill status={activeClient ? "Selected" : "Choose client"} />}
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
               <AdminStat
                 label="Website Type"
                 value={activeClient?.websitePlatform ?? "Not set"}
@@ -804,6 +994,23 @@ export default function AdminPage() {
                 value={metaStatus?.connected ? "Connected" : "Pending"}
                 hint={metaStatus?.recommendedNextStep ?? "Connect Meta for this client."}
               />
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <label className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                Client Selector
+              </label>
+              <select
+                value={activeClientId}
+                onChange={(event) => handleClientSelection(event.target.value)}
+                className={fieldClass}
+              >
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name} · {client.websitePlatform} · {client.currencyCode}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="mt-4 border-t border-[var(--line)] pt-4">
@@ -888,7 +1095,7 @@ export default function AdminPage() {
             description="Connect Meta, choose the exact ad account, and preview source data before syncing."
             action={<StatusPill status={metaReadyState} />}
           >
-            <div className="grid gap-3 md:grid-cols-2">
+            <div id="meta-connection" className="grid gap-3 md:grid-cols-2">
               <AdminStat
                 label="Connection"
                 value={metaStatus?.connected ? "Connected" : "Needs connection"}
@@ -987,7 +1194,7 @@ export default function AdminPage() {
             title="Storefront Connections"
             description="Keep the website source visible without letting connection setup dominate the page."
           >
-            <div className="grid gap-4 lg:grid-cols-2">
+            <div id="storefront-connections" className="grid gap-4 lg:grid-cols-2">
               <AdminBlock
                 title="Shopify"
                 description={shopifyStatus?.recommendedNextStep ?? "Checking Shopify status"}
@@ -1101,6 +1308,30 @@ export default function AdminPage() {
 
           <div className="space-y-4">
             <AdminPanel
+              eyebrow="Missing Channels"
+              title="Planned Paid Channels"
+              description="Keep these visible during onboarding so missing traffic sources are not forgotten."
+              action={<StatusPill status="Planned" />}
+            >
+              <div id="planned-channels" className="space-y-3">
+                {connectionItems
+                  .filter((item) => item.tone === "planned")
+                  .map((item) => (
+                    <AdminBlock
+                      key={item.id}
+                      title={item.name}
+                      description={item.nextAction}
+                      action={<StatusPill status="Not connected" />}
+                    >
+                      <div className="text-sm leading-6 text-[var(--muted)]">
+                        {item.context}. This is surfaced as a setup opportunity, but no connector is enabled for this channel yet.
+                      </div>
+                    </AdminBlock>
+                  ))}
+              </div>
+            </AdminPanel>
+
+            <AdminPanel
               eyebrow="Governance"
               title="Metric Logic"
               description="Review definitions and source mappings before exposing future admin-editable controls."
@@ -1164,10 +1395,7 @@ export default function AdminPage() {
               </div>
 
               <div className="mt-3 rounded-[14px] border border-[var(--line)] bg-white/45 p-3">
-                <div className="flex items-center gap-2 text-[var(--ink)]">
-                  <Workflow size={15} />
-                  <div className="text-sm font-semibold">Latest Sync Notes</div>
-                </div>
+                <div className="text-sm font-semibold text-[var(--ink)]">Latest Sync Notes</div>
                 <div className="mt-2 space-y-2 text-sm text-[var(--muted)]">
                   {(syncState?.syncRuns ?? []).slice(0, 3).map((run) => (
                     <div key={run.id} className="rounded-[12px] bg-white/62 px-3 py-2">
