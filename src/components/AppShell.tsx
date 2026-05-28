@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   Bell,
+  CalendarRange,
   Database,
   Gauge,
   LayoutDashboard,
@@ -40,9 +41,28 @@ type DashboardDisplayContextValue = {
   formatValue: (value: string) => string;
 };
 
+export type DashboardDatePreset =
+  | "today"
+  | "yesterday"
+  | "last_7d"
+  | "last_30d"
+  | "this_month"
+  | "last_month";
+
+type DashboardDateContextValue = {
+  datePreset: DashboardDatePreset;
+  metaPreviewQuery: string;
+  activeLabel: string;
+  activeSummary: string;
+  setDatePreset: (value: DashboardDatePreset) => void;
+};
+
 const OwnerModeContext = createContext<OwnerModeContextValue | null>(null);
 const DashboardDisplayContext =
   createContext<DashboardDisplayContextValue | null>(null);
+const DashboardDateContext = createContext<DashboardDateContextValue | null>(null);
+
+const DASHBOARD_DATE_PRESET_KEY = "media-dashboard-date-preset";
 
 const NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Command Center", href: "/" },
@@ -54,12 +74,26 @@ const NAV_ITEMS = [
   { icon: Database, label: "Admin", href: "/admin" },
 ];
 
+const DATE_PRESET_OPTIONS: Array<{
+  value: DashboardDatePreset;
+  label: string;
+}> = [
+  { value: "today", label: "Today" },
+  { value: "yesterday", label: "Yesterday" },
+  { value: "last_7d", label: "Last 7 days" },
+  { value: "last_30d", label: "Last 30 days" },
+  { value: "this_month", label: "This month" },
+  { value: "last_month", label: "Last month" },
+];
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [activeClientId, setActiveClientId] = useState("");
   const [isLoadingClients, setIsLoadingClients] = useState(true);
   const [ownerMode, setOwnerModeState] = useState(false);
+  const [datePreset, setDatePresetState] =
+    useState<DashboardDatePreset>("last_7d");
 
   const activeClient = useMemo(
     () =>
@@ -68,11 +102,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
-    const saved =
+    const savedOwnerMode =
       typeof window !== "undefined"
         ? window.localStorage.getItem("media-dashboard-owner-mode")
         : null;
-    setOwnerModeState(saved === "true");
+    const savedDatePreset =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem(DASHBOARD_DATE_PRESET_KEY)
+        : null;
+
+    setOwnerModeState(savedOwnerMode === "true");
+
+    if (
+      savedDatePreset &&
+      DATE_PRESET_OPTIONS.some((option) => option.value === savedDatePreset)
+    ) {
+      setDatePresetState(savedDatePreset as DashboardDatePreset);
+    }
   }, []);
 
   useEffect(() => {
@@ -125,6 +171,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     window.localStorage.setItem("media-dashboard-owner-mode", String(nextValue));
   }
 
+  function setDatePreset(nextValue: DashboardDatePreset) {
+    setDatePresetState(nextValue);
+    window.localStorage.setItem(DASHBOARD_DATE_PRESET_KEY, nextValue);
+  }
+
   const ownerContext = useMemo(
     () => ({
       ownerMode,
@@ -141,73 +192,141 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [activeClient?.currencyCode]);
 
+  const activeDateRange = useMemo(() => getPresetRange(datePreset), [datePreset]);
+  const dashboardDate = useMemo<DashboardDateContextValue>(
+    () => ({
+      datePreset,
+      metaPreviewQuery: `datePreset=${datePreset}`,
+      activeLabel:
+        DATE_PRESET_OPTIONS.find((option) => option.value === datePreset)?.label ??
+        "Last 7 days",
+      activeSummary: activeDateRange.summary,
+      setDatePreset,
+    }),
+    [activeDateRange.summary, datePreset]
+  );
+
+  const showDateController = pathname !== "/admin";
+
   return (
     <OwnerModeContext.Provider value={ownerContext}>
       <DashboardDisplayContext.Provider value={dashboardDisplay}>
-        <main className="min-h-screen bg-[var(--bg)] text-[var(--ink)]">
-          <Sidebar ownerMode={ownerMode} onToggleOwnerMode={setOwnerMode} />
-          <div className="xl:pl-[300px]">
-            <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[rgba(249,246,239,0.88)] px-6 py-5 backdrop-blur">
-              <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
-                <div>
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    <InfoChip tone="default">
-                      {isLoadingClients
-                        ? "Loading client..."
-                        : activeClient?.name ?? "No client selected"}
-                    </InfoChip>
-                    <InfoChip tone="warn">
-                      {isLoadingClients
-                        ? "Currency loading"
-                        : activeClient
-                        ? getCurrencyMeta(activeClient.currencyCode).label
-                        : "Currency pending"}
-                    </InfoChip>
-                    <InfoChip tone="good">Store sales truth first</InfoChip>
-                    <InfoChip tone={ownerMode ? "good" : "default"}>
-                      {ownerMode ? "Owner mode on" : "Owner mode off"}
-                    </InfoChip>
+        <DashboardDateContext.Provider value={dashboardDate}>
+          <main className="min-h-screen bg-[var(--bg)] text-[var(--ink)]">
+            <Sidebar ownerMode={ownerMode} onToggleOwnerMode={setOwnerMode} />
+            <div className="xl:pl-[300px]">
+              <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[rgba(249,246,239,0.88)] px-6 py-5 backdrop-blur">
+                <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
+                  <div>
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      <InfoChip tone="default">
+                        {isLoadingClients
+                          ? "Loading client..."
+                          : activeClient?.name ?? "No client selected"}
+                      </InfoChip>
+                      <InfoChip tone="warn">
+                        {isLoadingClients
+                          ? "Currency loading"
+                          : activeClient
+                          ? getCurrencyMeta(activeClient.currencyCode).label
+                          : "Currency pending"}
+                      </InfoChip>
+                      <InfoChip tone="good">Store sales truth first</InfoChip>
+                      <InfoChip tone={ownerMode ? "good" : "default"}>
+                        {ownerMode ? "Owner mode on" : "Owner mode off"}
+                      </InfoChip>
+                    </div>
+                    <h1 className="font-serif-display text-3xl leading-tight font-semibold tracking-tight md:text-5xl">
+                      Media Buying Reporting Dashboard
+                    </h1>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)] md:text-base">
+                      Decision-first reporting across business truth, platform truth,
+                      blended metrics, and confidence-based recommendations.
+                    </p>
                   </div>
-                  <h1 className="font-serif-display text-3xl leading-tight font-semibold tracking-tight md:text-5xl">
-                    Media Buying Reporting Dashboard
-                  </h1>
-                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)] md:text-base">
-                    Decision-first reporting across business truth, platform truth,
-                    blended metrics, and confidence-based recommendations.
-                  </p>
-                </div>
 
-                <div className="min-w-[280px] rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.5)] p-3 shadow-[var(--shadow)]">
-                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-                    Active Client
-                  </div>
-                  <select
-                    value={activeClientId}
-                    onChange={(event) => handleClientSwitch(event.target.value)}
-                    disabled={isLoadingClients || clients.length === 0}
-                    className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-3 py-3 text-sm font-medium text-[var(--ink)] outline-none"
+                  <div
+                    className={`grid gap-3 ${
+                      showDateController
+                        ? "xl:min-w-[620px] xl:grid-cols-[1.2fr,0.95fr]"
+                        : "xl:min-w-[280px]"
+                    }`}
                   >
-                    {isLoadingClients ? (
-                      <option value="">Loading clients...</option>
-                    ) : clients.length ? (
-                      clients.map((entry) => (
-                        <option key={entry.id} value={entry.id}>
-                          {entry.name} · {entry.currencyCode}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="">Create a client in Admin first</option>
-                    )}
-                  </select>
+                    {showDateController ? <DateControlCard /> : null}
+                    <div className="min-w-[280px] rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.5)] p-3 shadow-[var(--shadow)]">
+                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                        Active Client
+                      </div>
+                      <select
+                        value={activeClientId}
+                        onChange={(event) => handleClientSwitch(event.target.value)}
+                        disabled={isLoadingClients || clients.length === 0}
+                        className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-3 py-3 text-sm font-medium text-[var(--ink)] outline-none"
+                      >
+                        {isLoadingClients ? (
+                          <option value="">Loading clients...</option>
+                        ) : clients.length ? (
+                          clients.map((entry) => (
+                            <option key={entry.id} value={entry.id}>
+                              {entry.name} · {entry.currencyCode}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="">Create a client in Admin first</option>
+                        )}
+                      </select>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </header>
+              </header>
 
-            <div className="px-6 py-6">{children}</div>
-          </div>
-        </main>
+              <div className="px-6 py-6">{children}</div>
+            </div>
+          </main>
+        </DashboardDateContext.Provider>
       </DashboardDisplayContext.Provider>
     </OwnerModeContext.Provider>
+  );
+}
+
+function DateControlCard() {
+  const { activeLabel, activeSummary, datePreset, setDatePreset } =
+    useDashboardDate();
+
+  return (
+    <div className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.5)] p-3 shadow-[var(--shadow)]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+            <CalendarRange size={14} />
+            <span>Reporting Window</span>
+          </div>
+          <div className="mt-2 text-base font-semibold text-[var(--ink)]">
+            {activeLabel}
+          </div>
+          <div className="mt-1 text-sm text-[var(--muted)]">{activeSummary}</div>
+        </div>
+        <StatusPill status="Live" />
+      </div>
+
+      <select
+        value={datePreset}
+        onChange={(event) =>
+          setDatePreset(event.target.value as DashboardDatePreset)
+        }
+        className="mt-3 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-3 py-3 text-sm font-medium text-[var(--ink)] outline-none"
+      >
+        {DATE_PRESET_OPTIONS.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+
+      <div className="mt-2 text-xs text-[var(--muted)]">
+        Updates live Meta reporting previews across the dashboard.
+      </div>
+    </div>
   );
 }
 
@@ -401,7 +520,7 @@ export function DisplayValue({ value }: { value: string }) {
 
 export function StatusPill({ status }: { status: string }) {
   const tone =
-    /(scale|good|strong|protect|stable|ready|connected|healthy)/i.test(status)
+    /(scale|good|strong|protect|stable|ready|connected|healthy|live)/i.test(status)
       ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-900"
       : /(watch|actionable|review|weak|hold|blocked|fix|missing|risk)/i.test(status)
       ? "border-amber-500/25 bg-amber-500/10 text-amber-900"
@@ -506,6 +625,14 @@ export function useDashboardDisplay() {
   return context;
 }
 
+export function useDashboardDate() {
+  const context = useContext(DashboardDateContext);
+  if (!context) {
+    throw new Error("useDashboardDate must be used inside AppShell");
+  }
+  return context;
+}
+
 function formatMetricValue(value: string, currencyCode: ClientCurrencyCode) {
   if (!value.startsWith("$")) {
     return value;
@@ -539,4 +666,65 @@ function formatMetricValue(value: string, currencyCode: ClientCurrencyCode) {
     compactDisplay: "short",
     maximumFractionDigits,
   }).format(amount);
+}
+
+function getPresetRange(preset: DashboardDatePreset) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const end = new Date(today);
+  const start = new Date(today);
+
+  if (preset === "yesterday") {
+    start.setDate(start.getDate() - 1);
+    end.setDate(end.getDate() - 1);
+  } else if (preset === "last_7d") {
+    start.setDate(start.getDate() - 6);
+  } else if (preset === "last_30d") {
+    start.setDate(start.getDate() - 29);
+  } else if (preset === "this_month") {
+    start.setDate(1);
+  } else if (preset === "last_month") {
+    start.setDate(1);
+    start.setMonth(start.getMonth() - 1);
+    end.setDate(0);
+    end.setMonth(end.getMonth() - 1);
+  }
+
+  return {
+    start,
+    end,
+    summary: formatRangeSummary(start, end),
+  };
+}
+
+function formatRangeSummary(start: Date, end: Date) {
+  const sameDay = start.toDateString() === end.toDateString();
+  const startLabel = start.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+  const endLabel = end.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  if (sameDay) {
+    return end.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+
+  if (start.getFullYear() === end.getFullYear()) {
+    return `${startLabel} - ${endLabel}`;
+  }
+
+  return `${start.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })} - ${endLabel}`;
 }
