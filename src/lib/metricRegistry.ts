@@ -21,6 +21,51 @@ export type MetricAggregationMode =
   | "rule"
   | "unknown";
 
+export type MetricRevenueBasis =
+  | "gross_sales"
+  | "net_sales"
+  | "platform_purchase_value";
+
+export type MetricDenominatorChoice =
+  | "orders"
+  | "purchases"
+  | "new_customers"
+  | "sessions"
+  | "clicks"
+  | "begin_checkout"
+  | "add_to_cart";
+
+export type MetricChannel = "meta" | "google" | "tiktok" | "snap";
+
+export type MetricBenchmarkDirection =
+  | "higher_is_better"
+  | "lower_is_better";
+
+export type MetricAdminOverride = {
+  metricId: string;
+  revenueBasis: MetricRevenueBasis | null;
+  denominatorChoice: MetricDenominatorChoice | null;
+  includedChannels: MetricChannel[];
+  benchmarkDirection: MetricBenchmarkDirection | null;
+  benchmarkGood: number | null;
+  benchmarkWatch: number | null;
+  benchmarkRisk: number | null;
+  adminNotes: string | null;
+  updatedAt: string | null;
+};
+
+export type MetricOption = {
+  value: string;
+  label: string;
+};
+
+export type MetricControlOptions = {
+  revenueBasisOptions: MetricOption[];
+  denominatorOptions: MetricOption[];
+  channelOptions: MetricOption[];
+  benchmarkEnabled: boolean;
+};
+
 export type MetricRegistryEntry = {
   id: string;
   label: string;
@@ -50,6 +95,9 @@ export type MetricRegistryEntry = {
   integrationNote: string | null;
   signalRule: string | null;
   adminRecommendation: string;
+  adminOverride: MetricAdminOverride | null;
+  adminOverrideSummary: string[];
+  controlOptions: MetricControlOptions;
 };
 
 const DEVELOPER_MANAGED_METRICS = new Set([
@@ -75,6 +123,13 @@ const DENOMINATOR_SENSITIVE_METRICS = new Set([
   "view_content_rate",
   "lpv_rate",
 ]);
+
+const DEFAULT_CHANNEL_OPTIONS: MetricOption[] = [
+  { value: "meta", label: "Meta" },
+  { value: "google", label: "Google" },
+  { value: "tiktok", label: "TikTok" },
+  { value: "snap", label: "Snap" },
+];
 
 const LIVE_IMPLEMENTATION_OVERRIDES: Record<
   string,
@@ -300,9 +355,9 @@ const LIVE_IMPLEMENTATION_OVERRIDES: Record<
   },
 };
 
-export function getMetricRegistry() {
+export function getMetricRegistry(overrides: MetricAdminOverride[] = []) {
   return [...metricDictionary.metrics]
-    .map((metric) => buildMetricRegistryEntry(metric))
+    .map((metric) => buildMetricRegistryEntry(metric, overrides))
     .sort((left, right) => {
       if (left.category === right.category) {
         return left.label.localeCompare(right.label);
@@ -312,8 +367,11 @@ export function getMetricRegistry() {
     });
 }
 
-export function getMetricRegistryEntry(metricId: string) {
-  return getMetricRegistry().find((metric) => metric.id === metricId) ?? null;
+export function getMetricRegistryEntry(
+  metricId: string,
+  overrides: MetricAdminOverride[] = []
+) {
+  return getMetricRegistry(overrides).find((metric) => metric.id === metricId) ?? null;
 }
 
 export function getMetricRegistrySummary(entries = getMetricRegistry()) {
@@ -331,15 +389,41 @@ export function getMetricRegistrySummary(entries = getMetricRegistry()) {
       (entry) => entry.editability === "developer_managed"
     ).length,
     viewOnly: entries.filter((entry) => entry.editability === "view_only").length,
+    activeOverrides: entries.filter((entry) => entry.adminOverrideSummary.length > 0).length,
   };
 }
 
-function buildMetricRegistryEntry(metric: MetricDefinition): MetricRegistryEntry {
+export function buildMetricAdminOverride(metricId: string): MetricAdminOverride {
+  return {
+    metricId,
+    revenueBasis: null,
+    denominatorChoice: null,
+    includedChannels: [],
+    benchmarkDirection: null,
+    benchmarkGood: null,
+    benchmarkWatch: null,
+    benchmarkRisk: null,
+    adminNotes: null,
+    updatedAt: null,
+  };
+}
+
+function buildMetricRegistryEntry(
+  metric: MetricDefinition,
+  overrides: MetricAdminOverride[]
+): MetricRegistryEntry {
   const sourceMapping = findSourceMapping(metric);
   const customSignal = findCustomSignal(metric);
   const override = LIVE_IMPLEMENTATION_OVERRIDES[metric.id] ?? {};
   const editability =
     override.editability ?? getMetricEditability(metric, sourceMapping, customSignal);
+  const adminOverride = normalizeMetricAdminOverride(
+    overrides.find((entry) => entry.metricId === metric.id) ?? null,
+    metric.id
+  );
+  const controlOptions = getMetricControlOptions(metric, editability);
+  const bindingDetail = getCurrentFieldBinding(metric.id, override, adminOverride);
+  const executionNote = getLiveBindingNote(metric.id, override, adminOverride);
 
   return {
     id: metric.id,
@@ -358,11 +442,11 @@ function buildMetricRegistryEntry(metric: MetricDefinition): MetricRegistryEntry
       override.aggregation ?? getAggregationMode(metric, sourceMapping, customSignal),
     bindingStatus: override.bindingStatus ?? (sourceMapping ? "documented" : "partial"),
     currentFieldBinding:
-      override.currentFieldBinding ??
+      bindingDetail ??
       sourceMapping?.rawFieldsNeeded ??
       "No live field binding has been centralized yet.",
     liveBindingNote:
-      override.liveBindingNote ??
+      executionNote ??
       sourceMapping?.logicNote ??
       customSignal?.implementationLogic ??
       "This metric is documented, but the live dashboard still needs a central executable registry for it.",
@@ -384,6 +468,27 @@ function buildMetricRegistryEntry(metric: MetricDefinition): MetricRegistryEntry
     integrationNote: sourceMapping?.integrationNote ?? null,
     signalRule: customSignal?.equationOrRule ?? null,
     adminRecommendation: getAdminRecommendation(metric, editability, sourceMapping),
+    adminOverride,
+    adminOverrideSummary: getAdminOverrideSummary(metric.id, adminOverride),
+    controlOptions,
+  };
+}
+
+function normalizeMetricAdminOverride(
+  override: MetricAdminOverride | null,
+  metricId: string
+) {
+  if (!override) {
+    return null;
+  }
+
+  const normalized = buildMetricAdminOverride(metricId);
+
+  return {
+    ...normalized,
+    ...override,
+    includedChannels: [...(override.includedChannels ?? [])].sort() as MetricChannel[],
+    adminNotes: override.adminNotes?.trim() || null,
   };
 }
 
@@ -517,6 +622,94 @@ function getAggregationMode(
   return "unknown";
 }
 
+function getCurrentFieldBinding(
+  metricId: string,
+  override: Partial<MetricRegistryEntry>,
+  adminOverride: MetricAdminOverride | null
+) {
+  const fallback = override.currentFieldBinding;
+
+  if (!fallback || !adminOverride) {
+    return fallback;
+  }
+
+  if (metricId === "store_revenue") {
+    const basis = adminOverride.revenueBasis ?? "gross_sales";
+    if (basis === "net_sales") {
+      return "Admin override: prefer net revenue when live store truth supports it. Current live dashboard still defaults to gross sales until revenue-basis execution is centralized.";
+    }
+    return "Admin override: keep gross sales as the primary store-revenue basis. Live dashboard remains aligned with gross sales today.";
+  }
+
+  if (metricId === "aov") {
+    const basis = adminOverride.revenueBasis ?? "gross_sales";
+    if (basis === "net_sales") {
+      return "Admin override: calculate AOV from net revenue when the live truth layer supports it, still divided by completed orders.";
+    }
+    return "Admin override: calculate AOV from gross sales divided by completed orders.";
+  }
+
+  if (metricId === "mer") {
+    const basis = adminOverride.revenueBasis ?? "gross_sales";
+    if (basis === "net_sales") {
+      return "Admin override: use net revenue as the preferred numerator for MER once the execution layer reads this override. Current live dashboard still uses gross sales.";
+    }
+    return "Admin override: keep gross sales as the MER numerator basis.";
+  }
+
+  if (metricId === "cpa_cac" && adminOverride.denominatorChoice) {
+    return `Admin override: use ${formatDenominatorLabel(
+      adminOverride.denominatorChoice
+    )} as the active denominator for CPA / CAC.`;
+  }
+
+  if (
+    (metricId === "total_ad_spend" || metricId === "roas_by_channel") &&
+    adminOverride.includedChannels.length
+  ) {
+    return `Admin override: include ${formatChannelList(
+      adminOverride.includedChannels
+    )} in the reporting rollup.`;
+  }
+
+  return fallback;
+}
+
+function getLiveBindingNote(
+  metricId: string,
+  override: Partial<MetricRegistryEntry>,
+  adminOverride: MetricAdminOverride | null
+) {
+  const fallback = override.liveBindingNote;
+
+  if (!fallback || !adminOverride) {
+    return fallback;
+  }
+
+  if (["store_revenue", "aov", "mer"].includes(metricId) && adminOverride.revenueBasis) {
+    return `${fallback} The saved admin override now marks ${formatRevenueBasisLabel(
+      adminOverride.revenueBasis
+    )} as the preferred basis for this metric registry entry.`;
+  }
+
+  if (metricId === "cpa_cac" && adminOverride.denominatorChoice) {
+    return `${fallback} The saved admin override now marks ${formatDenominatorLabel(
+      adminOverride.denominatorChoice
+    )} as the preferred denominator.`;
+  }
+
+  if (
+    (metricId === "total_ad_spend" || metricId === "roas_by_channel") &&
+    adminOverride.includedChannels.length
+  ) {
+    return `${fallback} The saved admin override now narrows included channels to ${formatChannelList(
+      adminOverride.includedChannels
+    )}.`;
+  }
+
+  return fallback;
+}
+
 function parseRawFields(rawFields: string | null) {
   if (!rawFields) {
     return [];
@@ -595,7 +788,8 @@ function getEditableFields(
     metric.id === "store_revenue" ||
     metric.id === "net_revenue" ||
     metric.id === "gross_revenue" ||
-    metric.id === "aov"
+    metric.id === "aov" ||
+    metric.id === "mer"
   ) {
     fields.push("Revenue basis selection");
   }
@@ -662,4 +856,152 @@ function getAdminRecommendation(
   }
 
   return "Keep this metric view-only for now. It needs a clearer live execution path before admin editing becomes safe.";
+}
+
+function getMetricControlOptions(
+  metric: MetricDefinition,
+  editability: MetricRegistryEditability
+): MetricControlOptions {
+  if (editability !== "controlled_mapping") {
+    return {
+      revenueBasisOptions: [],
+      denominatorOptions: [],
+      channelOptions: [],
+      benchmarkEnabled: false,
+    };
+  }
+
+  return {
+    revenueBasisOptions: getRevenueBasisOptions(metric.id),
+    denominatorOptions: getDenominatorOptions(metric.id),
+    channelOptions: getChannelOptions(metric.id),
+    benchmarkEnabled: true,
+  };
+}
+
+function getRevenueBasisOptions(metricId: string): MetricOption[] {
+  if (!["store_revenue", "aov", "mer"].includes(metricId)) {
+    return [];
+  }
+
+  return [
+    { value: "gross_sales", label: "Gross sales" },
+    { value: "net_sales", label: "Net revenue" },
+  ];
+}
+
+function getDenominatorOptions(metricId: string): MetricOption[] {
+  if (metricId !== "cpa_cac") {
+    return [];
+  }
+
+  return [
+    { value: "purchases", label: "Purchases" },
+    { value: "new_customers", label: "New customers" },
+    { value: "orders", label: "Orders" },
+  ];
+}
+
+function getChannelOptions(metricId: string): MetricOption[] {
+  if (metricId !== "total_ad_spend" && metricId !== "roas_by_channel") {
+    return [];
+  }
+
+  return DEFAULT_CHANNEL_OPTIONS;
+}
+
+function getAdminOverrideSummary(
+  metricId: string,
+  adminOverride: MetricAdminOverride | null
+) {
+  if (!adminOverride) {
+    return [];
+  }
+
+  const summary: string[] = [];
+
+  if (adminOverride.revenueBasis) {
+    summary.push(`Revenue basis: ${formatRevenueBasisLabel(adminOverride.revenueBasis)}`);
+  }
+
+  if (adminOverride.denominatorChoice) {
+    summary.push(
+      `Denominator: ${formatDenominatorLabel(adminOverride.denominatorChoice)}`
+    );
+  }
+
+  if (
+    (metricId === "total_ad_spend" || metricId === "roas_by_channel") &&
+    adminOverride.includedChannels.length
+  ) {
+    summary.push(`Included channels: ${formatChannelList(adminOverride.includedChannels)}`);
+  }
+
+  if (adminOverride.benchmarkDirection) {
+    summary.push(
+      `Benchmark direction: ${
+        adminOverride.benchmarkDirection === "higher_is_better"
+          ? "Higher is better"
+          : "Lower is better"
+      }`
+    );
+  }
+
+  if (
+    adminOverride.benchmarkGood !== null ||
+    adminOverride.benchmarkWatch !== null ||
+    adminOverride.benchmarkRisk !== null
+  ) {
+    summary.push(
+      `Thresholds: good ${formatThresholdValue(
+        adminOverride.benchmarkGood
+      )}, watch ${formatThresholdValue(
+        adminOverride.benchmarkWatch
+      )}, risk ${formatThresholdValue(adminOverride.benchmarkRisk)}`
+    );
+  }
+
+  if (adminOverride.adminNotes) {
+    summary.push(`Admin note: ${adminOverride.adminNotes}`);
+  }
+
+  return summary;
+}
+
+function formatRevenueBasisLabel(value: MetricRevenueBasis) {
+  if (value === "net_sales") {
+    return "Net revenue";
+  }
+
+  if (value === "platform_purchase_value") {
+    return "Platform purchase value";
+  }
+
+  return "Gross sales";
+}
+
+function formatDenominatorLabel(value: MetricDenominatorChoice) {
+  if (value === "new_customers") {
+    return "new customers";
+  }
+
+  if (value === "begin_checkout") {
+    return "begin checkout";
+  }
+
+  if (value === "add_to_cart") {
+    return "add to cart";
+  }
+
+  return value.replaceAll("_", " ");
+}
+
+function formatChannelList(channels: MetricChannel[]) {
+  return channels
+    .map((channel) => DEFAULT_CHANNEL_OPTIONS.find((item) => item.value === channel)?.label ?? channel)
+    .join(", ");
+}
+
+function formatThresholdValue(value: number | null) {
+  return value === null ? "not set" : `${value}`;
 }
