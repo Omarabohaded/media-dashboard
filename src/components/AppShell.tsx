@@ -270,10 +270,24 @@ export function AppShell({
           <main className="min-h-screen bg-[var(--bg)] text-[var(--ink)]">
             <Sidebar ownerMode={ownerMode} onToggleOwnerMode={setOwnerMode} />
             <div className="xl:pl-[300px]">
-              <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[rgba(249,246,239,0.88)] px-6 py-5 backdrop-blur">
-                <div className="flex flex-col gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between">
-                  <div>
-                    <div className="mb-3 flex flex-wrap gap-2">
+              <header
+                className={`sticky top-0 z-20 border-b border-[var(--line)] bg-[rgba(249,246,239,0.88)] px-6 backdrop-blur ${
+                  portfolioMode ? "py-3" : "py-5"
+                }`}
+              >
+                <div
+                  className={`flex flex-col ${
+                    portfolioMode
+                      ? "gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between"
+                      : "gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between"
+                  }`}
+                >
+                  <div className={portfolioMode ? "max-w-4xl" : undefined}>
+                    <div
+                      className={`flex flex-wrap gap-2 ${
+                        portfolioMode ? "mb-2" : "mb-3"
+                      }`}
+                    >
                       <InfoChip tone="default">
                         {portfolioMode
                           ? "All stores in portfolio scope"
@@ -295,10 +309,22 @@ export function AppShell({
                         {ownerMode ? "Owner mode on" : "Owner mode off"}
                       </InfoChip>
                     </div>
-                    <h1 className="font-serif-display text-3xl leading-tight font-semibold tracking-tight md:text-5xl">
+                    <h1
+                      className={`font-serif-display font-semibold tracking-tight ${
+                        portfolioMode
+                          ? "text-2xl leading-tight md:text-3xl"
+                          : "text-3xl leading-tight md:text-5xl"
+                      }`}
+                    >
                       Media Buying Reporting Dashboard
                     </h1>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)] md:text-base">
+                    <p
+                      className={`max-w-3xl text-[var(--muted)] ${
+                        portfolioMode
+                          ? "mt-1 text-sm leading-5 md:text-[15px]"
+                          : "mt-2 text-sm leading-6 md:text-base"
+                      }`}
+                    >
                       Decision-first reporting across business truth, platform truth,
                       blended metrics, and confidence-based recommendations.
                     </p>
@@ -307,7 +333,9 @@ export function AppShell({
                   <div
                     className={`grid gap-3 ${
                       showDateController
-                        ? "xl:min-w-[620px] xl:grid-cols-[1.2fr,0.95fr]"
+                        ? portfolioMode
+                          ? "xl:min-w-[560px] xl:grid-cols-[1.05fr,0.85fr]"
+                          : "xl:min-w-[620px] xl:grid-cols-[1.2fr,0.95fr]"
                         : "xl:min-w-[280px]"
                     }`}
                   >
@@ -319,18 +347,19 @@ export function AppShell({
                         customRange={customRange}
                         onPresetChange={setDatePreset}
                         onApplyCustomRange={applyCustomRange}
+                        compact={portfolioMode}
                       />
                     ) : null}
                     {portfolioMode ? (
                       <div className="min-w-[280px] rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.5)] p-3 shadow-[var(--shadow)]">
-                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
                           Portfolio Scope
                         </div>
-                        <div className="mt-2 text-sm font-semibold text-[var(--ink)]">
+                        <div className="mt-1 text-sm font-semibold text-[var(--ink)]">
                           All configured stores
                         </div>
-                        <div className="mt-2 text-sm leading-6 text-[var(--muted)]">
-                          Open a store card below to jump into the deeper single-store dashboard with that client set as active.
+                        <div className="mt-1 text-sm leading-5 text-[var(--muted)]">
+                          Use a store card below to jump into the deeper single-store dashboard with that client set as active.
                         </div>
                       </div>
                     ) : (
@@ -362,7 +391,7 @@ export function AppShell({
                 </div>
               </header>
 
-              <div className="px-6 py-6">{children}</div>
+              <div className={`px-6 ${portfolioMode ? "py-4" : "py-6"}`}>{children}</div>
             </div>
           </main>
         </DashboardDateContext.Provider>
@@ -378,6 +407,7 @@ function DateControlCard({
   customRange,
   onPresetChange,
   onApplyCustomRange,
+  compact = false,
 }: {
   activeLabel: string;
   activeSummary: string;
@@ -385,6 +415,7 @@ function DateControlCard({
   customRange: DashboardCustomRange;
   onPresetChange: (value: DashboardDatePreset) => void;
   onApplyCustomRange: (value: DashboardCustomRange) => void;
+  compact?: boolean;
 }) {
   const [draftRange, setDraftRange] = useState<DashboardCustomRange>(customRange);
   const [rangeError, setRangeError] = useState<string | null>(null);
@@ -416,10 +447,20 @@ function DateControlCard({
             <CalendarRange size={14} />
             <span>Reporting Window</span>
           </div>
-          <div className="mt-2 text-base font-semibold text-[var(--ink)]">
+          <div
+            className={`font-semibold text-[var(--ink)] ${
+              compact ? "mt-1 text-sm" : "mt-2 text-base"
+            }`}
+          >
             {activeLabel}
           </div>
-          <div className="mt-1 text-sm text-[var(--muted)]">{activeSummary}</div>
+          <div
+            className={`text-[var(--muted)] ${
+              compact ? "mt-0.5 text-xs leading-5" : "mt-1 text-sm"
+            }`}
+          >
+            {activeSummary}
+          </div>
         </div>
         <StatusPill status="Live" />
       </div>
@@ -429,7 +470,9 @@ function DateControlCard({
         onChange={(event) =>
           onPresetChange(event.target.value as DashboardDatePreset)
         }
-        className="mt-3 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-3 py-3 text-sm font-medium text-[var(--ink)] outline-none"
+        className={`w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.78)] text-sm font-medium text-[var(--ink)] outline-none ${
+          compact ? "mt-2 px-3 py-2.5" : "mt-3 px-3 py-3"
+        }`}
       >
         {DATE_PRESET_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
@@ -498,7 +541,7 @@ function DateControlCard({
         </div>
       ) : null}
 
-      <div className="mt-2 text-xs text-[var(--muted)]">
+      <div className={`text-xs text-[var(--muted)] ${compact ? "mt-1" : "mt-2"}`}>
         Updates live Meta reporting previews across the dashboard.
       </div>
     </div>
