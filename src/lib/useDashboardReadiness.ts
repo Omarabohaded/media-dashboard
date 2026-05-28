@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useDashboardDate } from "@/components/AppShell";
 import type { ClientRecord, WebsitePlatform } from "@/lib/clientTypes";
 
 type ClientDirectoryResponse = {
@@ -262,11 +263,13 @@ function normalizeStorePreview(
 }
 
 export function useDashboardReadiness(options: HookOptions = {}) {
+  const { metaPreviewQuery: activeDateQuery } = useDashboardDate();
   const {
     includeStorePreview = true,
     includeMetaPreview = true,
-    metaPreviewQuery = "datePreset=last_7d",
+    metaPreviewQuery,
   } = options;
+  const effectiveMetaPreviewQuery = metaPreviewQuery ?? activeDateQuery;
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [activeClientId, setActiveClientIdState] = useState("");
   const [metaStatus, setMetaStatus] = useState<DashboardMetaStatus | null>(null);
@@ -398,7 +401,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
         const previewResponse = await fetch(
           `/api/integrations/meta/insights-preview?clientId=${encodeURIComponent(
             nextClientId
-          )}&${metaPreviewQuery}`,
+          )}&${effectiveMetaPreviewQuery}`,
           {
             cache: "no-store",
           }
@@ -433,7 +436,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
 
   useEffect(() => {
     void refresh();
-  }, [metaPreviewQuery]);
+  }, [effectiveMetaPreviewQuery]);
 
   function setActiveClientId(nextClientId: string) {
     setActiveClientIdState(nextClientId);
