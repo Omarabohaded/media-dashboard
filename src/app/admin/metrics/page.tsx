@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AppShell,
   MiniMetric,
@@ -9,27 +9,114 @@ import {
   Section,
   SourcePill,
 } from "@/components/AppShell";
-import {
-  getMetricRegistry,
-  getMetricRegistrySummary,
-  type MetricRegistryEntry,
+import type {
+  MetricAdminOverride,
+  MetricBenchmarkDirection,
+  MetricChannel,
+  MetricDenominatorChoice,
+  MetricRegistryEntry,
+  MetricRevenueBasis,
 } from "@/lib/metricRegistry";
 
-const METRIC_REGISTRY = getMetricRegistry();
-const REGISTRY_SUMMARY = getMetricRegistrySummary(METRIC_REGISTRY);
+type MetricRegistryResponse = {
+  entries: MetricRegistryEntry[];
+  summary: {
+    total: number;
+    liveBindings: number;
+    partialBindings: number;
+    documentedOnly: number;
+    controlledMappings: number;
+    developerManaged: number;
+    viewOnly: number;
+    activeOverrides: number;
+  };
+  storage: {
+    storageMode: "vercel_kv" | "ephemeral_tmp";
+    location: string;
+    durable: boolean;
+  };
+};
+
+type MetricOverrideDraft = {
+  revenueBasis: MetricRevenueBasis | "";
+  denominatorChoice: MetricDenominatorChoice | "";
+  includedChannels: MetricChannel[];
+  benchmarkDirection: MetricBenchmarkDirection | "";
+  benchmarkGood: string;
+  benchmarkWatch: string;
+  benchmarkRisk: string;
+  adminNotes: string;
+};
+
+const EMPTY_SUMMARY: MetricRegistryResponse["summary"] = {
+  total: 0,
+  liveBindings: 0,
+  partialBindings: 0,
+  documentedOnly: 0,
+  controlledMappings: 0,
+  developerManaged: 0,
+  viewOnly: 0,
+  activeOverrides: 0,
+};
 
 export default function AdminMetricsPage() {
+  const [entries, setEntries] = useState<MetricRegistryEntry[]>([]);
+  const [summary, setSummary] = useState<MetricRegistryResponse["summary"]>(
+    EMPTY_SUMMARY
+  );
+  const [storage, setStorage] = useState<MetricRegistryResponse["storage"] | null>(
+    null
+  );
   const [query, setQuery] = useState("");
   const [selectedMetricId, setSelectedMetricId] = useState("total_ad_spend");
+  const [draft, setDraft] = useState<MetricOverrideDraft>(buildOverrideDraft(null));
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+
+  async function loadRegistry(preferredMetricId?: string) {
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    const response = await fetch("/api/admin/metrics", { cache: "no-store" });
+    const payload = (await response.json()) as MetricRegistryResponse & {
+      error?: string;
+    };
+
+    if (!response.ok) {
+      throw new Error(payload.error ?? "Could not load the metric registry.");
+    }
+
+    setEntries(payload.entries);
+    setSummary(payload.summary);
+    setStorage(payload.storage);
+
+    const nextMetricId =
+      preferredMetricId && payload.entries.some((entry) => entry.id === preferredMetricId)
+        ? preferredMetricId
+        : payload.entries[0]?.id ?? "";
+
+    setSelectedMetricId(nextMetricId);
+  }
+
+  useEffect(() => {
+    void loadRegistry(selectedMetricId)
+      .catch((error) => {
+        setErrorMessage(error instanceof Error ? error.message : "Could not load the metric registry.");
+      })
+      .finally(() => setIsLoading(false));
+  }, []);
 
   const filteredMetrics = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
     if (!normalizedQuery) {
-      return METRIC_REGISTRY;
+      return entries;
     }
 
-    return METRIC_REGISTRY.filter((metric) =>
+    return entries.filter((metric) =>
       [
         metric.id,
         metric.label,
@@ -42,12 +129,123 @@ export default function AdminMetricsPage() {
         .toLowerCase()
         .includes(normalizedQuery)
     );
-  }, [query]);
+  }, [entries, query]);
 
   const selectedMetric =
     filteredMetrics.find((metric) => metric.id === selectedMetricId) ??
+    entries.find((metric) => metric.id === selectedMetricId) ??
     filteredMetrics[0] ??
-    METRIC_REGISTRY[0];
+    entries[0] ??
+    null;
+
+  useEffect(() => {
+    setDraft(buildOverrideDraft(selectedMetric?.adminOverride ?? null));
+  }, [selectedMetric?.id, selectedMetric?.adminOverride]);
+
+  async function handleSaveOverride() {
+    if (!selectedMetric) {
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+
+    try {
+      const response = await fetch("/api/admin/metrics", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          metricId: selectedMetric.id,
+          revenueBasis: draft.revenueBasis || null,
+          denominatorChoice: draft.denominatorChoice || null,
+          includedChannels: draft.includedChannels,
+          benchmarkDirection: draft.benchmarkDirection || null,
+          benchmarkGood: parseDraftNumber(draft.benchmarkGood),
+          benchmarkWatch: parseDraftNumber(draft.benchmarkWatch),
+          benchmarkRisk: parseDraftNumber(draft.benchmarkRisk),
+          adminNotes: draft.adminNotes.trim() || null,
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        error?: string;
+        entry?: MetricRegistryEntry | null;
+        summary?: MetricRegistryResponse["summary"];
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Could not save the metric override.");
+      }
+
+      if (payload.entry) {
+        setEntries((current) =>
+          current.map((entry) => (entry.id === payload.entry?.id ? payload.entry : entry))
+        );
+      }
+
+      if (payload.summary) {
+        setSummary(payload.summary);
+      }
+
+      setStatusMessage(`${selectedMetric.label} override saved.`);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not save the metric override."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleResetOverride() {
+    if (!selectedMetric) {
+      return;
+    }
+
+    setIsResetting(true);
+    setErrorMessage(null);
+    setStatusMessage(null);
+
+    try {
+      const response = await fetch(
+        `/api/admin/metrics?metricId=${encodeURIComponent(selectedMetric.id)}`,
+        {
+          method: "DELETE",
+        }
+      );
+      const payload = (await response.json()) as {
+        error?: string;
+        entry?: MetricRegistryEntry | null;
+        summary?: MetricRegistryResponse["summary"];
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Could not reset the metric override.");
+      }
+
+      if (payload.entry) {
+        setEntries((current) =>
+          current.map((entry) => (entry.id === payload.entry?.id ? payload.entry : entry))
+        );
+        setDraft(buildOverrideDraft(payload.entry.adminOverride));
+      }
+
+      if (payload.summary) {
+        setSummary(payload.summary);
+      }
+
+      setStatusMessage(`${selectedMetric.label} override cleared.`);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Could not reset the metric override."
+      );
+    } finally {
+      setIsResetting(false);
+    }
+  }
 
   return (
     <AppShell>
@@ -55,24 +253,22 @@ export default function AdminMetricsPage() {
         <PageLead
           eyebrow="Admin Metric Registry"
           title="Inspect metric logic before you edit it"
-          summary="This workspace brings the current metric workbook, live dashboard bindings, and code-managed rule notes into one place. It is intentionally inspect-first so you can see where a metric comes from, what field it maps to, how it aggregates, and whether it is safe for controlled admin editing later."
+          summary="This workspace brings the current metric workbook, live dashboard bindings, and code-managed rule notes into one place. It now also supports a first controlled admin layer for safe overrides like revenue basis, denominator choice, benchmark guidance, channel inclusion, and admin notes."
         />
+
+        <StorageNotice storage={storage} />
+        <InlineNotice message={errorMessage} tone="warn" />
+        <InlineNotice message={statusMessage} tone="good" />
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
-            <SourcePill label={`${REGISTRY_SUMMARY.total} documented metrics`} tone="good" />
+            <SourcePill label={`${summary.total} documented metrics`} tone="good" />
+            <SourcePill label={`${summary.liveBindings} live bindings`} tone="good" />
             <SourcePill
-              label={`${REGISTRY_SUMMARY.liveBindings} live bindings`}
-              tone="good"
-            />
-            <SourcePill
-              label={`${REGISTRY_SUMMARY.controlledMappings} controlled-edit candidates`}
+              label={`${summary.controlledMappings} controlled-edit candidates`}
               tone="warn"
             />
-            <SourcePill
-              label={`${REGISTRY_SUMMARY.developerManaged} code-managed rules`}
-              tone="default"
-            />
+            <SourcePill label={`${summary.activeOverrides} saved overrides`} tone="warn" />
           </div>
           <Link
             href="/admin"
@@ -84,39 +280,39 @@ export default function AdminMetricsPage() {
 
         <Section
           title="Registry Coverage"
-          subtitle="This first pass focuses on high-confidence inspection: real live bindings where they exist, workbook mappings where execution is still being centralized, and clear flags for metrics that should stay developer-managed."
+          subtitle="This pass stays tightly scoped: inspect the real metric logic, then adjust only safe structured controls without opening up the raw formula layer."
         >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MiniMetric
               label="Total Metrics"
-              value={`${REGISTRY_SUMMARY.total}`}
+              value={`${summary.total}`}
               hint="Metrics pulled from the current workbook dictionary."
               tone="good"
             />
             <MiniMetric
               label="Live Bindings"
-              value={`${REGISTRY_SUMMARY.liveBindings}`}
+              value={`${summary.liveBindings}`}
               hint="Metrics already tied to real dashboard fields or formulas."
               tone="good"
             />
             <MiniMetric
-              label="Partial / Workbook"
-              value={`${REGISTRY_SUMMARY.partialBindings + REGISTRY_SUMMARY.documentedOnly}`}
-              hint="Metrics that still rely on workbook mapping, proxy logic, or future storefront analytics."
+              label="Safe Edit Surface"
+              value={`${summary.controlledMappings}`}
+              hint="Metrics that support structured admin overrides."
               tone="warn"
             />
             <MiniMetric
-              label="Safe Edit Surface"
-              value={`${REGISTRY_SUMMARY.controlledMappings}`}
-              hint="Best candidates for structured admin overrides after this inspect-first pass."
-              tone="warn"
+              label="Active Overrides"
+              value={`${summary.activeOverrides}`}
+              hint="Saved admin adjustments across the registry."
+              tone={summary.activeOverrides ? "warn" : "good"}
             />
           </div>
         </Section>
 
         <Section
           title="Metric Catalog"
-          subtitle="Search by metric name, ID, source, truth layer, or field binding. Pick a metric to inspect the exact logic that currently exists in this project."
+          subtitle="Search by metric name, ID, source, truth layer, or field binding. Pick a metric to inspect the exact logic, then use the right-side control card when the metric supports safe admin edits."
         >
           <div className="grid gap-5 xl:grid-cols-[0.96fr,1.04fr]">
             <div className="rounded-[24px] border border-[var(--line)] bg-[rgba(255,255,255,0.45)] p-4">
@@ -128,185 +324,466 @@ export default function AdminMetricsPage() {
               />
 
               <div className="mt-4 space-y-3">
-                {filteredMetrics.map((metric) => {
-                  const isActive = metric.id === selectedMetric.id;
-                  return (
-                    <button
-                      key={metric.id}
-                      type="button"
-                      onClick={() => setSelectedMetricId(metric.id)}
-                      className={`w-full rounded-[22px] border p-4 text-left transition ${
-                        isActive
-                          ? "border-[var(--accent)] bg-[rgba(161,66,26,0.10)]"
-                          : "border-[var(--line)] bg-[rgba(255,255,255,0.58)] hover:border-[var(--accent)]/50"
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div>
-                          <div className="text-base font-semibold text-[var(--ink)]">
-                            {metric.label}
+                {isLoading ? (
+                  <div className="rounded-[22px] border border-[var(--line)] bg-[rgba(255,255,255,0.58)] p-4 text-sm text-[var(--muted)]">
+                    Loading the metric registry...
+                  </div>
+                ) : filteredMetrics.length ? (
+                  filteredMetrics.map((metric) => {
+                    const isActive = metric.id === selectedMetric?.id;
+                    return (
+                      <button
+                        key={metric.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedMetricId(metric.id);
+                          setStatusMessage(null);
+                          setErrorMessage(null);
+                        }}
+                        className={`w-full rounded-[22px] border p-4 text-left transition ${
+                          isActive
+                            ? "border-[var(--accent)] bg-[rgba(161,66,26,0.10)]"
+                            : "border-[var(--line)] bg-[rgba(255,255,255,0.58)] hover:border-[var(--accent)]/50"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="text-base font-semibold text-[var(--ink)]">
+                              {metric.label}
+                            </div>
+                            <div className="mt-1 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
+                              {metric.id}
+                            </div>
                           </div>
-                          <div className="mt-1 text-xs uppercase tracking-[0.16em] text-[var(--muted)]">
-                            {metric.id}
+                          <div className="flex flex-wrap gap-2">
+                            <RegistryPill
+                              label={formatBindingStatus(metric.bindingStatus)}
+                              tone={getBindingTone(metric.bindingStatus)}
+                            />
+                            <RegistryPill
+                              label={formatEditability(metric.editability)}
+                              tone={getEditabilityTone(metric.editability)}
+                            />
                           </div>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          <RegistryPill
-                            label={formatBindingStatus(metric.bindingStatus)}
-                            tone={getBindingTone(metric.bindingStatus)}
-                          />
-                          <RegistryPill
-                            label={formatEditability(metric.editability)}
-                            tone={getEditabilityTone(metric.editability)}
-                          />
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <SourcePill label={metric.category} tone="default" />
+                          <SourcePill label={metric.truthLayer} tone="default" />
+                          {metric.adminOverrideSummary.length ? (
+                            <SourcePill label="Override saved" tone="warn" />
+                          ) : null}
                         </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <SourcePill label={metric.category} tone="default" />
-                        <SourcePill label={metric.truthLayer} tone="default" />
-                      </div>
-                    </button>
-                  );
-                })}
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="rounded-[22px] border border-[var(--line)] bg-[rgba(255,255,255,0.58)] p-4 text-sm text-[var(--muted)]">
+                    No metrics matched that search.
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="rounded-[24px] border border-[var(--line)] bg-[rgba(255,255,255,0.45)] p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-                    Selected Metric
+              {selectedMetric ? (
+                <>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+                        Selected Metric
+                      </div>
+                      <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--ink)]">
+                        {selectedMetric.label}
+                      </h2>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <RegistryPill
+                          label={formatBindingStatus(selectedMetric.bindingStatus)}
+                          tone={getBindingTone(selectedMetric.bindingStatus)}
+                        />
+                        <RegistryPill
+                          label={formatEditability(selectedMetric.editability)}
+                          tone={getEditabilityTone(selectedMetric.editability)}
+                        />
+                        <SourcePill label={selectedMetric.priority} tone="default" />
+                        <SourcePill
+                          label={selectedMetric.primaryTruth ? "Primary truth" : "Diagnostic"}
+                          tone={selectedMetric.primaryTruth ? "good" : "warn"}
+                        />
+                      </div>
+                    </div>
+                    <div className="rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.72)] px-4 py-3 text-right">
+                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+                        Metric ID
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-[var(--ink)]">
+                        {selectedMetric.id}
+                      </div>
+                    </div>
                   </div>
-                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--ink)]">
-                    {selectedMetric.label}
-                  </h2>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <RegistryPill
-                      label={formatBindingStatus(selectedMetric.bindingStatus)}
-                      tone={getBindingTone(selectedMetric.bindingStatus)}
-                    />
-                    <RegistryPill
-                      label={formatEditability(selectedMetric.editability)}
-                      tone={getEditabilityTone(selectedMetric.editability)}
-                    />
-                    <SourcePill label={selectedMetric.priority} tone="default" />
-                    <SourcePill
-                      label={selectedMetric.primaryTruth ? "Primary truth" : "Diagnostic"}
-                      tone={selectedMetric.primaryTruth ? "good" : "warn"}
-                    />
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.72)] px-4 py-3 text-right">
-                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-                    Metric ID
-                  </div>
-                  <div className="mt-1 text-sm font-semibold text-[var(--ink)]">
-                    {selectedMetric.id}
-                  </div>
-                </div>
-              </div>
 
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <InspectorCard
-                  title="Definition"
-                  rows={[
-                    { label: "Formula", value: selectedMetric.formula },
-                    { label: "Meaning", value: selectedMetric.meaning },
-                    { label: "Best paired with", value: selectedMetric.pairing },
-                    {
-                      label: "Benchmark basis",
-                      value: selectedMetric.benchmarkBasis,
-                    },
-                  ]}
-                />
-                <InspectorCard
-                  title="Mapping"
-                  rows={[
-                    { label: "Primary source", value: selectedMetric.source },
-                    { label: "Truth layer", value: selectedMetric.truthLayer },
-                    {
-                      label: "Aggregation",
-                      value: formatAggregation(selectedMetric.aggregation),
-                    },
-                    {
-                      label: "Current field binding",
-                      value: selectedMetric.currentFieldBinding,
-                    },
-                  ]}
-                />
-                <InspectorCard
-                  title="Execution Notes"
-                  rows={[
-                    {
-                      label: "Live binding note",
-                      value: selectedMetric.liveBindingNote,
-                    },
-                    {
-                      label: "Integration note",
-                      value:
-                        selectedMetric.integrationNote ??
-                        "No extra integration note is documented yet.",
-                    },
-                    {
-                      label: "Signal rule",
-                      value:
-                        selectedMetric.signalRule ??
-                        "This metric is not currently defined as a custom signal rule.",
-                    },
-                  ]}
-                />
-                <InspectorCard
-                  title="Admin Surface"
-                  rows={[
-                    {
-                      label: "Edit recommendation",
-                      value: selectedMetric.adminRecommendation,
-                    },
-                    {
-                      label: "Protected reason",
-                      value: selectedMetric.protectedReason,
-                    },
-                  ]}
-                />
-              </div>
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <InspectorCard
+                      title="Definition"
+                      rows={[
+                        { label: "Formula", value: selectedMetric.formula },
+                        { label: "Meaning", value: selectedMetric.meaning },
+                        { label: "Best paired with", value: selectedMetric.pairing },
+                        {
+                          label: "Benchmark basis",
+                          value: selectedMetric.benchmarkBasis,
+                        },
+                      ]}
+                    />
+                    <InspectorCard
+                      title="Mapping"
+                      rows={[
+                        { label: "Primary source", value: selectedMetric.source },
+                        { label: "Truth layer", value: selectedMetric.truthLayer },
+                        {
+                          label: "Aggregation",
+                          value: formatAggregation(selectedMetric.aggregation),
+                        },
+                        {
+                          label: "Current field binding",
+                          value: selectedMetric.currentFieldBinding,
+                        },
+                      ]}
+                    />
+                    <InspectorCard
+                      title="Execution Notes"
+                      rows={[
+                        {
+                          label: "Live binding note",
+                          value: selectedMetric.liveBindingNote,
+                        },
+                        {
+                          label: "Integration note",
+                          value:
+                            selectedMetric.integrationNote ??
+                            "No extra integration note is documented yet.",
+                        },
+                        {
+                          label: "Signal rule",
+                          value:
+                            selectedMetric.signalRule ??
+                            "This metric is not currently defined as a custom signal rule.",
+                        },
+                      ]}
+                    />
+                    <InspectorCard
+                      title="Admin Surface"
+                      rows={[
+                        {
+                          label: "Edit recommendation",
+                          value: selectedMetric.adminRecommendation,
+                        },
+                        {
+                          label: "Protected reason",
+                          value: selectedMetric.protectedReason,
+                        },
+                      ]}
+                    />
+                  </div>
 
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <TagSection
-                  title="Raw Fields"
-                  items={selectedMetric.rawFields}
-                  emptyLabel="No raw field list is documented yet."
-                />
-                <TagSection
-                  title="Derived From"
-                  items={selectedMetric.derivedFrom}
-                  emptyLabel="This metric is treated as a base metric right now."
-                />
-                <TagSection
-                  title="Where Used"
-                  items={selectedMetric.dashboardUsage}
-                  emptyLabel="No dashboard usage has been tagged yet."
-                />
-                <TagSection
-                  title="Implementation Locations"
-                  items={selectedMetric.implementationLocations}
-                  emptyLabel="No implementation location has been tagged yet."
-                />
-                <TagSection
-                  title="Editable Fields"
-                  items={selectedMetric.editableFields}
-                  emptyLabel="This metric is inspect-only in the current plan."
-                />
-                <TagSection
-                  title="Protected Fields"
-                  items={selectedMetric.protectedFields}
-                  emptyLabel="No protected fields are listed."
-                />
-              </div>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2">
+                    <TagSection
+                      title="Saved Overrides"
+                      items={selectedMetric.adminOverrideSummary}
+                      emptyLabel="No admin override is saved for this metric yet."
+                    />
+                    <TagSection
+                      title="Editable Fields"
+                      items={selectedMetric.editableFields}
+                      emptyLabel="This metric is inspect-only in the current plan."
+                    />
+                    <TagSection
+                      title="Raw Fields"
+                      items={selectedMetric.rawFields}
+                      emptyLabel="No raw field list is documented yet."
+                    />
+                    <TagSection
+                      title="Derived From"
+                      items={selectedMetric.derivedFrom}
+                      emptyLabel="This metric is treated as a base metric right now."
+                    />
+                    <TagSection
+                      title="Where Used"
+                      items={selectedMetric.dashboardUsage}
+                      emptyLabel="No dashboard usage has been tagged yet."
+                    />
+                    <TagSection
+                      title="Implementation Locations"
+                      items={selectedMetric.implementationLocations}
+                      emptyLabel="No implementation location has been tagged yet."
+                    />
+                    <TagSection
+                      title="Protected Fields"
+                      items={selectedMetric.protectedFields}
+                      emptyLabel="No protected fields are listed."
+                    />
+                  </div>
+
+                  <MetricControlCard
+                    metric={selectedMetric}
+                    draft={draft}
+                    onDraftChange={setDraft}
+                    onSave={() => void handleSaveOverride()}
+                    onReset={() => void handleResetOverride()}
+                    isSaving={isSaving}
+                    isResetting={isResetting}
+                  />
+                </>
+              ) : (
+                <div className="rounded-[22px] border border-[var(--line)] bg-[rgba(255,255,255,0.62)] p-4 text-sm text-[var(--muted)]">
+                  Pick a metric from the catalog to inspect it.
+                </div>
+              )}
             </div>
           </div>
         </Section>
       </div>
     </AppShell>
+  );
+}
+
+function MetricControlCard({
+  metric,
+  draft,
+  onDraftChange,
+  onSave,
+  onReset,
+  isSaving,
+  isResetting,
+}: {
+  metric: MetricRegistryEntry;
+  draft: MetricOverrideDraft;
+  onDraftChange: (draft: MetricOverrideDraft) => void;
+  onSave: () => void;
+  onReset: () => void;
+  isSaving: boolean;
+  isResetting: boolean;
+}) {
+  const hasControls =
+    metric.editability === "controlled_mapping" &&
+    (metric.controlOptions.revenueBasisOptions.length > 0 ||
+      metric.controlOptions.denominatorOptions.length > 0 ||
+      metric.controlOptions.channelOptions.length > 0 ||
+      metric.controlOptions.benchmarkEnabled);
+
+  return (
+    <div className="mt-4 rounded-[22px] border border-[var(--line)] bg-[rgba(255,255,255,0.62)] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+            Controlled Admin Edit
+          </div>
+          <div className="mt-2 text-lg font-semibold text-[var(--ink)]">
+            {hasControls
+              ? "Adjust the safe mapping layer"
+              : "This metric stays inspect-first"}
+          </div>
+        </div>
+        {metric.adminOverride?.updatedAt ? (
+          <div className="text-xs text-[var(--muted)]">
+            Last saved {new Date(metric.adminOverride.updatedAt).toLocaleString()}
+          </div>
+        ) : null}
+      </div>
+
+      {hasControls ? (
+        <>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {metric.controlOptions.revenueBasisOptions.length ? (
+              <FieldBlock label="Revenue Basis">
+                <select
+                  value={draft.revenueBasis}
+                  onChange={(event) =>
+                    onDraftChange({
+                      ...draft,
+                      revenueBasis: event.target.value as MetricRevenueBasis | "",
+                    })
+                  }
+                  className="w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.88)] px-4 py-3 text-sm text-[var(--ink)] outline-none"
+                >
+                  <option value="">Use code default</option>
+                  {metric.controlOptions.revenueBasisOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </FieldBlock>
+            ) : null}
+
+            {metric.controlOptions.denominatorOptions.length ? (
+              <FieldBlock label="Denominator Choice">
+                <select
+                  value={draft.denominatorChoice}
+                  onChange={(event) =>
+                    onDraftChange({
+                      ...draft,
+                      denominatorChoice: event.target.value as
+                        | MetricDenominatorChoice
+                        | "",
+                    })
+                  }
+                  className="w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.88)] px-4 py-3 text-sm text-[var(--ink)] outline-none"
+                >
+                  <option value="">Use code default</option>
+                  {metric.controlOptions.denominatorOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </FieldBlock>
+            ) : null}
+          </div>
+
+          {metric.controlOptions.channelOptions.length ? (
+            <FieldBlock label="Included Channels">
+              <div className="mt-1 flex flex-wrap gap-3">
+                {metric.controlOptions.channelOptions.map((option) => {
+                  const checked = draft.includedChannels.includes(
+                    option.value as MetricChannel
+                  );
+                  return (
+                    <label
+                      key={option.value}
+                      className="flex items-center gap-2 rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-4 py-3 text-sm text-[var(--ink)]"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(event) => {
+                          const nextChannels = event.target.checked
+                            ? [...draft.includedChannels, option.value as MetricChannel]
+                            : draft.includedChannels.filter(
+                                (channel) => channel !== option.value
+                              );
+                          onDraftChange({
+                            ...draft,
+                            includedChannels: sortChannels(nextChannels),
+                          });
+                        }}
+                      />
+                      <span>{option.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </FieldBlock>
+          ) : null}
+
+          {metric.controlOptions.benchmarkEnabled ? (
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <FieldBlock label="Benchmark Direction">
+                <select
+                  value={draft.benchmarkDirection}
+                  onChange={(event) =>
+                    onDraftChange({
+                      ...draft,
+                      benchmarkDirection: event.target.value as
+                        | MetricBenchmarkDirection
+                        | "",
+                    })
+                  }
+                  className="w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.88)] px-4 py-3 text-sm text-[var(--ink)] outline-none"
+                >
+                  <option value="">Use code default</option>
+                  <option value="higher_is_better">Higher is better</option>
+                  <option value="lower_is_better">Lower is better</option>
+                </select>
+              </FieldBlock>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <FieldBlock label="Good">
+                  <input
+                    value={draft.benchmarkGood}
+                    onChange={(event) =>
+                      onDraftChange({ ...draft, benchmarkGood: event.target.value })
+                    }
+                    placeholder="e.g. 3"
+                    className="w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.88)] px-4 py-3 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]"
+                  />
+                </FieldBlock>
+                <FieldBlock label="Watch">
+                  <input
+                    value={draft.benchmarkWatch}
+                    onChange={(event) =>
+                      onDraftChange({ ...draft, benchmarkWatch: event.target.value })
+                    }
+                    placeholder="e.g. 2"
+                    className="w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.88)] px-4 py-3 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]"
+                  />
+                </FieldBlock>
+                <FieldBlock label="Risk">
+                  <input
+                    value={draft.benchmarkRisk}
+                    onChange={(event) =>
+                      onDraftChange({ ...draft, benchmarkRisk: event.target.value })
+                    }
+                    placeholder="e.g. 1"
+                    className="w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.88)] px-4 py-3 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]"
+                  />
+                </FieldBlock>
+              </div>
+            </div>
+          ) : null}
+
+          <FieldBlock label="Admin Notes">
+            <textarea
+              value={draft.adminNotes}
+              onChange={(event) =>
+                onDraftChange({ ...draft, adminNotes: event.target.value })
+              }
+              rows={4}
+              placeholder="Document why this metric uses this mapping for your team."
+              className="mt-1 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.88)] px-4 py-3 text-sm text-[var(--ink)] outline-none placeholder:text-[var(--muted)]"
+            />
+          </FieldBlock>
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={isSaving}
+              className="rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSaving ? "Saving..." : "Save Override"}
+            </button>
+            <button
+              type="button"
+              onClick={onReset}
+              disabled={isResetting}
+              className="rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-4 py-3 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isResetting ? "Clearing..." : "Reset To Code Default"}
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="mt-4 text-sm leading-6 text-[var(--muted)]">
+          This metric can be inspected here, but its executable logic should remain in code until the dashboard has a stronger rules engine or a more centralized live binding.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FieldBlock({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+        {label}
+      </div>
+      <div className="mt-2">{children}</div>
+    </div>
   );
 }
 
@@ -363,6 +840,50 @@ function TagSection({
   );
 }
 
+function InlineNotice({
+  message,
+  tone,
+}: {
+  message: string | null;
+  tone: "good" | "warn";
+}) {
+  if (!message) {
+    return null;
+  }
+
+  return (
+    <div
+      className={`rounded-[22px] border px-4 py-3 text-sm ${
+        tone === "good"
+          ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+          : "border-amber-300 bg-amber-50 text-amber-900"
+      }`}
+    >
+      {message}
+    </div>
+  );
+}
+
+function StorageNotice({ storage }: { storage: MetricRegistryResponse["storage"] | null }) {
+  if (!storage) {
+    return null;
+  }
+
+  return (
+    <div
+      className={`rounded-[22px] border px-4 py-3 text-sm ${
+        storage.durable
+          ? "border-cyan-300 bg-cyan-50 text-cyan-950"
+          : "border-amber-300 bg-amber-50 text-amber-950"
+      }`}
+    >
+      {storage.durable
+        ? `Metric override storage is durable through ${storage.location}. Saved admin controls should persist across refreshes and deployments.`
+        : `Metric override storage is temporary right now through ${storage.location}. Saved edits can reset after refreshes or deployments until durable storage is configured.`}
+    </div>
+  );
+}
+
 function RegistryPill({
   label,
   tone,
@@ -371,6 +892,38 @@ function RegistryPill({
   tone: "good" | "warn" | "default";
 }) {
   return <SourcePill label={label} tone={tone} />;
+}
+
+function buildOverrideDraft(override: MetricAdminOverride | null): MetricOverrideDraft {
+  return {
+    revenueBasis: override?.revenueBasis ?? "",
+    denominatorChoice: override?.denominatorChoice ?? "",
+    includedChannels: sortChannels(override?.includedChannels ?? []),
+    benchmarkDirection: override?.benchmarkDirection ?? "",
+    benchmarkGood: stringifyDraftNumber(override?.benchmarkGood ?? null),
+    benchmarkWatch: stringifyDraftNumber(override?.benchmarkWatch ?? null),
+    benchmarkRisk: stringifyDraftNumber(override?.benchmarkRisk ?? null),
+    adminNotes: override?.adminNotes ?? "",
+  };
+}
+
+function stringifyDraftNumber(value: number | null) {
+  return value === null ? "" : `${value}`;
+}
+
+function parseDraftNumber(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function sortChannels(channels: MetricChannel[]) {
+  return [...channels].sort();
 }
 
 function formatBindingStatus(status: MetricRegistryEntry["bindingStatus"]) {
