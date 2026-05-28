@@ -322,7 +322,14 @@ export function AppShell({
                       </p>
                     </div>
 
-                    <div className="flex flex-wrap items-start gap-2 2xl:justify-end">
+                    <div className="flex flex-col items-start gap-2 2xl:items-end">
+                      <ScopeControlCard
+                        portfolioMode={portfolioMode}
+                        activeClientId={activeClientId}
+                        clients={clients}
+                        isLoadingClients={isLoadingClients}
+                        onClientSwitch={handleClientSwitch}
+                      />
                       {showDateController ? (
                         <DateControlCard
                           activeLabel={dashboardDate.activeLabel}
@@ -333,13 +340,6 @@ export function AppShell({
                           onApplyCustomRange={applyCustomRange}
                         />
                       ) : null}
-                      <ScopeControlCard
-                        portfolioMode={portfolioMode}
-                        activeClientId={activeClientId}
-                        clients={clients}
-                        isLoadingClients={isLoadingClients}
-                        onClientSwitch={handleClientSwitch}
-                      />
                     </div>
                   </div>
                 </div>
