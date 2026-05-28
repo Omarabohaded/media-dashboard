@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Workflow } from "lucide-react";
 import { AppShell, MiniMetric, Section, StatusPill } from "@/components/AppShell";
@@ -518,6 +519,58 @@ export default function AdminPage() {
           }
           tone={clientStorage?.durable ? "info" : "warn"}
         />
+
+        <Section
+          title="Metric Logic"
+          subtitle="Inspect how each dashboard metric is defined, what it maps to today, and which parts are safe for future controlled admin editing."
+        >
+          <div className="grid gap-5 xl:grid-cols-[1.1fr,0.9fr]">
+            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-black uppercase text-slate-400">
+                    Metric Registry Workspace
+                  </div>
+                  <h3 className="mt-2 text-2xl font-black text-white">
+                    View metric mappings before editing them
+                  </h3>
+                </div>
+                <StatusPill status="Live" />
+              </div>
+              <div className="mt-4 text-sm leading-6 text-slate-300">
+                Use the registry to inspect source truth, current field binding,
+                aggregation style, derived inputs, and whether a metric should stay
+                code-managed or can later support structured admin overrides.
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <Link
+                  href="/admin/metrics"
+                  className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-500"
+                >
+                  Open Metric Registry
+                </Link>
+                <div className="rounded-xl border border-slate-700 px-4 py-3 text-sm text-slate-300">
+                  Best place to review: Total Ad Spend, Store Revenue, MER, Blended ROAS, CPA / CAC
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
+              <MiniMetric
+                label="Registry Goal"
+                value="Inspect First"
+                hint="This keeps metric governance safe before any admin-editable layer is added."
+                tone="good"
+              />
+              <MiniMetric
+                label="Safe Edit Surface"
+                value="Controlled"
+                hint="Mappings, thresholds, and denominator choices can become editable later without exposing raw formula code."
+                tone="warn"
+              />
+            </div>
+          </div>
+        </Section>
 
         <Section
           title="Client Onboarding"
