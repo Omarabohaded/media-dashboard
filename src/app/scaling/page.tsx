@@ -8,6 +8,11 @@ import {
   Section,
   SourcePill,
 } from "@/components/AppShell";
+import {
+  getEffectiveMer,
+  getEffectiveStoreRevenue,
+  getRevenueBasisLabel,
+} from "@/lib/dashboardMetricLogic";
 import { getFunnelReadiness } from "@/lib/funnelReadiness";
 import { evaluateScaling } from "@/lib/scalingEngine";
 import { useDashboardReadiness } from "@/lib/useDashboardReadiness";
@@ -36,16 +41,17 @@ export default function ScalingPage() {
     metaStatus,
     storePreview,
     storeStatus,
+    metricLogic,
   } = useDashboardReadiness();
 
   const hasMeta = Boolean(metaPreview && metaStatus?.selectedAccountId);
   const hasStoreTruth = Boolean(storePreview);
   const hasStoreAnalytics = false;
   const totalSpend = metaPreview?.totals.spend ?? 0;
-  const storeRevenue = storePreview?.grossSales ?? 0;
+  const storeRevenue = getEffectiveStoreRevenue(storePreview, metricLogic);
   const blendedRoas =
     hasMeta && totalSpend > 0 ? metaPreview!.totals.purchaseValue / totalSpend : 0;
-  const mer = hasMeta && hasStoreTruth && totalSpend > 0 ? storeRevenue / totalSpend : 0;
+  const mer = getEffectiveMer(storePreview, metaPreview, metricLogic) ?? 0;
   const purchaseVolume = metaPreview?.totals.purchases ?? 0;
   const averageFrequency =
     metaPreview && metaPreview.rows.length
@@ -245,7 +251,7 @@ export default function ScalingPage() {
             <MiniMetric
               label="Store Revenue"
               value={hasStoreTruth ? formatMoney(storeRevenue, storePreview!.currencyCode) : "Waiting"}
-              hint="Website truth"
+              hint={hasStoreTruth ? getRevenueBasisLabel(metricLogic.storeRevenueBasis) : "Website truth"}
               tone={hasStoreTruth ? "good" : "warn"}
             />
             <MiniMetric
@@ -257,7 +263,7 @@ export default function ScalingPage() {
             <MiniMetric
               label="MER"
               value={hasMeta && hasStoreTruth ? `${formatNumber(mer, 2)}x` : "Not ready"}
-              hint="Store revenue divided by ad spend"
+              hint={`${getRevenueBasisLabel(metricLogic.merRevenueBasis)} divided by ad spend`}
               tone={hasMeta && hasStoreTruth ? "good" : "warn"}
             />
             <MiniMetric
