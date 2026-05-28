@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Workflow } from "lucide-react";
-import { AppShell, MiniMetric, Section, StatusPill } from "@/components/AppShell";
+import { AppShell, StatusPill } from "@/components/AppShell";
 import {
   getCurrencyMeta,
   SUPPORTED_CLIENT_CURRENCIES,
@@ -93,6 +93,17 @@ type SyncStateResponse = {
   note: string;
 };
 
+const fieldClass =
+  "w-full rounded-[12px] border border-[var(--line)] bg-white/75 px-3 py-2.5 text-sm font-medium text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:bg-white";
+const primaryButtonClass =
+  "rounded-[12px] bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90";
+const secondaryButtonClass =
+  "rounded-[12px] border border-[var(--line)] bg-white/62 px-4 py-2.5 text-sm font-semibold text-[var(--ink)] transition hover:border-[var(--accent)] hover:bg-white";
+const dangerButtonClass =
+  "rounded-[12px] border border-rose-300 bg-rose-50 px-4 py-2.5 text-sm font-semibold text-rose-800 transition hover:border-rose-400 hover:bg-rose-100";
+const warningButtonClass =
+  "rounded-[12px] border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-900 transition hover:border-amber-400 hover:bg-amber-100";
+
 function Notice({
   message,
   tone = "info",
@@ -106,10 +117,10 @@ function Notice({
 
   const styles =
     tone === "info"
-      ? "border-cyan-500/30 bg-cyan-950/20 text-cyan-200"
-      : "border-amber-500/30 bg-amber-950/20 text-amber-200";
+      ? "border-cyan-200 bg-cyan-50 text-cyan-950"
+      : "border-amber-200 bg-amber-50 text-amber-950";
 
-  return <div className={`rounded-2xl border p-4 text-sm ${styles}`}>{message}</div>;
+  return <div className={`rounded-[14px] border px-3 py-2.5 text-sm ${styles}`}>{message}</div>;
 }
 
 function MissingEnv({ values }: { values: string[] }) {
@@ -118,20 +129,116 @@ function MissingEnv({ values }: { values: string[] }) {
   }
 
   return (
-    <div className="rounded-2xl border border-red-500/30 bg-red-950/20 p-4">
-      <div className="text-sm font-black uppercase text-red-300">
+    <div className="rounded-[14px] border border-rose-200 bg-rose-50 px-3 py-3">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-800">
         Missing Environment Values
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-2 flex flex-wrap gap-2">
         {values.map((value) => (
           <span
             key={value}
-            className="rounded-full bg-red-950/60 px-3 py-1 text-xs font-bold text-red-200"
+            className="rounded-full border border-rose-200 bg-white/75 px-2.5 py-1 text-xs font-semibold text-rose-800"
           >
             {value}
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+function AdminPanel({
+  title,
+  eyebrow,
+  description,
+  action,
+  children,
+}: {
+  title: string;
+  eyebrow?: string;
+  description?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-[18px] border border-[var(--line)] bg-white/58 p-4 shadow-[0_12px_30px_rgba(20,34,24,0.05)]">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3 border-b border-[var(--line)] pb-3">
+        <div className="min-w-0">
+          {eyebrow ? (
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+              {eyebrow}
+            </div>
+          ) : null}
+          <h2 className="mt-1 text-lg font-semibold tracking-tight text-[var(--ink)]">
+            {title}
+          </h2>
+          {description ? (
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--muted)]">
+              {description}
+            </p>
+          ) : null}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function AdminBlock({
+  title,
+  description,
+  action,
+  children,
+}: {
+  title: string;
+  description?: string;
+  action?: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="rounded-[16px] border border-[var(--line)] bg-white/52 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold text-[var(--ink)]">{title}</div>
+          {description ? (
+            <div className="mt-1 text-sm leading-5 text-[var(--muted)]">{description}</div>
+          ) : null}
+        </div>
+        {action}
+      </div>
+      {children ? <div className="mt-3">{children}</div> : null}
+    </div>
+  );
+}
+
+function AdminStat({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
+  return (
+    <div className="rounded-[14px] border border-[var(--line)] bg-white/45 px-3 py-3">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+        {label}
+      </div>
+      <div className="mt-1 text-lg font-semibold leading-6 text-[var(--ink)]">{value}</div>
+      {hint ? <div className="mt-1 text-xs leading-5 text-[var(--muted)]">{hint}</div> : null}
+    </div>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--line)] py-2.5 last:border-b-0">
+      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+        {label}
+      </div>
+      <div className="max-w-full text-right text-sm font-medium text-[var(--ink)]">{value}</div>
     </div>
   );
 }
@@ -163,34 +270,34 @@ function MetaAccountSearchPicker({
   }, [accounts, normalizedSearch]);
 
   return (
-    <div className="mt-3 space-y-3">
+    <div className="space-y-3">
       <label className="block">
-        <span className="text-xs font-black uppercase text-slate-400">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
           Search by account name or ID
         </span>
         <input
           value={searchValue}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder="Type account name, ID, or currency"
-          className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+          className={`mt-2 ${fieldClass}`}
         />
       </label>
 
       {selectedAccount ? (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-4 py-3 text-sm">
-          <div className="text-xs font-black uppercase text-emerald-200">
+        <div className="rounded-[14px] border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-800">
             Selected for this client
           </div>
-          <div className="mt-1 font-bold text-white">{selectedAccount.name}</div>
-          <div className="mt-1 text-xs text-emerald-100">
+          <div className="mt-1 font-semibold text-[var(--ink)]">{selectedAccount.name}</div>
+          <div className="mt-1 text-xs text-emerald-900">
             {selectedAccount.id}
             {selectedAccount.currency ? ` · ${selectedAccount.currency}` : ""}
           </div>
         </div>
       ) : null}
 
-      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/70">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-800 px-4 py-2 text-xs text-slate-400">
+      <div className="overflow-hidden rounded-[14px] border border-[var(--line)] bg-white/48">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--line)] px-3 py-2 text-xs text-[var(--muted)]">
           <span>
             {filteredAccounts.length} of {accounts.length} accounts
           </span>
@@ -198,7 +305,7 @@ function MetaAccountSearchPicker({
             <button
               type="button"
               onClick={() => onSearchChange("")}
-              className="font-bold text-cyan-200 transition hover:text-white"
+              className="font-semibold text-[var(--accent)] transition hover:opacity-80"
             >
               Clear search
             </button>
@@ -207,11 +314,11 @@ function MetaAccountSearchPicker({
 
         <div className="max-h-72 overflow-y-auto">
           {!accounts.length ? (
-            <div className="px-4 py-4 text-sm text-slate-400">
+            <div className="px-3 py-4 text-sm text-[var(--muted)]">
               Connect Meta first so available ad accounts can load here.
             </div>
           ) : !filteredAccounts.length ? (
-            <div className="px-4 py-4 text-sm text-slate-400">
+            <div className="px-3 py-4 text-sm text-[var(--muted)]">
               No ad accounts match this search. Try the account name or the numeric ID.
             </div>
           ) : (
@@ -223,22 +330,22 @@ function MetaAccountSearchPicker({
                   type="button"
                   key={account.id}
                   onClick={() => onSelect(account.id)}
-                  className={`block w-full border-b border-slate-800 px-4 py-3 text-left text-sm transition last:border-b-0 ${
+                  className={`block w-full border-b border-[var(--line)] px-3 py-3 text-left text-sm transition last:border-b-0 ${
                     isSelected
-                      ? "bg-emerald-950/30 text-white"
-                      : "text-slate-200 hover:bg-slate-900"
+                      ? "bg-emerald-50 text-[var(--ink)]"
+                      : "text-[var(--ink)] hover:bg-white/75"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="truncate font-bold">{account.name}</div>
-                      <div className="mt-1 break-all text-xs text-slate-400">
+                      <div className="truncate font-semibold">{account.name}</div>
+                      <div className="mt-1 break-all text-xs text-[var(--muted)]">
                         {account.id}
                         {account.currency ? ` · ${account.currency}` : ""}
                       </div>
                     </div>
                     {isSelected ? (
-                      <span className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-bold text-emerald-100">
+                      <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-900">
                         Selected
                       </span>
                     ) : null}
@@ -627,383 +734,289 @@ export default function AdminPage() {
 
   return (
     <AppShell>
-      <div className="space-y-5">
+      <div className="space-y-4">
         <Notice
           message={
             clientStorage
               ? clientStorage.durable
-                ? `Client storage is durable now. Data is stored through ${clientStorage.location}, so refreshes and future deployments should not wipe your clients.`
-                : `Client storage is still temporary right now. It is using ${clientStorage.location}, which can reset after refreshes or deployments until durable storage is configured.`
+                ? `Client storage is durable now through ${clientStorage.location}.`
+                : `Client storage is temporary through ${clientStorage.location}. Configure durable storage before relying on saved client setup.`
               : null
           }
           tone={clientStorage?.durable ? "info" : "warn"}
         />
 
-        <Section
-          title="Metric Logic"
-          subtitle="Inspect how each dashboard metric is defined, what it maps to today, and which parts are safe for future controlled admin editing."
-        >
-          <div className="grid gap-5 xl:grid-cols-[1.1fr,0.9fr]">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,0.9fr),minmax(420px,1.1fr)]">
+          <AdminPanel
+            eyebrow="Client Setup"
+            title="Active Client"
+            description="Switch client context, confirm reporting basics, and keep onboarding state tied to the right store."
+            action={<StatusPill status={activeClient ? "Selected" : "Choose client"} />}
+          >
+            <div className="rounded-[16px] border border-[var(--line)] bg-[rgba(255,255,255,0.64)] p-4">
+              <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
-                  <div className="text-sm font-black uppercase text-slate-400">
-                    Metric Registry Workspace
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                    Current Workspace
                   </div>
-                  <h3 className="mt-2 text-2xl font-black text-white">
-                    View metric mappings before editing them
-                  </h3>
-                </div>
-                <StatusPill status="Live" />
-              </div>
-              <div className="mt-4 text-sm leading-6 text-slate-300">
-                Use the registry to inspect source truth, current field binding,
-                aggregation style, derived inputs, and whether a metric should stay
-                code-managed or can later support structured admin overrides.
-              </div>
-              <div className="mt-4 flex flex-wrap gap-3">
-                <Link
-                  href="/admin/metrics"
-                  className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-500"
-                >
-                  Open Metric Registry
-                </Link>
-                <div className="rounded-xl border border-slate-700 px-4 py-3 text-sm text-slate-300">
-                  Best place to review: Total Ad Spend, Store Revenue, MER, Blended ROAS, CPA / CAC
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
-              <MiniMetric
-                label="Registry Goal"
-                value="Inspect First"
-                hint="This keeps metric governance safe before any admin-editable layer is added."
-                tone="good"
-              />
-              <MiniMetric
-                label="Safe Edit Surface"
-                value="Controlled"
-                hint="Mappings, thresholds, and denominator choices can become editable later without exposing raw formula code."
-                tone="warn"
-              />
-            </div>
-          </div>
-        </Section>
-
-        <Section
-          title="Client Onboarding"
-          subtitle="Create a client first, choose the website type, and set the main reporting currency."
-        >
-          <div className="grid gap-5 xl:grid-cols-[1.05fr,0.95fr]">
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-black uppercase text-slate-400">
-                    Active Client
-                  </div>
-                  <h3 className="mt-2 text-2xl font-black text-white">
+                  <div className="mt-1 text-2xl font-semibold tracking-tight text-[var(--ink)]">
                     {activeClient?.name ?? "No client selected"}
-                  </h3>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <StatusPill status={activeClient?.websitePlatform ?? "Website pending"} />
+                    <StatusPill
+                      status={
+                        activeClient
+                          ? getCurrencyMeta(activeClient.currencyCode).label
+                          : "Currency pending"
+                      }
+                    />
+                    <StatusPill status={`${clients.length} saved clients`} />
+                  </div>
                 </div>
-                <StatusPill status={activeClient ? "Good" : "Watch"} />
-              </div>
-
-              <div className="mt-4 grid gap-4 md:grid-cols-2">
-                <MiniMetric
-                  label="Website Type"
-                  value={activeClient?.websitePlatform ?? "Not set"}
-                  hint="Used to decide which truth source connects next."
-                  tone="warn"
-                />
-                <MiniMetric
-                  label="Client Currency"
-                  value={
-                    activeClient
-                      ? getCurrencyMeta(activeClient.currencyCode).label
-                      : "Not set"
-                  }
-                  hint="This is the client reporting currency across the dashboard."
-                  tone="good"
-                />
-                <MiniMetric
-                  label="Saved Clients"
-                  value={`${clients.length}`}
-                  hint="Each client keeps its own Meta and Shopify connection state."
-                  tone="good"
-                />
-                <MiniMetric
-                  label="Meta State"
-                  value={metaStatus?.connected ? "Connected" : "Pending"}
-                  hint={metaStatus?.recommendedNextStep ?? "Connect Meta for this client"}
-                  tone={metaStatus?.connected ? "good" : "warn"}
-                />
-              </div>
-
-              <div className="mt-4">
-                <div className="text-xs font-black uppercase text-slate-400">
-                  Client Selector
+                <div className="w-full sm:w-72">
+                  <label className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                    Client Selector
+                  </label>
+                  <select
+                    value={activeClientId}
+                    onChange={(event) => handleClientSelection(event.target.value)}
+                    className={`mt-2 ${fieldClass}`}
+                  >
+                    {clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.name} · {client.websitePlatform} · {client.currencyCode}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <select
-                  value={activeClientId}
-                  onChange={(event) => handleClientSelection(event.target.value)}
-                  className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
-                >
-                  {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name} · {client.websitePlatform} · {client.currencyCode}
-                    </option>
-                  ))}
-                </select>
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-5">
-              <div className="text-sm font-black uppercase text-slate-400">
-                Add New Client
-              </div>
-              <div className="mt-4 grid gap-4">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <AdminStat
+                label="Website Type"
+                value={activeClient?.websitePlatform ?? "Not set"}
+                hint="Determines the storefront truth source."
+              />
+              <AdminStat
+                label="Meta State"
+                value={metaStatus?.connected ? "Connected" : "Pending"}
+                hint={metaStatus?.recommendedNextStep ?? "Connect Meta for this client."}
+              />
+            </div>
+
+            <div className="mt-4 border-t border-[var(--line)] pt-4">
+              <div className="text-sm font-semibold text-[var(--ink)]">Add New Client</div>
+              <div className="mt-3 grid gap-3">
                 <input
                   value={clientNameDraft}
                   onChange={(event) => setClientNameDraft(event.target.value)}
                   placeholder="Client name"
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                  className={fieldClass}
                 />
-                <select
-                  value={websitePlatformDraft}
-                  onChange={(event) =>
-                    setWebsitePlatformDraft(event.target.value as WebsitePlatform)
-                  }
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
-                >
-                  <option value="shopify">Shopify</option>
-                  <option value="wordpress">WordPress / WooCommerce</option>
-                  <option value="salla">Salla</option>
-                  <option value="wix">Wix</option>
-                  <option value="custom">Other / Custom</option>
-                </select>
-                <select
-                  value={currencyCodeDraft}
-                  onChange={(event) =>
-                    setCurrencyCodeDraft(event.target.value as ClientCurrencyCode)
-                  }
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
-                >
-                  {SUPPORTED_CLIENT_CURRENCIES.map((currency) => (
-                    <option key={currency.code} value={currency.code}>
-                      {currency.label}
-                    </option>
-                  ))}
-                </select>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <select
+                    value={websitePlatformDraft}
+                    onChange={(event) =>
+                      setWebsitePlatformDraft(event.target.value as WebsitePlatform)
+                    }
+                    className={fieldClass}
+                  >
+                    <option value="shopify">Shopify</option>
+                    <option value="wordpress">WordPress / WooCommerce</option>
+                    <option value="salla">Salla</option>
+                    <option value="wix">Wix</option>
+                    <option value="custom">Other / Custom</option>
+                  </select>
+                  <select
+                    value={currencyCodeDraft}
+                    onChange={(event) =>
+                      setCurrencyCodeDraft(event.target.value as ClientCurrencyCode)
+                    }
+                    className={fieldClass}
+                  >
+                    {SUPPORTED_CLIENT_CURRENCIES.map((currency) => (
+                      <option key={currency.code} value={currency.code}>
+                        {currency.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <textarea
                   value={notesDraft}
                   onChange={(event) => setNotesDraft(event.target.value)}
                   rows={3}
                   placeholder="Optional notes"
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                  className={fieldClass}
                 />
               </div>
 
-              <div className="mt-4 space-y-4">
+              <div className="mt-3">
                 <Notice message={clientMessage} />
               </div>
 
-              <div className="mt-4 flex flex-wrap gap-3">
+              <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
                   onClick={() => void handleCreateClient()}
-                  className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-500"
+                  className={primaryButtonClass}
                 >
                   Create Client
                 </button>
                 <button
                   type="button"
                   onClick={() => void loadClients(activeClientId)}
-                  className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-slate-500 hover:text-white"
+                  className={secondaryButtonClass}
                 >
                   Refresh Clients
                 </button>
                 <button
                   type="button"
                   onClick={() => void handleDeleteClient()}
-                  className="rounded-xl border border-red-500/40 px-4 py-3 text-sm font-bold text-red-200 transition hover:border-red-400 hover:text-white"
+                  className={dangerButtonClass}
                 >
                   Delete Active Client
                 </button>
               </div>
             </div>
-          </div>
-        </Section>
+          </AdminPanel>
 
-        <div className="grid gap-5 xl:grid-cols-3">
-          <Section
+          <AdminPanel
+            eyebrow="Source Setup"
             title="Meta Connection"
-            subtitle="Use the official Meta app flow, then search and save the correct ad account to the active client."
+            description="Connect Meta, choose the exact ad account, and preview source data before syncing."
+            action={<StatusPill status={metaReadyState} />}
           >
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-black uppercase text-slate-400">
-                  Current State
-                </div>
-                <div className="mt-2 text-2xl font-black text-white">
-                  {metaStatus?.connected
-                    ? "Connected for this client"
-                    : "Needs connection"}
-                </div>
-              </div>
-              <StatusPill status={metaReadyState} />
-            </div>
-
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <MiniMetric
-                label="Client"
-                value={metaStatus?.client.name ?? activeClient?.name ?? "None"}
-                hint={
-                  metaStatus?.client.currencyCode
-                    ? getCurrencyMeta(metaStatus.client.currencyCode).label
-                    : "Choose a client first"
-                }
-                tone="good"
+            <div className="grid gap-3 md:grid-cols-2">
+              <AdminStat
+                label="Connection"
+                value={metaStatus?.connected ? "Connected" : "Needs connection"}
+                hint={metaStatus?.appMode ? `App mode: ${metaStatus.appMode}` : "Use the official Meta flow."}
               />
-              <MiniMetric
+              <AdminStat
                 label="Selected Account"
                 value={metaStatus?.selectedAccount?.name ?? "Not selected"}
-                hint={metaStatus?.selectedAccountId ?? "Save an ad account to this client"}
-                tone={metaStatus?.selectedAccount ? "good" : "warn"}
+                hint={metaStatus?.selectedAccountId ?? "Save an ad account to this client."}
               />
             </div>
 
-            <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/40 p-4 text-sm text-slate-300">
-              <div className="font-black uppercase text-slate-400">Callback URL</div>
-              <div className="mt-2 break-all text-cyan-300">
-                {metaStatus?.callbackUrl ?? "/api/integrations/meta/callback"}
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-4">
-              <MissingEnv values={metaStatus?.missingEnv ?? []} />
-              <Notice message={metaStatus?.connectionError ?? null} tone="warn" />
-              <Notice message={metaMessage} />
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-3">
-              <a
-                href={
-                  activeClientId
-                    ? `/api/integrations/meta/connect?clientId=${encodeURIComponent(activeClientId)}`
-                    : "/admin"
-                }
-                className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-500"
+            <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr),minmax(300px,0.75fr)]">
+              <AdminBlock
+                title="Save Account To Client"
+                description="Search connected Meta accounts by name or ID, confirm the result, then save it to the active client."
+                action={<StatusPill status={accountDraft ? "Account chosen" : "Choose account"} />}
               >
-                {metaStatus?.connected ? "Reconnect Meta App" : "Connect Meta App"}
-              </a>
-              <button
-                type="button"
-                onClick={() => void loadMetaStatus(activeClientId)}
-                className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-slate-500 hover:text-white"
-              >
-                Refresh Status
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleDisconnectMeta()}
-                className="rounded-xl border border-red-500/40 px-4 py-3 text-sm font-bold text-red-200 transition hover:border-red-400 hover:text-white"
-              >
-                Disconnect
-              </button>
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <div className="text-xs font-black uppercase text-slate-400">
-                    Save Account To Client
-                  </div>
-                  <div className="mt-1 text-sm text-slate-300">
-                    Search the connected Meta accounts, confirm the ID, then save it to the active client.
-                  </div>
+                <MetaAccountSearchPicker
+                  accounts={metaStatus?.accounts ?? []}
+                  selectedAccountId={accountDraft}
+                  searchValue={accountSearchDraft}
+                  onSearchChange={setAccountSearchDraft}
+                  onSelect={setAccountDraft}
+                />
+                <div className="mt-3 text-xs leading-5 text-[var(--muted)]">
+                  Search matches both account name and account ID. Missing accounts usually mean the connected Meta user does not have access in Business Manager.
                 </div>
-                <StatusPill status={accountDraft ? "Account chosen" : "Choose account"} />
-              </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleSaveMetaAccount()}
+                    className={primaryButtonClass}
+                  >
+                    {metaStatus?.selectedAccountId === accountDraft
+                      ? "Saved To Client"
+                      : "Save Account To Client"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleLoadMetaPreview()}
+                    className={secondaryButtonClass}
+                  >
+                    Load Insights Preview
+                  </button>
+                </div>
+              </AdminBlock>
 
-              <MetaAccountSearchPicker
-                accounts={metaStatus?.accounts ?? []}
-                selectedAccountId={accountDraft}
-                searchValue={accountSearchDraft}
-                onSearchChange={setAccountSearchDraft}
-                onSelect={setAccountDraft}
-              />
+              <div className="space-y-3">
+                <AdminBlock title="Meta Actions">
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={
+                        activeClientId
+                          ? `/api/integrations/meta/connect?clientId=${encodeURIComponent(activeClientId)}`
+                          : "/admin"
+                      }
+                      className={primaryButtonClass}
+                    >
+                      {metaStatus?.connected ? "Reconnect Meta" : "Connect Meta"}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => void loadMetaStatus(activeClientId)}
+                      className={secondaryButtonClass}
+                    >
+                      Refresh
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDisconnectMeta()}
+                      className={dangerButtonClass}
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                </AdminBlock>
 
-              <div className="mt-3 text-xs text-slate-500">
-                Search matches both account name and account ID. If some ad accounts are missing, the connected Meta user usually does not have access to them in Business Manager.
-              </div>
+                <AdminBlock title="Callback URL">
+                  <div className="break-all text-sm font-medium text-[var(--accent)]">
+                    {metaStatus?.callbackUrl ?? "/api/integrations/meta/callback"}
+                  </div>
+                </AdminBlock>
 
-              <div className="mt-4 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => void handleSaveMetaAccount()}
-                  className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-500"
-                >
-                  {metaStatus?.selectedAccountId === accountDraft
-                    ? "Saved To Client"
-                    : "Save Account To Client"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleLoadMetaPreview()}
-                  className="rounded-xl border border-emerald-500/40 px-4 py-3 text-sm font-bold text-emerald-200 transition hover:border-emerald-400 hover:text-white"
-                >
-                  Load Insights Preview
-                </button>
+                <MissingEnv values={metaStatus?.missingEnv ?? []} />
+                <Notice message={metaStatus?.connectionError ?? null} tone="warn" />
+                <Notice message={metaMessage} />
               </div>
             </div>
-          </Section>
+          </AdminPanel>
+        </div>
 
-          <Section
-            title="Storefront Truth"
-            subtitle="Shopify and WordPress remain the first storefront types we support."
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr),minmax(360px,0.65fr)]">
+          <AdminPanel
+            eyebrow="Store Truth"
+            title="Storefront Connections"
+            description="Keep the website source visible without letting connection setup dominate the page."
           >
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="font-black text-white">Shopify</div>
-                    <div className="mt-1 text-sm text-slate-400">
-                      {shopifyStatus?.recommendedNextStep ?? "Checking Shopify status"}
-                    </div>
-                  </div>
-                  <StatusPill status={shopifyReadyState} />
-                </div>
-
-                <div className="mt-4 grid gap-4 md:grid-cols-2">
-                  <MiniMetric
+            <div className="grid gap-4 lg:grid-cols-2">
+              <AdminBlock
+                title="Shopify"
+                description={shopifyStatus?.recommendedNextStep ?? "Checking Shopify status"}
+                action={<StatusPill status={shopifyReadyState} />}
+              >
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <AdminStat
                     label="Client"
                     value={shopifyStatus?.client.name ?? activeClient?.name ?? "None"}
                     hint={
                       activeClient?.storeAccessDeclined
-                        ? "This client has chosen not to share website access right now."
-                        : "Shopify is now connected per client through store-owner approval."
+                        ? "Website access has been declined for now."
+                        : "Connected per client through store approval."
                     }
-                    tone="good"
                   />
-                  <MiniMetric
+                  <AdminStat
                     label="Connected Store"
                     value={shopifyStatus?.shopName ?? "Not connected"}
                     hint={
                       activeClient?.storeAccessDeclined
-                        ? "Store truth is optional for this client until they grant access."
-                        : shopifyStatus?.storeDomain ?? "Start the Shopify install flow for this client"
+                        ? "Store truth is optional until they opt in."
+                        : shopifyStatus?.storeDomain ?? "Start the Shopify install flow."
                     }
-                    tone={shopifyStatus?.connected ? "good" : "warn"}
                   />
                 </div>
 
                 <div className="mt-3 space-y-3">
                   <MissingEnv values={shopifyStatus?.missingEnv ?? []} />
-                  <Notice
-                    message={shopifyStatus?.connectionError ?? null}
-                    tone="warn"
-                  />
+                  <Notice message={shopifyStatus?.connectionError ?? null} tone="warn" />
                   <Notice
                     message={
                       activeClient?.storeAccessDeclined && !shopifyStatus?.connected
@@ -1015,38 +1028,38 @@ export default function AdminPage() {
                   <Notice message={shopifyMessage} />
                 </div>
 
-                <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                  <div className="text-xs font-black uppercase text-slate-400">
+                <div className="mt-4 border-t border-[var(--line)] pt-4">
+                  <label className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
                     Install Store To Client
-                  </div>
+                  </label>
                   <input
                     value={shopifyStoreDomainDraft}
                     onChange={(event) => setShopifyStoreDomainDraft(event.target.value)}
                     placeholder="your-store.myshopify.com"
-                    className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+                    className={`mt-2 ${fieldClass}`}
                   />
-                  <div className="mt-3 text-xs text-slate-500">
-                    This opens Shopify&apos;s approval screen so the store owner can install and approve access for this client store.
+                  <div className="mt-2 text-xs leading-5 text-[var(--muted)]">
+                    Opens Shopify approval so the store owner can approve access for this client store.
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-3">
+                  <div className="mt-4 flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={handleConnectShopify}
-                      className="rounded-xl bg-blue-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-blue-500"
+                      className={primaryButtonClass}
                     >
                       {shopifyStatus?.connected ? "Reconnect Shopify" : "Connect Shopify"}
                     </button>
                     <button
                       type="button"
                       onClick={() => void loadShopifyStatus(activeClientId)}
-                      className="rounded-xl border border-slate-700 px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-slate-500 hover:text-white"
+                      className={secondaryButtonClass}
                     >
-                      Refresh Status
+                      Refresh
                     </button>
                     <button
                       type="button"
                       onClick={() => void handleDisconnectShopify()}
-                      className="rounded-xl border border-red-500/40 px-4 py-3 text-sm font-bold text-red-200 transition hover:border-red-400 hover:text-white"
+                      className={dangerButtonClass}
                     >
                       Disconnect
                     </button>
@@ -1057,7 +1070,7 @@ export default function AdminPage() {
                           !(activeClient?.storeAccessDeclined ?? false)
                         )
                       }
-                      className="rounded-xl border border-amber-500/40 px-4 py-3 text-sm font-bold text-amber-200 transition hover:border-amber-400 hover:text-white"
+                      className={warningButtonClass}
                     >
                       {activeClient?.storeAccessDeclined
                         ? "Clear Declined Access"
@@ -1065,129 +1078,113 @@ export default function AdminPage() {
                     </button>
                   </div>
                 </div>
-              </div>
+              </AdminBlock>
 
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="font-black text-white">WordPress / WooCommerce</div>
-                    <div className="mt-1 text-sm text-slate-400">
-                      {wordpressStatus?.recommendedNextStep ??
-                        "Checking WordPress status"}
-                    </div>
-                  </div>
-                  <StatusPill status={wordpressReadyState} />
-                </div>
-                <div className="mt-3 space-y-3">
+              <AdminBlock
+                title="WordPress / WooCommerce"
+                description={wordpressStatus?.recommendedNextStep ?? "Checking WordPress status"}
+                action={<StatusPill status={wordpressReadyState} />}
+              >
+                <div className="space-y-3">
                   <MissingEnv values={wordpressStatus?.missingEnv ?? []} />
                   <Notice
                     message={wordpressStatus?.connectionError ?? wordpressMessage}
                     tone="warn"
                   />
+                  <div className="rounded-[14px] border border-[var(--line)] bg-white/45 px-3 py-3 text-sm leading-6 text-[var(--muted)]">
+                    The dashboard keeps the client website currency as the main truth. Platform currency differences can be converted underneath without changing the client currency itself.
+                  </div>
+                </div>
+              </AdminBlock>
+            </div>
+          </AdminPanel>
+
+          <div className="space-y-4">
+            <AdminPanel
+              eyebrow="Governance"
+              title="Metric Logic"
+              description="Review definitions and source mappings before exposing future admin-editable controls."
+              action={<StatusPill status="Live" />}
+            >
+              <div className="space-y-3">
+                <AdminBlock
+                  title="Metric Registry Workspace"
+                  description="Inspect source truth, field binding, aggregation style, and whether each metric should stay code-managed."
+                >
+                  <Link href="/admin/metrics" className={primaryButtonClass}>
+                    Open Metric Registry
+                  </Link>
+                </AdminBlock>
+                <AdminStat
+                  label="Review Priority"
+                  value="Ad Spend, Store Revenue, MER, Blended ROAS, CPA / CAC"
+                  hint="Keep governance focused on metrics that change media buying decisions."
+                />
+              </div>
+            </AdminPanel>
+
+            <AdminPanel
+              eyebrow="Preview"
+              title="Sync Checks"
+              description="Compact source-readiness checks for preview data and recent sync activity."
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <AdminStat
+                  label="Meta Preview Spend"
+                  value={
+                    metaPreview && metaStatus?.selectedAccount?.currency
+                      ? `${metaStatus.selectedAccount.currency} ${metaPreview.totals.spend.toFixed(0)}`
+                      : "Waiting"
+                  }
+                  hint="Live Meta preview"
+                />
+                <AdminStat
+                  label="Meta Preview Revenue"
+                  value={
+                    metaPreview && metaStatus?.selectedAccount?.currency
+                      ? `${metaStatus.selectedAccount.currency} ${metaPreview.totals.purchaseValue.toFixed(0)}`
+                      : "Waiting"
+                  }
+                  hint="Platform-attributed value"
+                />
+              </div>
+              <div className="mt-3 rounded-[14px] border border-[var(--line)] bg-white/45 px-3 py-2">
+                <DetailRow
+                  label="Storage"
+                  value={syncState?.storage.storageMode ?? "Not loaded"}
+                />
+                <DetailRow
+                  label="Location"
+                  value={syncState?.storage.location ?? "Storage pending"}
+                />
+                <DetailRow
+                  label="Recent Runs"
+                  value={`${syncState?.syncRuns.length ?? 0}`}
+                />
+              </div>
+
+              <div className="mt-3 rounded-[14px] border border-[var(--line)] bg-white/45 p-3">
+                <div className="flex items-center gap-2 text-[var(--ink)]">
+                  <Workflow size={15} />
+                  <div className="text-sm font-semibold">Latest Sync Notes</div>
+                </div>
+                <div className="mt-2 space-y-2 text-sm text-[var(--muted)]">
+                  {(syncState?.syncRuns ?? []).slice(0, 3).map((run) => (
+                    <div key={run.id} className="rounded-[12px] bg-white/62 px-3 py-2">
+                      <div className="font-semibold text-[var(--ink)]">
+                        {run.clientName ? `${run.clientName} · ` : ""}
+                        {run.platform} · {run.status}
+                      </div>
+                      <div className="mt-1 text-xs leading-5">
+                        {run.notes[0] ?? run.finishedAt ?? "No notes yet"}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-
-              <div className="rounded-2xl border border-slate-800 bg-slate-950/40 p-4 text-sm leading-6 text-slate-300">
-                The dashboard should keep the client&apos;s website currency as the
-                main truth. When a platform later reports in a different currency,
-                like Snapchat using only dollars, we will convert underneath that
-                layer rather than change the client currency itself.
-              </div>
-            </div>
-          </Section>
-
-          <Section
-            title="Preview And Sync"
-            subtitle="Quick checks while the real database layer is still the next step."
-          >
-            <div className="grid gap-4 md:grid-cols-2">
-              <MiniMetric
-                label="Meta Preview Spend"
-                value={
-                  metaPreview && metaStatus?.selectedAccount?.currency
-                    ? `${metaStatus.selectedAccount.currency} ${metaPreview.totals.spend.toFixed(0)}`
-                    : "Waiting"
-                }
-                hint="Live Meta preview"
-                tone={metaPreview ? "good" : "warn"}
-              />
-              <MiniMetric
-                label="Meta Preview Revenue"
-                value={
-                  metaPreview && metaStatus?.selectedAccount?.currency
-                    ? `${metaStatus.selectedAccount.currency} ${metaPreview.totals.purchaseValue.toFixed(0)}`
-                    : "Waiting"
-                }
-                hint="Platform-attributed value"
-                tone={metaPreview ? "good" : "warn"}
-              />
-              <MiniMetric
-                label="Sync Storage"
-                value={syncState?.storage.storageMode ?? "Not loaded"}
-                hint={syncState?.storage.location ?? "Storage location pending"}
-                tone={syncState?.storage.durable ? "good" : "warn"}
-              />
-              <MiniMetric
-                label="Recent Runs"
-                value={`${syncState?.syncRuns.length ?? 0}`}
-                hint={syncState?.note ?? "Sync history loading"}
-                tone="good"
-              />
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-              <div className="flex items-center gap-2 text-cyan-300">
-                <Workflow size={16} />
-                <div className="font-black">Latest Sync Notes</div>
-              </div>
-              <div className="mt-3 space-y-3 text-sm text-slate-300">
-                {(syncState?.syncRuns ?? []).slice(0, 3).map((run) => (
-                  <div key={run.id} className="rounded-xl bg-slate-900/60 p-3">
-                    <div className="font-bold text-white">
-                      {run.clientName ? `${run.clientName} · ` : ""}
-                      {run.platform} · {run.status}
-                    </div>
-                    <div className="mt-1 text-slate-400">
-                      {run.notes[0] ?? run.finishedAt ?? "No notes yet"}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Section>
-        </div>
-
-        <Section
-          title="What This Solves"
-          subtitle="These are the UX fixes included in this admin pass."
-        >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <MiniMetric
-              label="Account Search"
-              value="Added"
-              hint="Meta ad accounts can now be filtered by name, ID, or currency before saving."
-              tone="good"
-            />
-            <MiniMetric
-              label="Meta Button"
-              value={metaStatus?.connected ? "Reconnect shown" : "Connect shown"}
-              hint="The label now changes once Meta is connected."
-              tone="good"
-            />
-            <MiniMetric
-              label="Client Currency"
-              value={activeClient?.currencyCode ?? "USD"}
-              hint="USD, AED, SAR, and EGP are available now."
-              tone="good"
-            />
-            <MiniMetric
-              label="Client Scope"
-              value="Per client"
-              hint="Meta and Shopify connections are now tied to the chosen client."
-              tone="good"
-            />
+            </AdminPanel>
           </div>
-        </Section>
+        </div>
       </div>
     </AppShell>
   );
