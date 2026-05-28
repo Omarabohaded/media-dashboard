@@ -21,11 +21,12 @@ import { getFunnelReadiness } from "@/lib/funnelReadiness";
 import { useDashboardReadiness } from "@/lib/useDashboardReadiness";
 import { evaluateTrackingGap } from "@/lib/workbookSignals";
 
-function formatMoney(value: number, currencyCode: string) {
+function formatMoney(value: number, currencyCode: string, digits = 0) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: currencyCode,
-    maximumFractionDigits: 0,
+    maximumFractionDigits: digits,
+    minimumFractionDigits: digits,
   }).format(value);
 }
 
@@ -35,6 +36,31 @@ function formatNumber(value: number, digits = 0) {
     minimumFractionDigits: digits,
   }).format(value);
 }
+
+function formatPercent(value: number, digits = 1) {
+  return `${formatNumber(value, digits)}%`;
+}
+
+type CommandSignal = {
+  title: string;
+  detail: string;
+  status: string;
+};
+
+type CampaignRow = {
+  campaignId: string;
+  campaignName: string;
+  spend: number;
+  ctr: number;
+  cpc?: number;
+  cpm?: number;
+  frequency: number;
+  reach?: number;
+  purchases: number;
+  purchaseValue: number;
+  addToCart?: number;
+  checkoutInitiated?: number;
+};
 
 export default function DashboardPage() {
   const {
@@ -51,6 +77,7 @@ export default function DashboardPage() {
   const hasMeta = Boolean(metaPreview && metaStatus?.selectedAccountId);
   const hasStoreTruth = Boolean(storePreview);
   const storeCurrency = storePreview?.currencyCode ?? activeClient?.currencyCode ?? "USD";
+  const adCurrency = metaStatus?.selectedAccount?.currency ?? storeCurrency;
   const spend = metaPreview?.totals.spend ?? 0;
   const revenue = getEffectiveStoreRevenue(storePreview, metricLogic);
   const orders = storePreview?.ordersCount ?? 0;
@@ -59,6 +86,7 @@ export default function DashboardPage() {
   const aov = getEffectiveAov(storePreview, metricLogic);
   const clicks = metaPreview?.totals.clicks ?? 0;
   const platformPurchases = metaPreview?.totals.purchases ?? 0;
+  const impressions = metaPreview?.totals.impressions ?? 0;
   const purchaseProxyCvr = hasMeta && clicks > 0 ? (platformPurchases / clicks) * 100 : null;
   const trackingGap = evaluateTrackingGap({
     storeRevenue: hasStoreTruth ? revenue : undefined,
@@ -75,18 +103,137 @@ export default function DashboardPage() {
     (metric) => metric.state === "blocked"
   ).length;
 
-  const summary = hasStoreTruth && hasMeta
-    ? mer !== null && mer >= 2
-      ? "Business truth is readable. Use this page for the top call, then go deeper into the tabs for the why."
-      : "Spend and revenue are both visible, but business efficiency is soft enough that deeper diagnosis belongs in Business Health, Funnel, and Paid Media."
-    : "This command center now stays honest. It shows the cross-tab summary, but it stops short of pretending the detail tabs are ready when truth layers are still missing.";
+  const campaignRows = [...(metaPreview?.rows ?? [])].sort((a, b) => b.spend - a.spend);
+  const topCampaigns = campaignRows.slice(0, 5);
+  const averageFrequency = campaignRows.length
+    ? campaignRows.reduce((sum, row) => sum + (row.frequency || 0), 0) / campaignRows.length
+    : null;
+  const totalAddToCart = campaignRows.reduce(
+    (sum, row) => sum + (row.addToCart ?? 0),
+    0
+  );
+  const totalCheckout = campaignRows.reduce(
+    (sum, row) => sum + (row.checkoutInitiated ?? 0),
+    0
+  );
+  const trafficCtr = hasMeta && impressions > 0 ? (clicks / impressions) * 100 : null;
+  const storeRevenueBasis = getRevenueBasisLabel(metricLogic.storeRevenueBasis);
+  const merBasis = getRevenueBasisLabel(metricLogic.merRevenueBasis);
+  const aovBasis = getRevenueBasisLabel(metricLogic.aovRevenueBasis);
+
+  const executiveSummary =
+    hasStoreTruth && hasMeta
+      ? mer !== null && mer >= 2
+        ? "Store truth and paid-media truth are both connected, so this page can now act like a real operating surface instead of a setup screen."
+        : "The dashboard is live and readable, but the current business-efficiency read needs deeper diagnosis across traffic quality, funnel friction, or attribution trust."
+      : "The dashboard shell is live, and it stays explicit about which truth layers are connected before it pretends a number is ready for decision-making.";
+
+  const risks: CommandSignal[] = [];
+  const opportunities: CommandSignal[] = [];
+
+  if (!hasStoreTruth) {
+    risks.push({
+      title: "Store truth is still missing.",
+      detail:
+        storeStatus?.recommendedNextStep ??
+        "Connect the store source before using revenue and order metrics as business truth.",
+      status: "Blocked",
+    });
+  }
+
+  if (!hasMeta) {
+    risks.push({
+      title: "Paid-media live preview is not ready.",
+      detail:
+        metaStatus?.connectionError ??
+        "Connect a paid-media account and save the selected ad account in Admin.",
+      status: "Blocked",
+    });
+  }
+
+  if (trackingGap.ready && trackingGap.active) {
+    risks.push({
+      title: "Platform revenue and store revenue are diverging.",
+      detail: trackingGap.summary,
+      status: "Review",
+    });
+  }
+
+  if (averageFrequency !== null && averageFrequency >= 4) {
+    risks.push({
+      title: "Average frequency is high enough to watch for fatigue.",
+      detail: `Campaign-weighted frequency is currently ${formatNumber(averageFrequency, 1)}.`,
+      status: "Watch",
+    });
+  }
+
+  if (blockedFunnelMetrics > 0) {
+    risks.push({
+      title: "Full funnel truth is still incomplete.",
+      detail: `${blockedFunnelMetrics} funnel metrics are still blocked until site analytics is connected.`,
+      status: "Partial",
+    });
+  }
+
+  if (mer !== null && mer >= 2) {
+    opportunities.push({
+      title: "Business efficiency is currently in a workable range.",
+      detail: `MER is ${formatNumber(mer, 2)}x using ${merBasis.toLowerCase()} against live ad spend.`,
+      status: "Stable",
+    });
+  }
+
+  if (blendedRoas !== null && blendedRoas >= 2) {
+    opportunities.push({
+      title: "Attributed return is supporting the current spend level.",
+      detail: `Blended ROAS is ${formatNumber(blendedRoas, 2)}x from connected platform revenue.`,
+      status: "Good",
+    });
+  }
+
+  if (topCampaigns[0]) {
+    const top = topCampaigns[0];
+    const topRoas = top.spend > 0 ? top.purchaseValue / top.spend : null;
+    opportunities.push({
+      title: `${top.campaignName} is the current spend leader.`,
+      detail:
+        topRoas !== null
+          ? `It has ${formatMoney(top.spend, adCurrency)} in spend with ${formatNumber(topRoas, 2)}x attributed ROAS.`
+          : `It currently leads spend at ${formatMoney(top.spend, adCurrency)}.`,
+      status: "Scale",
+    });
+  }
+
+  if (aov !== null) {
+    opportunities.push({
+      title: "Order quality is readable from store truth.",
+      detail: `AOV is ${formatMoney(aov, storeCurrency, 2)} using ${aovBasis.toLowerCase()}.`,
+      status: "Ready",
+    });
+  }
+
+  if (!risks.length) {
+    risks.push({
+      title: "No major blocking risks are active from the connected sources.",
+      detail: "Keep monitoring tracking trust, funnel completeness, and frequency as spend scales.",
+      status: "Healthy",
+    });
+  }
+
+  if (!opportunities.length) {
+    opportunities.push({
+      title: "The clearest next opportunity is data completion.",
+      detail: "As more truth layers connect, the dashboard can move from setup visibility into stronger action ranking.",
+      status: "Next",
+    });
+  }
 
   if (isLoading) {
     return (
       <AppShell>
         <DashboardLoadingState
-          title="Loading command center"
-          description="Pulling the active client, business truth, platform truth, and readiness signals now."
+          title="Loading live command center"
+          description="Pulling the active client, source status, paid-media preview, and storefront truth now."
         />
       </AppShell>
     );
@@ -97,8 +244,12 @@ export default function DashboardPage() {
       <div className="space-y-5">
         <PageLead
           eyebrow="Command Center"
-          title={activeClient ? `${activeClient.name} decision view` : "Decision-first command center"}
-          summary={summary}
+          title={
+            activeClient
+              ? `${activeClient.name} performance marketing command center`
+              : "Performance marketing command center"
+          }
+          summary={executiveSummary}
         />
 
         <div className="flex flex-wrap gap-2">
@@ -107,22 +258,14 @@ export default function DashboardPage() {
             tone={hasStoreTruth ? "good" : "warn"}
           />
           <SourcePill
-            label={hasMeta ? "Paid media source connected" : "Paid media source missing"}
+            label={hasMeta ? "Paid media connected" : "Paid media missing"}
             tone={hasMeta ? "good" : "warn"}
-          />
-          <SourcePill
-            label={
-              blockedFunnelMetrics > 0
-                ? `${blockedFunnelMetrics} funnel metrics still blocked`
-                : "Funnel layer fully readable"
-            }
-            tone={blockedFunnelMetrics > 0 ? "warn" : "good"}
           />
           <SourcePill
             label={
               trackingGap.ready
                 ? trackingGap.active
-                  ? "Tracking gap needs review"
+                  ? "Tracking gap active"
                   : "Tracking gap within range"
                 : "Tracking gap not ready"
             }
@@ -136,17 +279,25 @@ export default function DashboardPage() {
                 : "default"
             }
           />
+          <SourcePill
+            label={
+              blockedFunnelMetrics > 0
+                ? `${blockedFunnelMetrics} funnel metrics blocked`
+                : "Funnel truth readable"
+            }
+            tone={blockedFunnelMetrics > 0 ? "warn" : "good"}
+          />
         </div>
 
         {!hasStoreTruth && !hasMeta ? (
           <EmptySectionState
-            title="The command center is ready, but the truth layers are not"
-            description="The homepage is now an overview only. To unlock real tab-level analysis, connect store truth and at least one paid media source for the active client."
+            title="The dashboard route is live, but the core truth layers are still missing"
+            description="This page is now the real homepage of your dashboard. It will keep showing explicit readiness states until store truth and at least one paid-media source are connected."
             bullets={[
               `Active client: ${activeClient?.name ?? "No client selected"}`,
-              storeStatus?.recommendedNextStep ?? "Connect Shopify or WordPress/WooCommerce first.",
+              storeStatus?.recommendedNextStep ?? "Connect Shopify or WordPress / WooCommerce first.",
               metaStatus?.connectionError ?? "Then connect Meta and save the correct ad account in Admin.",
-              message ?? "Once those are connected, each tab will show its own deeper numbers instead of reusing the homepage sections.",
+              message ?? "Once those sources are live, this page will read as a real operating surface rather than a setup checkpoint.",
             ]}
           />
         ) : null}
@@ -155,7 +306,7 @@ export default function DashboardPage() {
           <MiniMetric
             label="Store Revenue"
             value={hasStoreTruth ? formatMoney(revenue, storeCurrency) : "Waiting"}
-            hint={hasStoreTruth ? getRevenueBasisLabel(metricLogic.storeRevenueBasis) : "Business truth"}
+            hint={hasStoreTruth ? `${storeRevenueBasis} business truth` : "Business truth"}
             tone={hasStoreTruth ? "good" : "warn"}
           />
           <MiniMetric
@@ -166,163 +317,297 @@ export default function DashboardPage() {
           />
           <MiniMetric
             label="Ad Spend"
-            value={hasMeta ? formatMoney(spend, metaStatus?.selectedAccount?.currency ?? "USD") : "Waiting"}
+            value={hasMeta ? formatMoney(spend, adCurrency) : "Waiting"}
             hint="Connected paid-media spend"
             tone={hasMeta ? "good" : "warn"}
           />
           <MiniMetric
             label="MER"
             value={mer !== null ? `${formatNumber(mer, 2)}x` : "Waiting"}
-            hint={`${getRevenueBasisLabel(metricLogic.merRevenueBasis)} divided by ad spend`}
+            hint={`${merBasis} divided by ad spend`}
             tone={mer !== null ? (mer >= 2 ? "good" : "warn") : "warn"}
           />
           <MiniMetric
             label="Blended ROAS"
             value={blendedRoas !== null ? `${formatNumber(blendedRoas, 2)}x` : "Waiting"}
             hint="Platform-attributed revenue divided by spend"
-            tone={blendedRoas !== null ? "good" : "warn"}
+            tone={blendedRoas !== null ? (blendedRoas >= 2 ? "good" : "warn") : "warn"}
           />
           <MiniMetric
             label="AOV"
-            value={aov !== null ? formatMoney(aov, storeCurrency) : "Waiting"}
-            hint={aov !== null ? `${getRevenueBasisLabel(metricLogic.aovRevenueBasis)} divided by orders` : "Revenue divided by orders"}
+            value={aov !== null ? formatMoney(aov, storeCurrency, 2) : "Waiting"}
+            hint={`${aovBasis} divided by orders`}
             tone={aov !== null ? "good" : "warn"}
           />
         </div>
 
+        <div className="grid gap-5 xl:grid-cols-[1.15fr,1.15fr,0.7fr]">
+          <Section title="Top Risks" subtitle="What looks fragile from the connected truth layers right now.">
+            <div className="space-y-3">
+              {risks.slice(0, 3).map((signal) => (
+                <SignalCard key={signal.title} signal={signal} />
+              ))}
+            </div>
+          </Section>
+
+          <Section title="Top Opportunities" subtitle="The best current reads without overclaiming beyond live data.">
+            <div className="space-y-3">
+              {opportunities.slice(0, 3).map((signal) => (
+                <SignalCard key={signal.title} signal={signal} />
+              ))}
+            </div>
+          </Section>
+
+          <Section title="Operator Status" subtitle="Connection health for the real dashboard inputs.">
+            <div className="grid gap-3">
+              <OperatorRow
+                label="Storefront"
+                value={storeStatus?.sourceLabel ?? "Waiting"}
+                status={hasStoreTruth ? "Connected" : storeStatus?.clientDeclinedAccess ? "Declined" : "Blocked"}
+              />
+              <OperatorRow
+                label="Meta account"
+                value={metaStatus?.selectedAccount?.name ?? "Waiting"}
+                status={hasMeta ? "Live" : "Blocked"}
+              />
+              <OperatorRow
+                label="Reporting window"
+                value="Header control"
+                status="Live"
+              />
+              <OperatorRow
+                label="Metric logic"
+                value="Admin registry"
+                status="Connected"
+              />
+            </div>
+          </Section>
+        </div>
+
         <div className="grid gap-5 xl:grid-cols-[1.2fr,0.8fr]">
           <Section
-            title="Top Read"
-            subtitle="One summary, then clear paths into the deeper tabs."
+            title="Campaign Read"
+            subtitle="Top campaigns by spend from the connected paid-media preview."
           >
-            <div className="space-y-4">
-              <SignalCard
-                title={
-                  mer === null
-                    ? "Business efficiency is not fully readable yet"
-                    : mer >= 2
-                    ? "Business efficiency is stable enough to operate from"
-                    : "Business efficiency needs deeper diagnosis"
-                }
-                detail={
-                  mer === null
-                    ? "MER and final scale decisions still depend on both store truth and paid-media spend."
-                    : mer >= 2
-                    ? "The overview supports daily monitoring, but real decisions should still move into the dedicated Business Health, Funnel, Paid Media, and Scaling tabs."
-                    : "The overview already tells you there is a problem. The next step is to use the deeper tabs to see whether the pressure is coming from traffic quality, funnel friction, or tracking mismatch."
-                }
-                status={mer === null ? "Waiting" : mer >= 2 ? "Stable" : "Actionable"}
+            {topCampaigns.length ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full border-separate border-spacing-y-3">
+                  <thead>
+                    <tr className="text-left text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+                      <th className="pb-1 pr-4">Campaign</th>
+                      <th className="pb-1 pr-4">Spend</th>
+                      <th className="pb-1 pr-4">CTR</th>
+                      <th className="pb-1 pr-4">Purchases</th>
+                      <th className="pb-1 pr-4">ROAS</th>
+                      <th className="pb-1">Frequency</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topCampaigns.map((row) => {
+                      const roas = row.spend > 0 ? row.purchaseValue / row.spend : null;
+                      return (
+                        <tr key={row.campaignId} className="rounded-[18px] bg-[rgba(255,255,255,0.62)]">
+                          <td className="rounded-l-[18px] px-4 py-4 text-sm font-semibold text-[var(--ink)]">
+                            {row.campaignName}
+                          </td>
+                          <td className="px-4 py-4 text-sm text-[var(--muted)]">
+                            {formatMoney(row.spend, adCurrency)}
+                          </td>
+                          <td className="px-4 py-4 text-sm text-[var(--muted)]">
+                            {formatPercent(row.ctr, 1)}
+                          </td>
+                          <td className="px-4 py-4 text-sm text-[var(--muted)]">
+                            {formatNumber(row.purchases)}
+                          </td>
+                          <td className="px-4 py-4 text-sm text-[var(--muted)]">
+                            {roas !== null ? `${formatNumber(roas, 2)}x` : "-"}
+                          </td>
+                          <td className="rounded-r-[18px] px-4 py-4 text-sm text-[var(--muted)]">
+                            {formatNumber(row.frequency ?? 0, 1)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <EmptySectionState
+                title="Campaign-level paid-media read is not ready yet"
+                description="Once a live paid-media preview is connected, this table will rank the current spend leaders and their efficiency signals."
               />
-              <SignalCard
-                title={trackingGap.ready ? "Tracking trust is being checked" : "Tracking trust is still incomplete"}
-                detail={trackingGap.summary}
-                status={trackingGap.ready ? (trackingGap.active ? "Review" : "Healthy") : "Blocked"}
+            )}
+          </Section>
+
+          <Section
+            title="Funnel Proxy"
+            subtitle="Platform-side proxy only. Session-based funnel truth still depends on site analytics."
+          >
+            <div className="grid gap-3">
+              <ProxyMetric
+                label="Clicks"
+                value={hasMeta ? formatNumber(clicks) : "Waiting"}
+                hint={trafficCtr !== null ? `${formatPercent(trafficCtr, 1)} CTR` : "Traffic proxy"}
               />
-              <SignalCard
-                title={
-                  purchaseProxyCvr !== null
-                    ? "Funnel proxy is available"
-                    : "Funnel proxy is still incomplete"
-                }
-                detail={
-                  purchaseProxyCvr !== null
-                    ? `Platform-side purchase CVR is ${formatNumber(purchaseProxyCvr, 1)}%, but the workbook still prefers session-based website truth in the Funnel tab.`
-                    : "The Funnel tab now exists as its own workspace, but it will stay honest about what is blocked until analytics truth is connected."
-                }
-                status={purchaseProxyCvr !== null ? "Partial" : "Blocked"}
+              <ProxyMetric
+                label="Add to cart"
+                value={hasMeta ? formatNumber(totalAddToCart) : "Waiting"}
+                hint="Platform-reported action volume"
+              />
+              <ProxyMetric
+                label="Begin checkout"
+                value={hasMeta ? formatNumber(totalCheckout) : "Waiting"}
+                hint="Platform-reported checkout start"
+              />
+              <ProxyMetric
+                label="Purchases"
+                value={hasMeta ? formatNumber(platformPurchases) : "Waiting"}
+                hint={purchaseProxyCvr !== null ? `${formatPercent(purchaseProxyCvr, 1)} click-to-purchase` : "Purchase proxy"}
+              />
+            </div>
+          </Section>
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-[0.9fr,1.1fr]">
+          <Section
+            title="Business Truth Rules"
+            subtitle="The homepage now shows which revenue basis is actually driving the core metrics."
+          >
+            <div className="grid gap-3">
+              <LogicRow
+                metric="Store revenue"
+                logic={`${storeRevenueBasis} from storefront truth`}
+              />
+              <LogicRow
+                metric="MER"
+                logic={`${merBasis} divided by total ad spend`}
+              />
+              <LogicRow
+                metric="AOV"
+                logic={`${aovBasis} divided by orders`}
+              />
+              <LogicRow
+                metric="Blended ROAS"
+                logic="Platform-attributed revenue divided by spend"
               />
             </div>
           </Section>
 
           <Section
             title="Go Deeper"
-            subtitle="Each tab now has its own job instead of scrolling you down the homepage."
+            subtitle="Each tab keeps its own job instead of repeating the homepage."
           >
-            <div className="grid gap-3">
+            <div className="grid gap-3 md:grid-cols-2">
               <QuickLinkCard
                 href="/health"
                 title="Business Health"
-                detail="Store truth, MER, blended ROAS, and tracking trust."
+                detail="Store truth, blended efficiency, and tracking trust."
               />
               <QuickLinkCard
                 href="/funnel"
                 title="Funnel"
-                detail="Sessions, step rates, drop-off diagnosis, and funnel readiness."
+                detail="Site conversion steps, blocked metrics, and drop-off reads."
               />
               <QuickLinkCard
                 href="/paid-media"
                 title="Paid Media"
-                detail="Campaign-level delivery, efficiency, and spend allocation reads."
+                detail="Campaign delivery, cost efficiency, and budget allocation."
               />
               <QuickLinkCard
                 href="/scaling"
                 title="Scaling"
-                detail="Whether growth is actually safe, blocked, or ready."
+                detail="Whether growth is safe, blocked, or under pressure."
               />
               <QuickLinkCard
                 href="/action"
                 title="Actions"
-                detail="Ranked next moves with risk and opportunity lanes."
+                detail="Ranked next moves built from connected signals."
+              />
+              <QuickLinkCard
+                href="/admin"
+                title="Admin"
+                detail="Metric logic, client settings, and source configuration."
               />
             </div>
           </Section>
         </div>
-
-        <Section
-          title="Cross-Tab Readiness"
-          subtitle="This replaces the old long-scroll behavior with a clearer view of what each analysis page can trust today."
-        >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <ReadinessTile
-              label="Business Health"
-              status={hasStoreTruth && hasMeta ? "Ready" : "Partial"}
-              hint="Needs store truth plus paid-media spend."
-            />
-            <ReadinessTile
-              label="Funnel"
-              status={blockedFunnelMetrics < funnelReadiness.length ? "Partial" : "Blocked"}
-              hint="Needs site analytics for full session-based truth."
-            />
-            <ReadinessTile
-              label="Paid Media"
-              status={hasMeta ? "Ready" : "Blocked"}
-              hint="Campaign-level reads start after the connected ad account is saved."
-            />
-            <ReadinessTile
-              label="Scaling"
-              status={hasStoreTruth && hasMeta && blockedFunnelMetrics === 0 ? "Ready" : "Blocked"}
-              hint="Should stay blocked until business truth and funnel truth are both dependable."
-            />
-            <ReadinessTile
-              label="Actions"
-              status={hasMeta ? "Partial" : "Blocked"}
-              hint="Can start with media-side warnings, then improve once business truth is connected."
-            />
-          </div>
-        </Section>
       </div>
     </AppShell>
   );
 }
 
-function SignalCard({
-  title,
-  detail,
+function SignalCard({ signal }: { signal: CommandSignal }) {
+  return (
+    <div className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.6)] p-4">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h3 className="text-base font-semibold text-[var(--ink)]">{signal.title}</h3>
+          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{signal.detail}</p>
+        </div>
+        <StatusPill status={signal.status} />
+      </div>
+    </div>
+  );
+}
+
+function OperatorRow({
+  label,
+  value,
   status,
 }: {
-  title: string;
-  detail: string;
+  label: string;
+  value: string;
   status: string;
 }) {
   return (
-    <div className="rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.58)] p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-semibold text-[var(--ink)]">{title}</h3>
-          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{detail}</p>
-        </div>
+    <div className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.6)] p-4">
+      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+        {label}
+      </div>
+      <div className="mt-2 text-sm font-semibold text-[var(--ink)]">{value}</div>
+      <div className="mt-3">
         <StatusPill status={status} />
       </div>
+    </div>
+  );
+}
+
+function ProxyMetric({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+}) {
+  return (
+    <div className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.6)] p-4">
+      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+        {label}
+      </div>
+      <div className="mt-2 text-2xl font-semibold tracking-tight text-[var(--ink)]">
+        {value}
+      </div>
+      <div className="mt-2 text-sm text-[var(--muted)]">{hint}</div>
+    </div>
+  );
+}
+
+function LogicRow({
+  metric,
+  logic,
+}: {
+  metric: string;
+  logic: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-[18px] border border-[var(--line)] bg-[rgba(255,255,255,0.58)] px-4 py-4">
+      <div>
+        <div className="text-sm font-semibold text-[var(--ink)]">{metric}</div>
+        <div className="mt-1 text-sm text-[var(--muted)]">{logic}</div>
+      </div>
+      <StatusPill status="Live" />
     </div>
   );
 }
@@ -339,32 +624,10 @@ function QuickLinkCard({
   return (
     <Link
       href={href}
-      className="rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.58)] p-4 transition hover:border-[var(--accent)] hover:bg-[rgba(255,255,255,0.8)]"
+      className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.6)] p-4 transition hover:border-[var(--accent)] hover:bg-[rgba(255,255,255,0.78)]"
     >
       <div className="text-base font-semibold text-[var(--ink)]">{title}</div>
       <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{detail}</p>
     </Link>
-  );
-}
-
-function ReadinessTile({
-  label,
-  status,
-  hint,
-}: {
-  label: string;
-  status: string;
-  hint: string;
-}) {
-  return (
-    <div className="rounded-[22px] border border-[var(--line)] bg-[rgba(255,255,255,0.58)] p-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-          {label}
-        </p>
-        <StatusPill status={status} />
-      </div>
-      <p className="mt-3 text-sm leading-6 text-[var(--muted)]">{hint}</p>
-    </div>
   );
 }
