@@ -685,10 +685,8 @@ function getPresetRange(preset: DashboardDatePreset) {
   } else if (preset === "this_month") {
     start.setDate(1);
   } else if (preset === "last_month") {
-    start.setDate(1);
-    start.setMonth(start.getMonth() - 1);
+    start.setMonth(start.getMonth() - 1, 1);
     end.setDate(0);
-    end.setMonth(end.getMonth() - 1);
   }
 
   return {
