@@ -47,7 +47,13 @@ export type DashboardDatePreset =
   | "last_7d"
   | "last_30d"
   | "this_month"
-  | "last_month";
+  | "last_month"
+  | "custom";
+
+export type DashboardCustomRange = {
+  startDate: string;
+  endDate: string;
+};
 
 type DashboardDateContextValue = {
   datePreset: DashboardDatePreset;
@@ -63,6 +69,8 @@ const DashboardDisplayContext =
 const DashboardDateContext = createContext<DashboardDateContextValue | null>(null);
 
 const DASHBOARD_DATE_PRESET_KEY = "media-dashboard-date-preset";
+const DASHBOARD_CUSTOM_START_KEY = "media-dashboard-custom-start";
+const DASHBOARD_CUSTOM_END_KEY = "media-dashboard-custom-end";
 
 const NAV_ITEMS = [
   { icon: LayoutDashboard, label: "Command Center", href: "/" },
@@ -84,6 +92,7 @@ const DATE_PRESET_OPTIONS: Array<{
   { value: "last_30d", label: "Last 30 days" },
   { value: "this_month", label: "This month" },
   { value: "last_month", label: "Last month" },
+  { value: "custom", label: "Custom" },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -94,6 +103,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [ownerMode, setOwnerModeState] = useState(false);
   const [datePreset, setDatePresetState] =
     useState<DashboardDatePreset>("last_7d");
+  const [customRange, setCustomRangeState] = useState<DashboardCustomRange>(
+    getDefaultCustomRange()
+  );
 
   const activeClient = useMemo(
     () =>
@@ -110,14 +122,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       typeof window !== "undefined"
         ? window.localStorage.getItem(DASHBOARD_DATE_PRESET_KEY)
         : null;
+    const savedCustomRange =
+      typeof window !== "undefined" ? readStoredCustomRange() : null;
 
     setOwnerModeState(savedOwnerMode === "true");
+
+    if (savedCustomRange) {
+      setCustomRangeState(savedCustomRange);
+    }
 
     if (
       savedDatePreset &&
       DATE_PRESET_OPTIONS.some((option) => option.value === savedDatePreset)
     ) {
-      setDatePresetState(savedDatePreset as DashboardDatePreset);
+      if (savedDatePreset === "custom" && !savedCustomRange) {
+        setDatePresetState("last_7d");
+      } else {
+        setDatePresetState(savedDatePreset as DashboardDatePreset);
+      }
     }
   }, []);
 
@@ -173,7 +195,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   function setDatePreset(nextValue: DashboardDatePreset) {
     setDatePresetState(nextValue);
+
+    if (nextValue === "custom") {
+      return;
+    }
+
     window.localStorage.setItem(DASHBOARD_DATE_PRESET_KEY, nextValue);
+    window.location.reload();
+  }
+
+  function applyCustomRange(nextRange: DashboardCustomRange) {
+    setCustomRangeState(nextRange);
+    setDatePresetState("custom");
+    window.localStorage.setItem(DASHBOARD_DATE_PRESET_KEY, "custom");
+    window.localStorage.setItem(DASHBOARD_CUSTOM_START_KEY, nextRange.startDate);
+    window.localStorage.setItem(DASHBOARD_CUSTOM_END_KEY, nextRange.endDate);
     window.location.reload();
   }
 
@@ -193,18 +229,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     };
   }, [activeClient?.currencyCode]);
 
-  const activeDateRange = useMemo(() => getPresetRange(datePreset), [datePreset]);
+  const activeDateRange = useMemo(
+    () => getActiveDateRange(datePreset, customRange),
+    [customRange, datePreset]
+  );
   const dashboardDate = useMemo<DashboardDateContextValue>(
     () => ({
       datePreset,
-      metaPreviewQuery: `datePreset=${datePreset}`,
+      metaPreviewQuery: buildMetaPreviewQuery(datePreset, customRange),
       activeLabel:
         DATE_PRESET_OPTIONS.find((option) => option.value === datePreset)?.label ??
         "Last 7 days",
       activeSummary: activeDateRange.summary,
       setDatePreset,
     }),
-    [activeDateRange.summary, datePreset]
+    [activeDateRange.summary, customRange, datePreset]
   );
 
   const showDateController = pathname !== "/admin";
@@ -253,7 +292,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         : "xl:min-w-[280px]"
                     }`}
                   >
-                    {showDateController ? <DateControlCard /> : null}
+                    {showDateController ? (
+                      <DateControlCard
+                        activeLabel={dashboardDate.activeLabel}
+                        activeSummary={dashboardDate.activeSummary}
+                        datePreset={datePreset}
+                        customRange={customRange}
+                        onPresetChange={setDatePreset}
+                        onApplyCustomRange={applyCustomRange}
+                      />
+                    ) : null}
                     <div className="min-w-[280px] rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.5)] p-3 shadow-[var(--shadow)]">
                       <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
                         Active Client
@@ -290,9 +338,42 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function DateControlCard() {
-  const { activeLabel, activeSummary, datePreset, setDatePreset } =
-    useDashboardDate();
+function DateControlCard({
+  activeLabel,
+  activeSummary,
+  datePreset,
+  customRange,
+  onPresetChange,
+  onApplyCustomRange,
+}: {
+  activeLabel: string;
+  activeSummary: string;
+  datePreset: DashboardDatePreset;
+  customRange: DashboardCustomRange;
+  onPresetChange: (value: DashboardDatePreset) => void;
+  onApplyCustomRange: (value: DashboardCustomRange) => void;
+}) {
+  const [draftRange, setDraftRange] = useState<DashboardCustomRange>(customRange);
+  const [rangeError, setRangeError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDraftRange(customRange);
+  }, [customRange]);
+
+  function handleApply() {
+    if (!draftRange.startDate || !draftRange.endDate) {
+      setRangeError("Choose both a start date and an end date.");
+      return;
+    }
+
+    if (!isCustomRangeValid(draftRange)) {
+      setRangeError("End date must be the same as or after the start date.");
+      return;
+    }
+
+    setRangeError(null);
+    onApplyCustomRange(draftRange);
+  }
 
   return (
     <div className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.5)] p-3 shadow-[var(--shadow)]">
@@ -313,7 +394,7 @@ function DateControlCard() {
       <select
         value={datePreset}
         onChange={(event) =>
-          setDatePreset(event.target.value as DashboardDatePreset)
+          onPresetChange(event.target.value as DashboardDatePreset)
         }
         className="mt-3 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.78)] px-3 py-3 text-sm font-medium text-[var(--ink)] outline-none"
       >
@@ -323,6 +404,66 @@ function DateControlCard() {
           </option>
         ))}
       </select>
+
+      {datePreset === "custom" ? (
+        <div className="mt-3 rounded-[18px] border border-[var(--line)] bg-[rgba(255,255,255,0.62)] p-3">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="text-sm text-[var(--ink)]">
+              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+                Start date
+              </span>
+              <input
+                type="date"
+                value={draftRange.startDate}
+                onChange={(event) => {
+                  setDraftRange((current) => ({
+                    ...current,
+                    startDate: event.target.value,
+                  }));
+                  setRangeError(null);
+                }}
+                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.88)] px-3 py-3 text-sm font-medium text-[var(--ink)] outline-none"
+              />
+            </label>
+            <label className="text-sm text-[var(--ink)]">
+              <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+                End date
+              </span>
+              <input
+                type="date"
+                value={draftRange.endDate}
+                onChange={(event) => {
+                  setDraftRange((current) => ({
+                    ...current,
+                    endDate: event.target.value,
+                  }));
+                  setRangeError(null);
+                }}
+                className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.88)] px-3 py-3 text-sm font-medium text-[var(--ink)] outline-none"
+              />
+            </label>
+          </div>
+
+          {rangeError ? (
+            <div className="mt-3 rounded-2xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {rangeError}
+            </div>
+          ) : null}
+
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="text-xs text-[var(--muted)]">
+              Apply a custom reporting window for live Meta preview queries.
+            </div>
+            <button
+              type="button"
+              onClick={handleApply}
+              className="rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+            >
+              Apply custom range
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-2 text-xs text-[var(--muted)]">
         Updates live Meta reporting previews across the dashboard.
@@ -669,7 +810,7 @@ function formatMetricValue(value: string, currencyCode: ClientCurrencyCode) {
   }).format(amount);
 }
 
-function getPresetRange(preset: DashboardDatePreset) {
+function getPresetRange(preset: Exclude<DashboardDatePreset, "custom">) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -695,6 +836,39 @@ function getPresetRange(preset: DashboardDatePreset) {
     end,
     summary: formatRangeSummary(start, end),
   };
+}
+
+function getActiveDateRange(
+  preset: DashboardDatePreset,
+  customRange: DashboardCustomRange
+) {
+  if (preset === "custom" && isCustomRangeValid(customRange)) {
+    const start = parseDateInput(customRange.startDate);
+    const end = parseDateInput(customRange.endDate);
+
+    if (start && end) {
+      return {
+        start,
+        end,
+        summary: formatRangeSummary(start, end),
+      };
+    }
+  }
+
+  return getPresetRange(preset === "custom" ? "last_7d" : preset);
+}
+
+function buildMetaPreviewQuery(
+  preset: DashboardDatePreset,
+  customRange: DashboardCustomRange
+) {
+  if (preset === "custom" && isCustomRangeValid(customRange)) {
+    return `since=${encodeURIComponent(customRange.startDate)}&until=${encodeURIComponent(
+      customRange.endDate
+    )}`;
+  }
+
+  return `datePreset=${preset === "custom" ? "last_7d" : preset}`;
 }
 
 function formatRangeSummary(start: Date, end: Date) {
@@ -726,4 +900,51 @@ function formatRangeSummary(start: Date, end: Date) {
     day: "numeric",
     year: "numeric",
   })} - ${endLabel}`;
+}
+
+function getDefaultCustomRange(): DashboardCustomRange {
+  const range = getPresetRange("last_7d");
+  return {
+    startDate: formatDateInput(range.start),
+    endDate: formatDateInput(range.end),
+  };
+}
+
+function readStoredCustomRange(): DashboardCustomRange | null {
+  const startDate = window.localStorage.getItem(DASHBOARD_CUSTOM_START_KEY) ?? "";
+  const endDate = window.localStorage.getItem(DASHBOARD_CUSTOM_END_KEY) ?? "";
+
+  if (!startDate || !endDate) {
+    return null;
+  }
+
+  const storedRange = { startDate, endDate };
+  return isCustomRangeValid(storedRange) ? storedRange : null;
+}
+
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateInput(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return null;
+  }
+
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isCustomRangeValid(range: DashboardCustomRange) {
+  const start = parseDateInput(range.startDate);
+  const end = parseDateInput(range.endDate);
+
+  if (!start || !end) {
+    return false;
+  }
+
+  return start.getTime() <= end.getTime();
 }
