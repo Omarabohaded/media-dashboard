@@ -10,6 +10,12 @@ import {
 } from "@/components/AppShell";
 import { generateActions } from "@/lib/actionEngine";
 import { detectRootCauses } from "@/lib/crossMetricEngine";
+import {
+  getCpaDenominatorLabel,
+  getEffectiveCpaCac,
+  getEffectiveMer,
+  getEffectiveStoreRevenue,
+} from "@/lib/dashboardMetricLogic";
 import { getFunnelReadiness } from "@/lib/funnelReadiness";
 import { prioritizeSignals } from "@/lib/priorityEngine";
 import { evaluateRelationships } from "@/lib/relationshipEngine";
@@ -24,6 +30,7 @@ export default function ActionPage() {
     metaStatus,
     storePreview,
     storeStatus,
+    metricLogic,
   } = useDashboardReadiness();
 
   const hasMeta = Boolean(metaPreview && metaStatus?.selectedAccountId);
@@ -49,14 +56,9 @@ export default function ActionPage() {
     metaPreview && metaPreview.totals.spend > 0
       ? metaPreview.totals.purchaseValue / metaPreview.totals.spend
       : 0;
-  const mer =
-    hasMeta && hasStoreTruth && metaPreview!.totals.spend > 0
-      ? storePreview!.grossSales / metaPreview!.totals.spend
-      : 0;
-  const ncac =
-    metaPreview && metaPreview.totals.purchases > 0
-      ? metaPreview.totals.spend / metaPreview.totals.purchases
-      : 999;
+  const mer = getEffectiveMer(storePreview, metaPreview, metricLogic) ?? 0;
+  const configuredCac = getEffectiveCpaCac(metaPreview, storePreview, metricLogic);
+  const ncac = configuredCac.value ?? 999;
   const checkoutRate =
     metaPreview && metaPreview.totals.purchases > 0
       ? (metaPreview.rows.reduce((sum, row) => sum + (row.checkoutInitiated ?? 0), 0) /
@@ -74,7 +76,9 @@ export default function ActionPage() {
         100
       : null;
   const trackingGap = evaluateTrackingGap({
-    storeRevenue: hasStoreTruth ? storePreview?.grossSales : undefined,
+    storeRevenue: hasStoreTruth
+      ? getEffectiveStoreRevenue(storePreview, metricLogic)
+      : undefined,
     platformRevenue: hasMeta ? metaPreview?.totals.purchaseValue : undefined,
     storeOrders: hasStoreTruth ? storePreview?.ordersCount : undefined,
     platformPurchases: hasMeta ? metaPreview?.totals.purchases : undefined,
@@ -172,8 +176,10 @@ export default function ActionPage() {
               }
             />
             <SourcePill
-              label="Risk lane ranks above opportunity lane"
-              tone="default"
+              label={`CPA / CAC uses ${getCpaDenominatorLabel(
+                configuredCac.appliedDenominator
+              )}`}
+              tone={configuredCac.blockedReason ? "warn" : "default"}
             />
             <SourcePill
               label={
