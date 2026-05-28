@@ -1,11 +1,23 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 const ACTIVE_CLIENT_STORAGE_KEY = "media-dashboard-active-client";
 
 export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Suspense fallback={children}>
+      <AdminClientQuerySync>{children}</AdminClientQuerySync>
+    </Suspense>
+  );
+}
+
+function AdminClientQuerySync({
   children,
 }: {
   children: React.ReactNode;
