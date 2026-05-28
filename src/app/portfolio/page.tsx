@@ -10,7 +10,6 @@ import {
   Section,
   SourcePill,
   StatusPill,
-  useDashboardDate,
   useOwnerMode,
 } from "@/components/AppShell";
 import { getCurrencyMeta, type ClientCurrencyCode } from "@/lib/clientTypes";
@@ -48,7 +47,6 @@ export default function PortfolioPage() {
 
 function PortfolioContent() {
   const { ownerMode, setOwnerMode } = useOwnerMode();
-  const { activeSummary } = useDashboardDate();
   const { cards, summary, isLoading, error, refresh } = useMultiStoreView();
   const [sortBy, setSortBy] = useState<SortKey>("websiteSales");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -111,22 +109,12 @@ function PortfolioContent() {
   }
 
   return (
-    <div className="space-y-5">
-      <PageLead
-        eyebrow="Portfolio"
-        title="Multi-store overview"
-        summary="Compare spend, website sales, ROAS, orders, AOV, and cost per order across the portfolio without losing the same reporting-window and metric-logic rules used everywhere else in the dashboard."
+    <div className="space-y-4">
+      <CompactPortfolioHeader
+        totalStores={summary.totalStores}
+        readyStores={summary.readyStores}
+        mixedCurrencies={mixedCurrencies}
       />
-
-      <div className="flex flex-wrap gap-2">
-        <SourcePill label={`Window: ${activeSummary}`} tone="good" />
-        <SourcePill label="Metric logic from Admin" tone="default" />
-        <SourcePill
-          label={mixedCurrencies ? "Multiple currencies detected" : "Single currency view"}
-          tone={mixedCurrencies ? "warn" : "good"}
-        />
-        <SourcePill label="Each card opens the store dashboard" tone="default" />
-      </div>
 
       {error ? (
         <Section
@@ -263,6 +251,47 @@ function PortfolioContent() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function CompactPortfolioHeader({
+  totalStores,
+  readyStores,
+  mixedCurrencies,
+}: {
+  totalStores: number;
+  readyStores: number;
+  mixedCurrencies: boolean;
+}) {
+  return (
+    <div className="rounded-[24px] border border-[var(--line)] bg-[rgba(255,255,255,0.5)] px-5 py-4 shadow-[var(--shadow)]">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+        <div className="max-w-3xl">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
+            Portfolio
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <h2 className="font-serif-display text-3xl leading-tight font-semibold tracking-tight text-[var(--ink)] md:text-4xl">
+              Multi-store overview
+            </h2>
+            <StatusPill status={`${readyStores} ready`} />
+          </div>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">
+            Compare store performance side by side using the current reporting window and the same business-truth logic already applied across the dashboard.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2 xl:max-w-[420px] xl:justify-end">
+          <SourcePill label={`${totalStores} stores in scope`} tone="default" />
+          <SourcePill label="Metric logic from Admin" tone="default" />
+          <SourcePill
+            label={mixedCurrencies ? "Multiple currencies detected" : "Single currency view"}
+            tone={mixedCurrencies ? "warn" : "good"}
+          />
+          <SourcePill label="Store cards drill into dashboard" tone="default" />
+        </div>
+      </div>
     </div>
   );
 }
