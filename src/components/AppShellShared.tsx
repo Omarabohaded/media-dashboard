@@ -29,6 +29,30 @@ export function Section({
   );
 }
 
+export function PageLead({
+  eyebrow,
+  title,
+  summary,
+}: {
+  eyebrow: string;
+  title: string;
+  summary: string;
+}) {
+  return (
+    <div className="rounded-[22px] border border-[var(--line)] bg-[var(--surface)] px-4 py-4 shadow-[var(--shadow)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+        {eyebrow}
+      </p>
+      <h2 className="mt-1 font-serif-display text-[24px] leading-tight font-semibold tracking-tight text-[var(--ink)] md:text-[28px]">
+        {title}
+      </h2>
+      <p className="mt-1.5 max-w-4xl text-sm leading-6 text-[var(--muted)]">
+        {summary}
+      </p>
+    </div>
+  );
+}
+
 export function MiniMetric({
   label,
   value,
