@@ -79,6 +79,14 @@ function formatNumber(value: number | null, digits = 0) {
 }
 
 export default function MultiStorePage() {
+  return (
+    <AppShell>
+      <MultiStoreViewContent />
+    </AppShell>
+  );
+}
+
+function MultiStoreViewContent() {
   const { metaPreviewQuery, activeSummary } = useDashboardDate();
   const [payload, setPayload] = useState<MultiStoreResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -135,127 +143,123 @@ export default function MultiStorePage() {
 
   if (isLoading) {
     return (
-      <AppShell>
-        <DashboardLoadingState
-          title="Loading multi-store comparison"
-          description="Pulling store-truth and paid-media summaries across the client portfolio."
-        />
-      </AppShell>
+      <DashboardLoadingState
+        title="Loading multi-store comparison"
+        description="Pulling store-truth and paid-media summaries across the client portfolio."
+      />
     );
   }
 
   return (
-    <AppShell>
-      <div className="space-y-5">
-        <PageLead
-          eyebrow="Multi Store View"
-          title="Portfolio comparison across stores"
-          summary="Use this page to compare store-level spend, sales, ROAS, orders, AOV, and cost per order without jumping between client dashboards. The reporting window in the header controls every store card on this page."
+    <div className="space-y-5">
+      <PageLead
+        eyebrow="Multi Store View"
+        title="Portfolio comparison across stores"
+        summary="Use this page to compare store-level spend, sales, ROAS, orders, AOV, and cost per order without jumping between client dashboards. The reporting window in the header controls every store card on this page."
+      />
+
+      <div className="flex flex-wrap gap-2">
+        <SourcePill
+          label={`${payload?.summary.totalStores ?? 0} stores`}
+          tone="good"
         />
-
-        <div className="flex flex-wrap gap-2">
-          <SourcePill
-            label={`${payload?.summary.totalStores ?? 0} stores`}
-            tone="good"
-          />
-          <SourcePill
-            label={`${payload?.summary.readyStores ?? 0} ready`}
-            tone="good"
-          />
-          <SourcePill
-            label={`${payload?.summary.partialStores ?? 0} partial`}
-            tone="warn"
-          />
-          <SourcePill
-            label={`${payload?.summary.blockedStores ?? 0} blocked`}
-            tone="bad"
-          />
-          <SourcePill
-            label={`Reporting window: ${activeSummary}`}
-            tone="default"
-          />
-          {hasMixedCurrencies ? (
-            <SourcePill label="Mixed currencies" tone="warn" />
-          ) : null}
-        </div>
-
-        {message ? (
-          <EmptySectionState
-            title="The portfolio view could not be loaded"
-            description={message}
-            bullets={[
-              "Check that at least one client exists in Admin.",
-              "Confirm Meta or store-truth connections for the stores you expect to compare.",
-            ]}
-          />
-        ) : null}
-
-        {!message && cards.length === 0 ? (
-          <EmptySectionState
-            title="No stores are available yet"
-            description="Create and connect clients in Admin first, then this page will compare them here using the shared reporting window."
-            bullets={[
-              "Add clients in Admin.",
-              "Connect store truth where available.",
-              "Connect Meta per client so ad spend can be compared next to website sales.",
-            ]}
-          />
-        ) : null}
-
-        {!message && cards.length > 0 ? (
-          <Section
-            title="Store Comparison"
-            subtitle="Each card uses the same metric logic as the client dashboards, so the comparison stays aligned with your existing reporting rules."
-          >
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-wrap gap-2">
-                {(["all", "ready", "partial", "blocked"] as FilterKey[]).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setFilterKey(key)}
-                    className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                      filterKey === key
-                        ? "border-[var(--accent)] bg-[rgba(161,66,26,0.12)] text-[var(--accent)]"
-                        : "border-[var(--line)] bg-[rgba(255,255,255,0.72)] text-[var(--ink)]"
-                    }`}
-                  >
-                    {key.charAt(0).toUpperCase() + key.slice(1)}
-                  </button>
-                ))}
-              </div>
-
-              <label className="flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.72)] px-4 py-3 text-sm text-[var(--ink)]">
-                <span className="font-semibold">Sort by</span>
-                <select
-                  value={sortKey}
-                  onChange={(event) => setSortKey(event.target.value as SortKey)}
-                  className="bg-transparent outline-none"
-                >
-                  {SORT_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            {hasMixedCurrencies ? (
-              <div className="mt-4 rounded-[20px] border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
-                This portfolio contains mixed currencies. ROAS and orders are fully comparable, but spend, sales, AOV, and cost per order are still shown in each store’s native currency.
-              </div>
-            ) : null}
-
-            <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {filteredCards.map((card) => (
-                <StoreCard key={card.clientId} card={card} />
-              ))}
-            </div>
-          </Section>
+        <SourcePill
+          label={`${payload?.summary.readyStores ?? 0} ready`}
+          tone="good"
+        />
+        <SourcePill
+          label={`${payload?.summary.partialStores ?? 0} partial`}
+          tone="warn"
+        />
+        <SourcePill
+          label={`${payload?.summary.blockedStores ?? 0} blocked`}
+          tone="bad"
+        />
+        <SourcePill
+          label={`Reporting window: ${activeSummary}`}
+          tone="default"
+        />
+        {hasMixedCurrencies ? (
+          <SourcePill label="Mixed currencies" tone="warn" />
         ) : null}
       </div>
-    </AppShell>
+
+      {message ? (
+        <EmptySectionState
+          title="The portfolio view could not be loaded"
+          description={message}
+          bullets={[
+            "Check that at least one client exists in Admin.",
+            "Confirm Meta or store-truth connections for the stores you expect to compare.",
+          ]}
+        />
+      ) : null}
+
+      {!message && cards.length === 0 ? (
+        <EmptySectionState
+          title="No stores are available yet"
+          description="Create and connect clients in Admin first, then this page will compare them here using the shared reporting window."
+          bullets={[
+            "Add clients in Admin.",
+            "Connect store truth where available.",
+            "Connect Meta per client so ad spend can be compared next to website sales.",
+          ]}
+        />
+      ) : null}
+
+      {!message && cards.length > 0 ? (
+        <Section
+          title="Store Comparison"
+          subtitle="Each card uses the same metric logic as the client dashboards, so the comparison stays aligned with your existing reporting rules."
+        >
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap gap-2">
+              {(["all", "ready", "partial", "blocked"] as FilterKey[]).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFilterKey(key)}
+                  className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+                    filterKey === key
+                      ? "border-[var(--accent)] bg-[rgba(161,66,26,0.12)] text-[var(--accent)]"
+                      : "border-[var(--line)] bg-[rgba(255,255,255,0.72)] text-[var(--ink)]"
+                  }`}
+                >
+                  {key.charAt(0).toUpperCase() + key.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            <label className="flex items-center gap-3 rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.72)] px-4 py-3 text-sm text-[var(--ink)]">
+              <span className="font-semibold">Sort by</span>
+              <select
+                value={sortKey}
+                onChange={(event) => setSortKey(event.target.value as SortKey)}
+                className="bg-transparent outline-none"
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {hasMixedCurrencies ? (
+            <div className="mt-4 rounded-[20px] border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              This portfolio contains mixed currencies. ROAS and orders are fully comparable, but spend, sales, AOV, and cost per order are still shown in each store’s native currency.
+            </div>
+          ) : null}
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {filteredCards.map((card) => (
+              <StoreCard key={card.clientId} card={card} />
+            ))}
+          </div>
+        </Section>
+      ) : null}
+    </div>
   );
 }
 
