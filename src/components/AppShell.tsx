@@ -6,7 +6,6 @@ import {
   BarChart3,
   Bell,
   Building2,
-  CalendarRange,
   Database,
   Gauge,
   LayoutDashboard,
@@ -14,24 +13,28 @@ import {
   Rocket,
   ShieldCheck,
   Target,
+  type LucideIcon,
 } from "lucide-react";
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-import {
-  getCurrencyMeta,
-  type ClientCurrencyCode,
-  type ClientRecord,
-} from "@/lib/clientTypes";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { getCurrencyMeta, type ClientCurrencyCode, type ClientRecord } from "@/lib/clientTypes";
 
-type ClientDirectoryResponse = {
-  clients: ClientRecord[];
-  activeClientId: string;
-};
+export {
+  DashboardLoadingState,
+  DisplayValue,
+  EmptySectionState,
+  MiniMetric,
+  Section,
+  SourcePill,
+} from "./AppShellShared";
+
+export type DashboardDatePreset =
+  | "today"
+  | "yesterday"
+  | "last_7d"
+  | "last_30d"
+  | "this_month"
+  | "last_month"
+  | "custom";
 
 type OwnerModeContextValue = {
   ownerMode: boolean;
@@ -43,26 +46,6 @@ type DashboardDisplayContextValue = {
   formatValue: (value: string) => string;
 };
 
-type DashboardHeaderMeta = {
-  eyebrow: string;
-  title: string;
-  summary: string;
-};
-
-export type DashboardDatePreset =
-  | "today"
-  | "yesterday"
-  | "last_7d"
-  | "last_30d"
-  | "this_month"
-  | "last_month"
-  | "custom";
-
-export type DashboardCustomRange = {
-  startDate: string;
-  endDate: string;
-};
-
 type DashboardDateContextValue = {
   datePreset: DashboardDatePreset;
   metaPreviewQuery: string;
@@ -72,22 +55,17 @@ type DashboardDateContextValue = {
 };
 
 type NavItem = {
-  icon: typeof LayoutDashboard;
+  icon: LucideIcon;
   label: string;
   href: string;
   ownerOnly?: boolean;
 };
 
 const OwnerModeContext = createContext<OwnerModeContextValue | null>(null);
-const DashboardDisplayContext =
-  createContext<DashboardDisplayContextValue | null>(null);
+const DashboardDisplayContext = createContext<DashboardDisplayContextValue | null>(null);
 const DashboardDateContext = createContext<DashboardDateContextValue | null>(null);
 
-const DASHBOARD_DATE_PRESET_KEY = "media-dashboard-date-preset";
-const DASHBOARD_CUSTOM_START_KEY = "media-dashboard-custom-start";
-const DASHBOARD_CUSTOM_END_KEY = "media-dashboard-custom-end";
-
-const NAV_ITEMS: NavItem[] = [
+const navItems: NavItem[] = [
   { icon: Building2, label: "Portfolio", href: "/portfolio", ownerOnly: true },
   { icon: LayoutDashboard, label: "Command Center", href: "/" },
   { icon: ShieldCheck, label: "Business Health", href: "/health" },
@@ -96,18 +74,10 @@ const NAV_ITEMS: NavItem[] = [
   { icon: Rocket, label: "Scaling", href: "/scaling" },
   { icon: Bell, label: "Actions", href: "/action" },
   { icon: Database, label: "Admin", href: "/admin" },
-  {
-    icon: Palette,
-    label: "Theme Settings",
-    href: "/admin/theme",
-    ownerOnly: true,
-  },
+  { icon: Palette, label: "Theme Settings", href: "/admin/theme", ownerOnly: true },
 ];
 
-const DATE_PRESET_OPTIONS: Array<{
-  value: DashboardDatePreset;
-  label: string;
-}> = [
+const dateOptions: Array<{ value: DashboardDatePreset; label: string }> = [
   { value: "today", label: "Today" },
   { value: "yesterday", label: "Yesterday" },
   { value: "last_7d", label: "Last 7 days" },
@@ -125,140 +95,223 @@ export function AppShell({
   portfolioMode?: boolean;
 }) {
   const pathname = usePathname();
+  const [ownerMode, setOwnerModeState] = useState(false);
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [activeClientId, setActiveClientId] = useState("");
-  const [isLoadingClients, setIsLoadingClients] = useState(true);
-  const [ownerMode, setOwnerModeState] = useState(false);
-  const [datePreset, setDatePresetState] =
-    useState<DashboardDatePreset>("last_7d");
-  const [customRange, setCustomRangeState] = useState<DashboardCustomRange>(
-    getDefaultCustomRange()
-  );
-
-  const activeClient = useMemo(
-    () =>
-      clients.find((entry) => entry.id === activeClientId) ?? clients[0] ?? null,
-    [activeClientId, clients]
-  );
+  const [datePreset, setDatePresetState] = useState<DashboardDatePreset>("last_7d");
 
   useEffect(() => {
-    const savedOwnerMode =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem("media-dashboard-owner-mode")
-        : null;
-    const savedDatePreset =
-      typeof window !== "undefined"
-        ? window.localStorage.getItem(DASHBOARD_DATE_PRESET_KEY)
-        : null;
-    const savedCustomRange =
-      typeof window !== "undefined" ? readStoredCustomRange() : null;
-
-    setOwnerModeState(savedOwnerMode === "true");
-
-    if (savedCustomRange) {
-      setCustomRangeState(savedCustomRange);
-    }
-
-    if (
-      savedDatePreset &&
-      DATE_PRESET_OPTIONS.some((option) => option.value === savedDatePreset)
-    ) {
-      if (savedDatePreset === "custom" && !savedCustomRange) {
-        setDatePresetState("last_7d");
-      } else {
-        setDatePresetState(savedDatePreset as DashboardDatePreset);
-      }
+    setOwnerModeState(localStorage.getItem("media-dashboard-owner-mode") === "true");
+    const storedDate = localStorage.getItem("media-dashboard-date-preset") as DashboardDatePreset | null;
+    if (storedDate && dateOptions.some((option) => option.value === storedDate)) {
+      setDatePresetState(storedDate);
     }
   }, []);
 
   useEffect(() => {
     async function loadClients() {
-      setIsLoadingClients(true);
-      const preferredClientId =
-        typeof window !== "undefined"
-          ? window.localStorage.getItem("media-dashboard-active-client")
-          : null;
-      const query = preferredClientId
-        ? `?clientId=${encodeURIComponent(preferredClientId)}`
-        : "";
-
       try {
-        const response = await fetch(`/api/admin/clients${query}`, {
-          cache: "no-store",
-        });
-
-        if (!response.ok) {
-          throw new Error("Client directory unavailable");
-        }
-
-        const payload = (await response.json()) as ClientDirectoryResponse;
-        const nextClientId =
-          preferredClientId &&
-          payload.clients.some((entry) => entry.id === preferredClientId)
-            ? preferredClientId
-            : payload.activeClientId;
+        const storedClient = localStorage.getItem("media-dashboard-active-client");
+        const query = storedClient ? `?clientId=${encodeURIComponent(storedClient)}` : "";
+        const response = await fetch(`/api/admin/clients${query}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = (await response.json()) as {
+          clients: ClientRecord[];
+          activeClientId: string;
+        };
         setClients(payload.clients);
-        setActiveClientId(nextClientId);
+        setActiveClientId(
+          storedClient && payload.clients.some((client) => client.id === storedClient)
+            ? storedClient
+            : payload.activeClientId
+        );
       } catch {
         setClients([]);
-        setActiveClientId("");
-      } finally {
-        setIsLoadingClients(false);
       }
     }
 
     void loadClients();
   }, [pathname]);
 
-  function handleClientSwitch(nextClientId: string) {
-    setActiveClientId(nextClientId);
-    window.localStorage.setItem("media-dashboard-active-client", nextClientId);
-    window.location.reload();
-  }
+  const activeClient = clients.find((client) => client.id === activeClientId) ?? clients[0];
+  const currencyCode = activeClient?.currencyCode ?? "USD";
+  const ownerContext = useMemo(
+    () => ({
+      ownerMode,
+      setOwnerMode: (value: boolean) => {
+        setOwnerModeState(value);
+        localStorage.setItem("media-dashboard-owner-mode", String(value));
+      },
+    }),
+    [ownerMode]
+  );
+  const displayContext = useMemo<DashboardDisplayContextValue>(
+    () => ({
+      currencyCode,
+      formatValue: (value) => formatMetricValue(value, currencyCode),
+    }),
+    [currencyCode]
+  );
+  const dateContext = useMemo<DashboardDateContextValue>(
+    () => ({
+      datePreset,
+      metaPreviewQuery: `datePreset=${datePreset === "custom" ? "last_7d" : datePreset}`,
+      activeLabel: dateOptions.find((option) => option.value === datePreset)?.label ?? "Last 7 days",
+      activeSummary: getDateSummary(datePreset),
+      setDatePreset: (value) => {
+        setDatePresetState(value);
+        localStorage.setItem("media-dashboard-date-preset", value);
+      },
+    }),
+    [datePreset]
+  );
+  const meta = getHeaderMeta(pathname);
+  const clientLabel = portfolioMode ? "All configured stores" : activeClient?.name ?? "No client selected";
+  const currencyLabel = portfolioMode ? "Portfolio scope" : getCurrencyMeta(currencyCode).label;
 
-  function setOwnerMode(nextValue: boolean) {
-    setOwnerModeState(nextValue);
-    window.localStorage.setItem("media-dashboard-owner-mode", String(nextValue));
-  }
-
-  function setDatePreset(nextValue: DashboardDatePreset) {
-    setDatePresetState(nextValue);
-
-    if (nextValue === "custom") {
-      return;
-    }
-
-    window.localStorage.setItem(DASHBOARD_DATE_PRESET_KEY, nextValue);
-  }
-
-  return <>{children}</>;
+  return (
+    <OwnerModeContext.Provider value={ownerContext}>
+      <DashboardDisplayContext.Provider value={displayContext}>
+        <DashboardDateContext.Provider value={dateContext}>
+          <main className="min-h-screen bg-[var(--bg)] text-[var(--ink)]">
+            <aside className="fixed left-0 top-0 hidden h-screen w-[300px] border-r border-[var(--line)] bg-[var(--bg-soft)] px-5 py-6 xl:flex xl:flex-col">
+              <div className="rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow)]">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-[var(--accent)] text-white">
+                    <Gauge size={24} />
+                  </div>
+                  <div>
+                    <h2 className="font-serif-display text-2xl leading-none font-semibold">Operator OS</h2>
+                    <p className="mt-1 text-sm text-[var(--muted)]">Media buying reporting workspace</p>
+                  </div>
+                </div>
+              </div>
+              <nav className="mt-6 flex-1 space-y-2 overflow-y-auto pr-2">
+                {navItems
+                  .filter((item) => !item.ownerOnly || ownerMode)
+                  .map(({ icon: Icon, label, href }) => {
+                    const active = href === "/" ? pathname === "/" : href === "/admin" ? pathname === "/admin" : pathname.startsWith(href);
+                    return (
+                      <Link
+                        key={href}
+                        href={href}
+                        className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
+                          active ? "bg-[var(--accent-soft)] text-[var(--accent)]" : "text-[var(--ink)] hover:bg-[var(--surface-muted)]"
+                        }`}
+                      >
+                        <Icon size={18} />
+                        <span>{label}</span>
+                      </Link>
+                    );
+                  })}
+              </nav>
+              <div className="mt-auto rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow)]">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">Owner Access</div>
+                    <p className="mt-1 text-sm text-[var(--muted)]">Keep portfolio-level views behind owner mode as we expand them.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => ownerContext.setOwnerMode(!ownerMode)}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold ${ownerMode ? "bg-[var(--ink)] text-white" : "bg-[var(--surface-muted)] text-[var(--ink)]"}`}
+                  >
+                    {ownerMode ? "On" : "Off"}
+                  </button>
+                </div>
+              </div>
+            </aside>
+            <div className="xl:pl-[300px]">
+              <header className="sticky top-0 z-20 border-b border-[var(--line)] bg-[var(--bg-soft)] px-6 py-3 backdrop-blur">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <InfoChip>{clientLabel}</InfoChip>
+                    <InfoChip>{currencyLabel}</InfoChip>
+                    <InfoChip tone="good">Store sales truth first</InfoChip>
+                    <InfoChip tone={ownerMode ? "good" : "default"}>{ownerMode ? "Owner mode on" : "Owner mode off"}</InfoChip>
+                  </div>
+                  {!portfolioMode && clients.length ? (
+                    <select
+                      value={activeClientId}
+                      onChange={(event) => {
+                        setActiveClientId(event.target.value);
+                        localStorage.setItem("media-dashboard-active-client", event.target.value);
+                      }}
+                      className="rounded-[12px] border border-[var(--line)] bg-[var(--surface-strong)] px-3 py-2 text-sm font-medium text-[var(--ink)] outline-none"
+                    >
+                      {clients.map((client) => (
+                        <option key={client.id} value={client.id}>{client.name} · {client.currencyCode}</option>
+                      ))}
+                    </select>
+                  ) : null}
+                </div>
+                <div className="mt-3 border-t border-[var(--line)] pt-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">{meta.eyebrow}</p>
+                  <h1 className="mt-1 font-serif-display text-[25px] leading-tight font-semibold tracking-tight text-[var(--ink)] md:text-[31px]">{meta.title}</h1>
+                  <p className="mt-1.5 max-w-3xl text-sm leading-6 text-[var(--muted)]">{meta.summary}</p>
+                </div>
+              </header>
+              <div className={`px-6 ${portfolioMode ? "py-3" : "py-4"}`}>{children}</div>
+            </div>
+          </main>
+        </DashboardDateContext.Provider>
+      </DashboardDisplayContext.Provider>
+    </OwnerModeContext.Provider>
+  );
 }
 
-function getDefaultCustomRange(): DashboardCustomRange {
-  const endDate = new Date();
-  const startDate = new Date();
-  startDate.setDate(endDate.getDate() - 6);
-
-  return {
-    startDate: formatDateInput(startDate),
-    endDate: formatDateInput(endDate),
-  };
+function InfoChip({ children, tone = "default" }: { children: React.ReactNode; tone?: "good" | "default" }) {
+  const style = tone === "good" ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-900" : "border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]";
+  return <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${style}`}>{children}</span>;
 }
 
-function formatDateInput(date: Date) {
-  return date.toISOString().slice(0, 10);
+export function StatusPill({ status }: { status: string }) {
+  const tone = /(good|strong|ready|connected|healthy|live|owner)/i.test(status)
+    ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-900"
+    : /(watch|review|weak|blocked|fix|missing|risk|partial)/i.test(status)
+    ? "border-amber-500/25 bg-amber-500/10 text-amber-900"
+    : "border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]";
+  return <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${tone}`}>{status}</span>;
 }
 
-function readStoredCustomRange(): DashboardCustomRange | null {
-  const startDate = window.localStorage.getItem(DASHBOARD_CUSTOM_START_KEY);
-  const endDate = window.localStorage.getItem(DASHBOARD_CUSTOM_END_KEY);
+export function useOwnerMode() {
+  const context = useContext(OwnerModeContext);
+  if (!context) throw new Error("useOwnerMode must be used inside AppShell");
+  return context;
+}
 
-  if (!startDate || !endDate) {
-    return null;
-  }
+export function useDashboardDisplay() {
+  const context = useContext(DashboardDisplayContext);
+  if (!context) throw new Error("useDashboardDisplay must be used inside AppShell");
+  return context;
+}
 
-  return {
-    startDate,
-    endDate,
-  };
+export function useDashboardDate() {
+  const context = useContext(DashboardDateContext);
+  if (!context) throw new Error("useDashboardDate must be used inside AppShell");
+  return context;
+}
+
+function getHeaderMeta(pathname: string) {
+  if (pathname.startsWith("/admin/theme")) return { eyebrow: "Theme System", title: "Dashboard Themes", summary: "Switch the global dashboard palette from one controlled Admin workspace." };
+  if (pathname.startsWith("/portfolio") || pathname.startsWith("/multi-store")) return { eyebrow: "Portfolio", title: "Multi-store Overview", summary: "Compare store performance quickly and rank the portfolio without losing operational context." };
+  if (pathname.startsWith("/paid-media")) return { eyebrow: "Channel Analysis", title: "Paid Media", summary: "Use this workspace for campaign delivery, cost, and efficiency reads." };
+  if (pathname.startsWith("/health")) return { eyebrow: "Business Truth", title: "Business Health", summary: "Check store truth, spend truth, and blended efficiency for decision-making." };
+  if (pathname.startsWith("/funnel")) return { eyebrow: "Conversion Analysis", title: "Funnel", summary: "Read where conversion performance weakens across the funnel." };
+  if (pathname.startsWith("/scaling")) return { eyebrow: "Decision Engine", title: "Scaling", summary: "Use scaling rules after source confidence is high enough to support bigger spend." };
+  if (pathname.startsWith("/action")) return { eyebrow: "Priority Lane", title: "Actions", summary: "See which risks and opportunities need attention first." };
+  if (pathname.startsWith("/admin")) return { eyebrow: "Configuration", title: "Admin", summary: "Connect sources, map clients, and control the logic that powers the dashboard." };
+  return { eyebrow: "Operating Surface", title: "Command Center", summary: "Scan the active client quickly across business truth, paid-media truth, and priority signals." };
+}
+
+function formatMetricValue(value: string, currencyCode: ClientCurrencyCode) {
+  if (!value.startsWith("$")) return value;
+  const parsed = Number(value.slice(1).replace(/,/g, ""));
+  if (!Number.isFinite(parsed)) return value;
+  const { locale } = getCurrencyMeta(currencyCode);
+  return new Intl.NumberFormat(locale, { style: "currency", currency: currencyCode, maximumFractionDigits: 0 }).format(parsed);
+}
+
+function getDateSummary(preset: DashboardDatePreset) {
+  return dateOptions.find((option) => option.value === preset)?.label ?? "Last 7 days";
 }
