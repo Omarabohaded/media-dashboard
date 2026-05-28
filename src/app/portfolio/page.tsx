@@ -242,32 +242,101 @@ function PortfolioContent() {
           description="Try widening the readiness or currency filters so the portfolio grid can show the available stores again."
         />
       ) : (
-        <div className="grid gap-5 xl:grid-cols-2 2xl:grid-cols-3">
-          {visibleCards.map((card) => (
-            <StoreCard key={card.clientId} card={card} />
-          ))}
-        </div>
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-serif-display text-2xl font-semibold tracking-tight text-[var(--ink)]">
+                Store Comparison
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-[var(--muted)]">
+                Ranked by {getSortLabel(sortBy).toLowerCase()} so the primary metrics line up for faster portfolio scanning.
+              </p>
+            </div>
+            <SourcePill label={`${visibleCards.length} stores shown`} tone="default" />
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {visibleCards.map((card, index) => (
+              <StoreCard
+                key={card.clientId}
+                card={card}
+                rank={sortBy === "storeName" ? null : index + 1}
+                sortBy={sortBy}
+              />
+            ))}
+          </div>
+        </section>
       )}
     </div>
   );
 }
 
-function StoreCard({ card }: { card: MultiStoreCard }) {
+function StoreCard({
+  card,
+  rank,
+  sortBy,
+}: {
+  card: MultiStoreCard;
+  rank: number | null;
+  sortBy: SortKey;
+}) {
   return (
-    <div className="rounded-[28px] border border-[var(--line)] bg-[rgba(255,255,255,0.58)] p-5 shadow-[var(--shadow)]">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-            {getPlatformLabel(card.websitePlatform)}
+    <article className="rounded-[26px] border border-[var(--line)] bg-[rgba(255,255,255,0.58)] p-5 shadow-[var(--shadow)]">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            {rank ? (
+              <span className="rounded-full border border-[var(--line)] bg-[rgba(255,255,255,0.7)] px-2.5 py-1 text-xs font-semibold text-[var(--muted)]">
+                #{rank} by {getSortLabel(sortBy)}
+              </span>
+            ) : null}
+            <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+              {getPlatformLabel(card.websitePlatform)}
+            </span>
           </div>
           <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--ink)]">
             {card.storeName}
           </h3>
         </div>
-        <StatusPill status={getStatusLabel(card.status)} />
+        <div className="flex flex-wrap items-center gap-2 md:justify-end">
+          <StatusPill status={getStatusLabel(card.status)} />
+          <SourcePill label={card.currencyCode} tone="default" />
+        </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-4 rounded-[22px] border border-[var(--line)] bg-[rgba(255,255,255,0.5)] p-4">
+        <div className="grid gap-4 md:grid-cols-3">
+          <PrimaryPortfolioMetric
+            label="Ad Spend"
+            value={formatMoney(card.adSpend, card.currencyCode)}
+            hint="Paid-media spend"
+          />
+          <PrimaryPortfolioMetric
+            label="Website Sales"
+            value={formatMoney(card.websiteSales, card.currencyCode)}
+            hint="Store-truth revenue"
+          />
+          <PrimaryPortfolioMetric
+            label="ROAS"
+            value={formatRatio(card.roas)}
+            hint="Sales / spend"
+            tone={card.roas !== null && card.roas >= 2 ? "good" : "default"}
+          />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 rounded-[18px] bg-[rgba(20,34,24,0.035)] px-4 py-3 sm:grid-cols-3">
+        <SecondaryPortfolioMetric label="Orders" value={formatWholeNumber(card.orders)} />
+        <SecondaryPortfolioMetric
+          label="AOV"
+          value={formatMoney(card.aov, card.currencyCode, 2)}
+        />
+        <SecondaryPortfolioMetric
+          label="Cost / Order"
+          value={formatMoney(card.costPerOrder, card.currencyCode, 2)}
+        />
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <SourcePill
           label={card.storeConnected ? "Store truth connected" : "Store truth missing"}
           tone={card.storeConnected ? "good" : "warn"}
@@ -276,99 +345,67 @@ function StoreCard({ card }: { card: MultiStoreCard }) {
           label={card.metaConnected ? "Meta connected" : "Meta missing"}
           tone={card.metaConnected ? "good" : "warn"}
         />
-        <SourcePill label={card.currencyCode} tone="default" />
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        <PortfolioMetric
-          label="Ad Spend"
-          value={formatMoney(card.adSpend, card.currencyCode)}
-          hint="Connected paid-media spend"
-        />
-        <PortfolioMetric
-          label="Website Sales"
-          value={formatMoney(card.websiteSales, card.currencyCode)}
-          hint="Store-truth revenue"
-        />
-        <PortfolioMetric
-          label="ROAS"
-          value={formatRatio(card.roas)}
-          hint="Website sales divided by spend"
-        />
-        <PortfolioMetric
-          label="Orders"
-          value={formatWholeNumber(card.orders)}
-          hint="Website/store orders"
-        />
-        <PortfolioMetric
-          label="AOV"
-          value={formatMoney(card.aov, card.currencyCode, 2)}
-          hint="Website sales divided by orders"
-        />
-        <PortfolioMetric
-          label="Cost per Order"
-          value={formatMoney(card.costPerOrder, card.currencyCode, 2)}
-          hint="Spend divided by orders"
-        />
-      </div>
-
-      <div className="mt-5 grid gap-3">
-        <SourceRow label="Store source" value={card.storeSourceLabel} />
-        <SourceRow label="Paid media source" value={card.metaSourceLabel} />
+      <div className="mt-3 grid gap-2 text-xs leading-5 text-[var(--muted)] md:grid-cols-2">
+        <div>
+          <span className="font-semibold text-[var(--ink)]">Store source:</span> {card.storeSourceLabel}
+        </div>
+        <div>
+          <span className="font-semibold text-[var(--ink)]">Paid media:</span> {card.metaSourceLabel}
+        </div>
       </div>
 
       {card.issues.length ? (
-        <div className="mt-5 rounded-[22px] border border-amber-300 bg-amber-50 p-4">
-          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-900">
-            Issues to watch
-          </div>
-          <div className="mt-2 space-y-2 text-sm leading-6 text-amber-900">
-            {card.issues.map((issue) => (
-              <div key={issue}>{issue}</div>
-            ))}
-          </div>
+        <div className="mt-4 rounded-[18px] border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+          <span className="font-semibold">Watch:</span> {card.issues.slice(0, 2).join(" ")}
+          {card.issues.length > 2 ? ` +${card.issues.length - 2} more` : ""}
         </div>
       ) : null}
 
-      <div className="mt-5 flex items-center justify-between gap-3">
+      <div className="mt-4 flex flex-col gap-3 border-t border-[var(--line)] pt-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-sm text-[var(--muted)]">
-          Open this store to inspect campaign, funnel, and health views in more detail.
+          Open the store for campaign, funnel, and health details.
         </div>
         <button
           type="button"
           onClick={() => openStoreDashboard(card.clientId)}
-          className="shrink-0 rounded-2xl bg-[var(--accent)] px-4 py-3 text-sm font-semibold text-white transition hover:opacity-90"
+          className="shrink-0 rounded-2xl bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
         >
           Open store dashboard
         </button>
       </div>
-    </div>
+    </article>
   );
 }
 
-function PortfolioMetric({
+function PrimaryPortfolioMetric({
   label,
   value,
   hint,
+  tone = "default",
 }: {
   label: string;
   value: string;
   hint: string;
+  tone?: "good" | "default";
 }) {
+  const valueColor = tone === "good" ? "text-emerald-800" : "text-[var(--ink)]";
+
   return (
-    <div className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.62)] p-4">
+    <div className="min-w-0">
       <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
         {label}
       </div>
-      <div className="mt-2 text-2xl font-semibold tracking-tight text-[var(--ink)]">
+      <div className={`mt-2 text-[26px] font-semibold leading-none tracking-tight ${valueColor}`}>
         {value}
       </div>
-      <div className="mt-2 text-sm text-[var(--muted)]">{hint}</div>
+      <div className="mt-2 text-xs leading-5 text-[var(--muted)]">{hint}</div>
     </div>
   );
 }
 
-function SourceRow({
+function SecondaryPortfolioMetric({
   label,
   value,
 }: {
@@ -376,11 +413,11 @@ function SourceRow({
   value: string;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-[18px] border border-[var(--line)] bg-[rgba(255,255,255,0.62)] px-4 py-3">
-      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+    <div className="min-w-0">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
         {label}
       </div>
-      <div className="text-right text-sm font-medium text-[var(--ink)]">{value}</div>
+      <div className="mt-1 text-base font-semibold text-[var(--ink)]">{value}</div>
     </div>
   );
 }
@@ -434,6 +471,10 @@ function getSortableValue(card: MultiStoreCard, sortBy: Exclude<SortKey, "storeN
   }
 
   return card.aov;
+}
+
+function getSortLabel(sortBy: SortKey) {
+  return SORT_OPTIONS.find((option) => option.value === sortBy)?.label ?? "Website sales";
 }
 
 function getPlatformLabel(platform: MultiStoreCard["websitePlatform"]) {
