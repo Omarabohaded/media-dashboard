@@ -395,7 +395,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
         cache: "no-store",
       }
     );
-    const previewPayload = (await response.json()) as
+    const previewPayload = (await previewResponse.json()) as
       | ShopifyPreviewResponse
       | WordPressPreviewResponse
       | { error?: string };
