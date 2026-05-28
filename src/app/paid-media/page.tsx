@@ -10,6 +10,10 @@ import {
   SourcePill,
   StatusPill,
 } from "@/components/AppShell";
+import {
+  getCpaDenominatorLabel,
+  getEffectiveCpaCac,
+} from "@/lib/dashboardMetricLogic";
 import { useDashboardReadiness } from "@/lib/useDashboardReadiness";
 
 function formatMoney(value: number, currencyCode: string) {
@@ -32,7 +36,14 @@ function formatPercent(value: number, digits = 1) {
 }
 
 export default function PaidMediaPage() {
-  const { activeClient, isLoading, metaPreview, metaStatus } = useDashboardReadiness();
+  const {
+    activeClient,
+    isLoading,
+    metaPreview,
+    metaStatus,
+    storePreview,
+    metricLogic,
+  } = useDashboardReadiness();
 
   const hasMeta = Boolean(metaPreview && metaStatus?.selectedAccountId);
   const currency = metaStatus?.selectedAccount?.currency ?? "USD";
@@ -45,6 +56,7 @@ export default function PaidMediaPage() {
   const cpc = clicks > 0 ? spend / clicks : null;
   const cpm = impressions > 0 ? (spend / impressions) * 1000 : null;
   const roas = spend > 0 ? revenue / spend : null;
+  const cpaCac = getEffectiveCpaCac(metaPreview, storePreview, metricLogic);
   const sortedRows = [...(metaPreview?.rows ?? [])].sort((a, b) => b.spend - a.spend);
   const avgFrequency =
     sortedRows.length > 0
@@ -80,6 +92,12 @@ export default function PaidMediaPage() {
             label={hasMeta ? "Meta live" : "Meta missing"}
             tone={hasMeta ? "good" : "warn"}
           />
+          <SourcePill
+            label={`CPA / CAC uses ${getCpaDenominatorLabel(
+              cpaCac.appliedDenominator
+            )}`}
+            tone={cpaCac.blockedReason ? "warn" : "default"}
+          />
           <SourcePill label="Google pending" tone="default" />
           <SourcePill label="TikTok pending" tone="default" />
           <SourcePill label="Snap pending" tone="default" />
@@ -101,7 +119,7 @@ export default function PaidMediaPage() {
           title="Paid Media Snapshot"
           subtitle="These are the delivery and efficiency metrics that belong on a real paid-media page, not inside the command center scroll."
         >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
             <MiniMetric
               label="Spend"
               value={hasMeta ? formatMoney(spend, currency) : "Waiting"}
@@ -119,6 +137,15 @@ export default function PaidMediaPage() {
               value={roas !== null ? `${formatNumber(roas, 2)}x` : "Waiting"}
               hint="Attributed revenue divided by spend"
               tone={roas !== null ? "good" : "warn"}
+            />
+            <MiniMetric
+              label="CPA / CAC"
+              value={cpaCac.value !== null ? formatMoney(cpaCac.value, currency) : "Blocked"}
+              hint={
+                cpaCac.blockedReason ??
+                `${getCpaDenominatorLabel(cpaCac.appliedDenominator)} denominator`
+              }
+              tone={cpaCac.value !== null ? "good" : "warn"}
             />
             <MiniMetric
               label="CTR"
