@@ -306,7 +306,7 @@ export function AppShell({
                     </InfoChip>
                   </div>
 
-                  <div className="grid gap-3 2xl:grid-cols-[minmax(0,1.45fr),minmax(360px,1fr)] 2xl:items-start">
+                  <div className="grid gap-3 2xl:grid-cols-[minmax(0,1fr),auto] 2xl:items-start">
                     <div className="min-w-0">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
                         {headerMeta.eyebrow}
@@ -322,13 +322,7 @@ export function AppShell({
                       </p>
                     </div>
 
-                    <div
-                      className={`grid gap-2 ${
-                        showDateController
-                          ? "xl:grid-cols-[minmax(0,1.15fr),minmax(220px,0.85fr)]"
-                          : "xl:grid-cols-1"
-                      }`}
-                    >
+                    <div className="flex flex-wrap items-start gap-2 2xl:justify-end">
                       {showDateController ? (
                         <DateControlCard
                           activeLabel={dashboardDate.activeLabel}
@@ -398,21 +392,22 @@ function DateControlCard({
   }
 
   return (
-    <div className="rounded-[16px] border border-[var(--line)] bg-[rgba(255,255,255,0.56)] px-3 py-2.5 shadow-[var(--shadow)]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-            <CalendarRange size={13} />
-            <span>Reporting Window</span>
-          </div>
-          <div className="mt-1 text-sm font-semibold leading-5 text-[var(--ink)]">
-            {activeLabel}
-          </div>
-          <div className="mt-0.5 text-xs leading-5 text-[var(--muted)]">
-            {activeSummary}
-          </div>
+    <div className="min-w-[228px] rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.56)] px-3 py-2 shadow-[var(--shadow)] xl:w-[258px]">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+          <CalendarRange size={13} />
+          <span>Reporting Window</span>
         </div>
         <StatusPill status="Live" />
+      </div>
+
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="text-sm font-semibold leading-5 text-[var(--ink)]">
+          {activeLabel}
+        </span>
+        <span className="text-[11px] leading-4 text-[var(--muted)]">
+          {activeSummary}
+        </span>
       </div>
 
       <select
@@ -420,7 +415,7 @@ function DateControlCard({
         onChange={(event) =>
           onPresetChange(event.target.value as DashboardDatePreset)
         }
-        className="mt-2 w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.8)] px-3 py-2.5 text-sm font-medium text-[var(--ink)] outline-none"
+        className="mt-2 w-full rounded-[12px] border border-[var(--line)] bg-[rgba(255,255,255,0.8)] px-2.5 py-2 text-sm font-medium text-[var(--ink)] outline-none"
       >
         {DATE_PRESET_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>
@@ -430,7 +425,7 @@ function DateControlCard({
       </select>
 
       {datePreset === "custom" ? (
-        <div className="mt-3 rounded-[16px] border border-[var(--line)] bg-[rgba(255,255,255,0.65)] p-3">
+        <div className="mt-2 rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.65)] p-3">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm text-[var(--ink)]">
               <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
@@ -446,7 +441,7 @@ function DateControlCard({
                   }));
                   setRangeError(null);
                 }}
-                className="mt-2 w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.88)] px-3 py-2.5 text-sm font-medium text-[var(--ink)] outline-none"
+                className="mt-2 w-full rounded-[12px] border border-[var(--line)] bg-[rgba(255,255,255,0.88)] px-2.5 py-2 text-sm font-medium text-[var(--ink)] outline-none"
               />
             </label>
             <label className="text-sm text-[var(--ink)]">
@@ -463,25 +458,22 @@ function DateControlCard({
                   }));
                   setRangeError(null);
                 }}
-                className="mt-2 w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.88)] px-3 py-2.5 text-sm font-medium text-[var(--ink)] outline-none"
+                className="mt-2 w-full rounded-[12px] border border-[var(--line)] bg-[rgba(255,255,255,0.88)] px-2.5 py-2 text-sm font-medium text-[var(--ink)] outline-none"
               />
             </label>
           </div>
 
           {rangeError ? (
-            <div className="mt-3 rounded-[14px] border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <div className="mt-3 rounded-[12px] border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               {rangeError}
             </div>
           ) : null}
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-xs leading-5 text-[var(--muted)]">
-              Apply a custom reporting window for live Meta preview queries.
-            </div>
             <button
               type="button"
               onClick={handleApply}
-              className="rounded-[14px] bg-[var(--accent)] px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90"
+              className="rounded-[12px] bg-[var(--accent)] px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90"
             >
               Apply custom range
             </button>
@@ -507,22 +499,19 @@ function ScopeControlCard({
 }) {
   if (portfolioMode) {
     return (
-      <div className="rounded-[16px] border border-[var(--line)] bg-[rgba(255,255,255,0.56)] px-3 py-2.5 shadow-[var(--shadow)]">
+      <div className="min-w-[208px] rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.56)] px-3 py-2 shadow-[var(--shadow)] xl:w-[228px]">
         <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
           Scope
         </div>
-        <div className="mt-1 text-sm font-semibold text-[var(--ink)]">
+        <div className="mt-1 text-sm font-semibold leading-5 text-[var(--ink)]">
           All configured stores
-        </div>
-        <div className="mt-0.5 text-xs leading-5 text-[var(--muted)]">
-          Open any store card below to jump into its deeper dashboard view.
         </div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-[16px] border border-[var(--line)] bg-[rgba(255,255,255,0.56)] px-3 py-2.5 shadow-[var(--shadow)]">
+    <div className="min-w-[228px] rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.56)] px-3 py-2 shadow-[var(--shadow)] xl:w-[258px]">
       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
         Active Client
       </div>
@@ -530,7 +519,7 @@ function ScopeControlCard({
         value={activeClientId}
         onChange={(event) => onClientSwitch(event.target.value)}
         disabled={isLoadingClients || clients.length === 0}
-        className="mt-2 w-full rounded-[14px] border border-[var(--line)] bg-[rgba(255,255,255,0.8)] px-3 py-2.5 text-sm font-medium text-[var(--ink)] outline-none"
+        className="mt-2 w-full rounded-[12px] border border-[var(--line)] bg-[rgba(255,255,255,0.8)] px-2.5 py-2 text-sm font-medium text-[var(--ink)] outline-none"
       >
         {isLoadingClients ? (
           <option value="">Loading clients...</option>
@@ -544,9 +533,6 @@ function ScopeControlCard({
           <option value="">Create a client in Admin first</option>
         )}
       </select>
-      <div className="mt-2 text-xs leading-5 text-[var(--muted)]">
-        The selected client controls the working view across the store-level dashboard routes.
-      </div>
     </div>
   );
 }
