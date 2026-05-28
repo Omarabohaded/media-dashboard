@@ -272,69 +272,69 @@ export function AppShell({
             <div className="xl:pl-[300px]">
               <header
                 className={`sticky top-0 z-20 border-b border-[var(--line)] bg-[rgba(249,246,239,0.88)] px-6 backdrop-blur ${
-                  portfolioMode ? "py-3" : "py-5"
+                  portfolioMode ? "py-2" : "py-5"
                 }`}
               >
                 <div
                   className={`flex flex-col ${
                     portfolioMode
-                      ? "gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between"
+                      ? "gap-2 xl:flex-row xl:items-start xl:justify-between"
                       : "gap-4 2xl:flex-row 2xl:items-start 2xl:justify-between"
                   }`}
                 >
-                  <div className={portfolioMode ? "max-w-4xl" : undefined}>
-                    <div
-                      className={`flex flex-wrap gap-2 ${
-                        portfolioMode ? "mb-2" : "mb-3"
-                      }`}
-                    >
-                      <InfoChip tone="default">
-                        {portfolioMode
-                          ? "All stores in portfolio scope"
-                          : isLoadingClients
-                          ? "Loading client..."
-                          : activeClient?.name ?? "No client selected"}
-                      </InfoChip>
-                      <InfoChip tone="warn">
-                        {portfolioMode
-                          ? "Portfolio comparison view"
-                          : isLoadingClients
-                          ? "Currency loading"
-                          : activeClient
-                          ? getCurrencyMeta(activeClient.currencyCode).label
-                          : "Currency pending"}
-                      </InfoChip>
-                      <InfoChip tone="good">Store sales truth first</InfoChip>
-                      <InfoChip tone={ownerMode ? "good" : "default"}>
-                        {ownerMode ? "Owner mode on" : "Owner mode off"}
-                      </InfoChip>
-                    </div>
-                    <h1
-                      className={`font-serif-display font-semibold tracking-tight ${
-                        portfolioMode
-                          ? "text-2xl leading-tight md:text-3xl"
-                          : "text-3xl leading-tight md:text-5xl"
-                      }`}
-                    >
-                      Media Buying Reporting Dashboard
-                    </h1>
-                    <p
-                      className={`max-w-3xl text-[var(--muted)] ${
-                        portfolioMode
-                          ? "mt-1 text-sm leading-5 md:text-[15px]"
-                          : "mt-2 text-sm leading-6 md:text-base"
-                      }`}
-                    >
-                      Decision-first reporting across business truth, platform truth,
-                      blended metrics, and confidence-based recommendations.
-                    </p>
+                  <div className={portfolioMode ? "max-w-3xl" : undefined}>
+                    {portfolioMode ? (
+                      <>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <InfoChip tone="default">Portfolio</InfoChip>
+                          <InfoChip tone={ownerMode ? "good" : "default"}>
+                            {ownerMode ? "Owner mode on" : "Owner mode off"}
+                          </InfoChip>
+                          <InfoChip tone="good">Store sales truth first</InfoChip>
+                        </div>
+                        <h1 className="mt-1 font-serif-display text-[24px] leading-tight font-semibold tracking-tight text-[var(--ink)] md:text-[28px]">
+                          Multi-store portfolio dashboard
+                        </h1>
+                        <p className="mt-0.5 text-sm leading-5 text-[var(--muted)] md:text-[15px]">
+                          Compare stores quickly and reach the live portfolio data without a hero-style intro.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="mb-3 flex flex-wrap gap-2">
+                          <InfoChip tone="default">
+                            {isLoadingClients
+                              ? "Loading client..."
+                              : activeClient?.name ?? "No client selected"}
+                          </InfoChip>
+                          <InfoChip tone="warn">
+                            {isLoadingClients
+                              ? "Currency loading"
+                              : activeClient
+                              ? getCurrencyMeta(activeClient.currencyCode).label
+                              : "Currency pending"}
+                          </InfoChip>
+                          <InfoChip tone="good">Store sales truth first</InfoChip>
+                          <InfoChip tone={ownerMode ? "good" : "default"}>
+                            {ownerMode ? "Owner mode on" : "Owner mode off"}
+                          </InfoChip>
+                        </div>
+                        <h1 className="font-serif-display text-3xl leading-tight font-semibold tracking-tight md:text-5xl">
+                          Media Buying Reporting Dashboard
+                        </h1>
+                        <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)] md:text-base">
+                          Decision-first reporting across business truth, platform truth,
+                          blended metrics, and confidence-based recommendations.
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   <div
-                    className={`grid gap-3 ${
+                    className={`grid gap-2 ${
                       showDateController
                         ? portfolioMode
-                          ? "xl:min-w-[560px] xl:grid-cols-[1.05fr,0.85fr]"
+                          ? "xl:min-w-[500px] xl:grid-cols-[1fr,0.8fr]"
                           : "xl:min-w-[620px] xl:grid-cols-[1.2fr,0.95fr]"
                         : "xl:min-w-[280px]"
                     }`}
@@ -351,15 +351,15 @@ export function AppShell({
                       />
                     ) : null}
                     {portfolioMode ? (
-                      <div className="min-w-[280px] rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.5)] p-3 shadow-[var(--shadow)]">
+                      <div className="min-w-[240px] rounded-[18px] border border-[var(--line)] bg-[rgba(255,255,255,0.5)] px-3 py-2 shadow-[var(--shadow)]">
                         <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-                          Portfolio Scope
+                          Scope
                         </div>
                         <div className="mt-1 text-sm font-semibold text-[var(--ink)]">
                           All configured stores
                         </div>
-                        <div className="mt-1 text-sm leading-5 text-[var(--muted)]">
-                          Use a store card below to jump into the deeper single-store dashboard with that client set as active.
+                        <div className="mt-0.5 text-xs leading-5 text-[var(--muted)]">
+                          Open a store card below to jump into its deeper dashboard view.
                         </div>
                       </div>
                     ) : (
@@ -391,7 +391,7 @@ export function AppShell({
                 </div>
               </header>
 
-              <div className={`px-6 ${portfolioMode ? "py-4" : "py-6"}`}>{children}</div>
+              <div className={`px-6 ${portfolioMode ? "py-2.5" : "py-6"}`}>{children}</div>
             </div>
           </main>
         </DashboardDateContext.Provider>
@@ -440,16 +440,16 @@ function DateControlCard({
   }
 
   return (
-    <div className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.5)] p-3 shadow-[var(--shadow)]">
+    <div className="rounded-[18px] border border-[var(--line)] bg-[rgba(255,255,255,0.5)] px-3 py-2 shadow-[var(--shadow)]">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+          <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
             <CalendarRange size={14} />
             <span>Reporting Window</span>
           </div>
           <div
             className={`font-semibold text-[var(--ink)] ${
-              compact ? "mt-1 text-sm" : "mt-2 text-base"
+              compact ? "mt-1 text-sm leading-5" : "mt-2 text-base"
             }`}
           >
             {activeLabel}
@@ -471,7 +471,7 @@ function DateControlCard({
           onPresetChange(event.target.value as DashboardDatePreset)
         }
         className={`w-full rounded-2xl border border-[var(--line)] bg-[rgba(255,255,255,0.78)] text-sm font-medium text-[var(--ink)] outline-none ${
-          compact ? "mt-2 px-3 py-2.5" : "mt-3 px-3 py-3"
+          compact ? "mt-2 px-3 py-2" : "mt-3 px-3 py-3"
         }`}
       >
         {DATE_PRESET_OPTIONS.map((option) => (
@@ -541,9 +541,11 @@ function DateControlCard({
         </div>
       ) : null}
 
-      <div className={`text-xs text-[var(--muted)] ${compact ? "mt-1" : "mt-2"}`}>
-        Updates live Meta reporting previews across the dashboard.
-      </div>
+      {compact ? null : (
+        <div className="mt-2 text-xs text-[var(--muted)]">
+          Updates live Meta reporting previews across the dashboard.
+        </div>
+      )}
     </div>
   );
 }
