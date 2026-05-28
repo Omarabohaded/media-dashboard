@@ -11,6 +11,12 @@ import {
   SourcePill,
   StatusPill,
 } from "@/components/AppShell";
+import {
+  getEffectiveAov,
+  getEffectiveMer,
+  getEffectiveStoreRevenue,
+  getRevenueBasisLabel,
+} from "@/lib/dashboardMetricLogic";
 import { getFunnelReadiness } from "@/lib/funnelReadiness";
 import { useDashboardReadiness } from "@/lib/useDashboardReadiness";
 import { evaluateTrackingGap } from "@/lib/workbookSignals";
@@ -39,17 +45,18 @@ export default function DashboardPage() {
     metaStatus,
     storePreview,
     storeStatus,
+    metricLogic,
   } = useDashboardReadiness();
 
   const hasMeta = Boolean(metaPreview && metaStatus?.selectedAccountId);
   const hasStoreTruth = Boolean(storePreview);
   const storeCurrency = storePreview?.currencyCode ?? activeClient?.currencyCode ?? "USD";
   const spend = metaPreview?.totals.spend ?? 0;
-  const revenue = storePreview?.grossSales ?? 0;
+  const revenue = getEffectiveStoreRevenue(storePreview, metricLogic);
   const orders = storePreview?.ordersCount ?? 0;
-  const mer = hasMeta && hasStoreTruth && spend > 0 ? revenue / spend : null;
+  const mer = getEffectiveMer(storePreview, metaPreview, metricLogic);
   const blendedRoas = hasMeta && spend > 0 ? metaPreview!.totals.purchaseValue / spend : null;
-  const aov = hasStoreTruth && orders > 0 ? revenue / orders : null;
+  const aov = getEffectiveAov(storePreview, metricLogic);
   const clicks = metaPreview?.totals.clicks ?? 0;
   const platformPurchases = metaPreview?.totals.purchases ?? 0;
   const purchaseProxyCvr = hasMeta && clicks > 0 ? (platformPurchases / clicks) * 100 : null;
@@ -148,7 +155,7 @@ export default function DashboardPage() {
           <MiniMetric
             label="Store Revenue"
             value={hasStoreTruth ? formatMoney(revenue, storeCurrency) : "Waiting"}
-            hint="Business truth"
+            hint={hasStoreTruth ? getRevenueBasisLabel(metricLogic.storeRevenueBasis) : "Business truth"}
             tone={hasStoreTruth ? "good" : "warn"}
           />
           <MiniMetric
@@ -166,7 +173,7 @@ export default function DashboardPage() {
           <MiniMetric
             label="MER"
             value={mer !== null ? `${formatNumber(mer, 2)}x` : "Waiting"}
-            hint="Store revenue divided by ad spend"
+            hint={`${getRevenueBasisLabel(metricLogic.merRevenueBasis)} divided by ad spend`}
             tone={mer !== null ? (mer >= 2 ? "good" : "warn") : "warn"}
           />
           <MiniMetric
@@ -178,7 +185,7 @@ export default function DashboardPage() {
           <MiniMetric
             label="AOV"
             value={aov !== null ? formatMoney(aov, storeCurrency) : "Waiting"}
-            hint="Revenue divided by orders"
+            hint={aov !== null ? `${getRevenueBasisLabel(metricLogic.aovRevenueBasis)} divided by orders` : "Revenue divided by orders"}
             tone={aov !== null ? "good" : "warn"}
           />
         </div>
