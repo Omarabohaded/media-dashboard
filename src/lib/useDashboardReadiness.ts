@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useDashboardDate } from "@/components/AppShell";
 import type { ClientRecord, WebsitePlatform } from "@/lib/clientTypes";
 
 type ClientDirectoryResponse = {
@@ -129,6 +128,9 @@ type HookOptions = {
   includeMetaPreview?: boolean;
   metaPreviewQuery?: string;
 };
+
+const DASHBOARD_DATE_PRESET_KEY = "media-dashboard-date-preset";
+const DEFAULT_META_PREVIEW_QUERY = "datePreset=last_7d";
 
 function getDeclinedStoreMessage(platform: WebsitePlatform) {
   return platform === "shopify" || platform === "wordpress"
@@ -262,14 +264,25 @@ function normalizeStorePreview(
   };
 }
 
+function getStoredMetaPreviewQuery() {
+  if (typeof window === "undefined") {
+    return DEFAULT_META_PREVIEW_QUERY;
+  }
+
+  const savedPreset = window.localStorage.getItem(DASHBOARD_DATE_PRESET_KEY);
+  return savedPreset ? `datePreset=${savedPreset}` : DEFAULT_META_PREVIEW_QUERY;
+}
+
 export function useDashboardReadiness(options: HookOptions = {}) {
-  const { metaPreviewQuery: activeDateQuery } = useDashboardDate();
   const {
     includeStorePreview = true,
     includeMetaPreview = true,
     metaPreviewQuery,
   } = options;
-  const effectiveMetaPreviewQuery = metaPreviewQuery ?? activeDateQuery;
+  const [storedMetaPreviewQuery, setStoredMetaPreviewQuery] = useState(
+    DEFAULT_META_PREVIEW_QUERY
+  );
+  const effectiveMetaPreviewQuery = metaPreviewQuery ?? storedMetaPreviewQuery;
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [activeClientId, setActiveClientIdState] = useState("");
   const [metaStatus, setMetaStatus] = useState<DashboardMetaStatus | null>(null);
@@ -433,6 +446,14 @@ export function useDashboardReadiness(options: HookOptions = {}) {
       setIsLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (metaPreviewQuery) {
+      return;
+    }
+
+    setStoredMetaPreviewQuery(getStoredMetaPreviewQuery());
+  }, [metaPreviewQuery]);
 
   useEffect(() => {
     void refresh();
