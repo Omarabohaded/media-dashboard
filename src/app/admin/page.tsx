@@ -136,6 +136,123 @@ function MissingEnv({ values }: { values: string[] }) {
   );
 }
 
+function MetaAccountSearchPicker({
+  accounts,
+  selectedAccountId,
+  searchValue,
+  onSearchChange,
+  onSelect,
+}: {
+  accounts: MetaAccountOption[];
+  selectedAccountId: string;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  onSelect: (accountId: string) => void;
+}) {
+  const normalizedSearch = searchValue.trim().toLowerCase();
+  const selectedAccount = accounts.find((account) => account.id === selectedAccountId) ?? null;
+  const filteredAccounts = useMemo(() => {
+    if (!normalizedSearch) {
+      return accounts;
+    }
+
+    return accounts.filter((account) => {
+      const accountText = `${account.name} ${account.id} ${account.currency ?? ""}`.toLowerCase();
+      return accountText.includes(normalizedSearch);
+    });
+  }, [accounts, normalizedSearch]);
+
+  return (
+    <div className="mt-3 space-y-3">
+      <label className="block">
+        <span className="text-xs font-black uppercase text-slate-400">
+          Search by account name or ID
+        </span>
+        <input
+          value={searchValue}
+          onChange={(event) => onSearchChange(event.target.value)}
+          placeholder="Type account name, ID, or currency"
+          className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-500"
+        />
+      </label>
+
+      {selectedAccount ? (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-4 py-3 text-sm">
+          <div className="text-xs font-black uppercase text-emerald-200">
+            Selected for this client
+          </div>
+          <div className="mt-1 font-bold text-white">{selectedAccount.name}</div>
+          <div className="mt-1 text-xs text-emerald-100">
+            {selectedAccount.id}
+            {selectedAccount.currency ? ` · ${selectedAccount.currency}` : ""}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/70">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-800 px-4 py-2 text-xs text-slate-400">
+          <span>
+            {filteredAccounts.length} of {accounts.length} accounts
+          </span>
+          {searchValue ? (
+            <button
+              type="button"
+              onClick={() => onSearchChange("")}
+              className="font-bold text-cyan-200 transition hover:text-white"
+            >
+              Clear search
+            </button>
+          ) : null}
+        </div>
+
+        <div className="max-h-72 overflow-y-auto">
+          {!accounts.length ? (
+            <div className="px-4 py-4 text-sm text-slate-400">
+              Connect Meta first so available ad accounts can load here.
+            </div>
+          ) : !filteredAccounts.length ? (
+            <div className="px-4 py-4 text-sm text-slate-400">
+              No ad accounts match this search. Try the account name or the numeric ID.
+            </div>
+          ) : (
+            filteredAccounts.map((account) => {
+              const isSelected = account.id === selectedAccountId;
+
+              return (
+                <button
+                  type="button"
+                  key={account.id}
+                  onClick={() => onSelect(account.id)}
+                  className={`block w-full border-b border-slate-800 px-4 py-3 text-left text-sm transition last:border-b-0 ${
+                    isSelected
+                      ? "bg-emerald-950/30 text-white"
+                      : "text-slate-200 hover:bg-slate-900"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate font-bold">{account.name}</div>
+                      <div className="mt-1 break-all text-xs text-slate-400">
+                        {account.id}
+                        {account.currency ? ` · ${account.currency}` : ""}
+                      </div>
+                    </div>
+                    {isSelected ? (
+                      <span className="shrink-0 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-bold text-emerald-100">
+                        Selected
+                      </span>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [activeClientId, setActiveClientId] = useState("");
@@ -152,6 +269,7 @@ export default function AdminPage() {
   const [shopifyMessage, setShopifyMessage] = useState<string | null>(null);
   const [wordpressMessage, setWordpressMessage] = useState<string | null>(null);
   const [accountDraft, setAccountDraft] = useState("");
+  const [accountSearchDraft, setAccountSearchDraft] = useState("");
   const [shopifyStoreDomainDraft, setShopifyStoreDomainDraft] = useState("");
   const [metaStatus, setMetaStatus] = useState<MetaStatus | null>(null);
   const [metaPreview, setMetaPreview] = useState<MetaInsightsPreview | null>(null);
@@ -198,6 +316,7 @@ export default function AdminPage() {
     const payload = (await response.json()) as MetaStatus;
     setMetaStatus(payload);
     setAccountDraft(payload.selectedAccountId ?? payload.accounts[0]?.id ?? "");
+    setAccountSearchDraft("");
   }
 
   async function loadShopifyStatus(clientId: string) {
@@ -719,7 +838,7 @@ export default function AdminPage() {
         <div className="grid gap-5 xl:grid-cols-3">
           <Section
             title="Meta Connection"
-            subtitle="Use the official Meta app flow, then save the correct ad account to the active client."
+            subtitle="Use the official Meta app flow, then search and save the correct ad account to the active client."
           >
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -795,25 +914,28 @@ export default function AdminPage() {
             </div>
 
             <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-950/40 p-4">
-              <div className="text-xs font-black uppercase text-slate-400">
-                Save Account To Client
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="text-xs font-black uppercase text-slate-400">
+                    Save Account To Client
+                  </div>
+                  <div className="mt-1 text-sm text-slate-300">
+                    Search the connected Meta accounts, confirm the ID, then save it to the active client.
+                  </div>
+                </div>
+                <StatusPill status={accountDraft ? "Account chosen" : "Choose account"} />
               </div>
-              <select
-                value={accountDraft}
-                onChange={(event) => setAccountDraft(event.target.value)}
-                className="mt-3 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none"
-              >
-                <option value="">Select a Meta ad account</option>
-                {(metaStatus?.accounts ?? []).map((account) => (
-                  <option key={account.id} value={account.id}>
-                    {account.name} ({account.id})
-                  </option>
-                ))}
-              </select>
+
+              <MetaAccountSearchPicker
+                accounts={metaStatus?.accounts ?? []}
+                selectedAccountId={accountDraft}
+                searchValue={accountSearchDraft}
+                onSearchChange={setAccountSearchDraft}
+                onSelect={setAccountDraft}
+              />
 
               <div className="mt-3 text-xs text-slate-500">
-                If some ad accounts are missing, the connected Meta user usually
-                does not have access to them in Business Manager.
+                Search matches both account name and account ID. If some ad accounts are missing, the connected Meta user usually does not have access to them in Business Manager.
               </div>
 
               <div className="mt-4 flex flex-wrap gap-3">
@@ -1041,9 +1163,9 @@ export default function AdminPage() {
         >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <MiniMetric
-              label="Save Feedback"
+              label="Account Search"
               value="Added"
-              hint="Saving the Meta account now shows a clear success message."
+              hint="Meta ad accounts can now be filtered by name, ID, or currency before saving."
               tone="good"
             />
             <MiniMetric
