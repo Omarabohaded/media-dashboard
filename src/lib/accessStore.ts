@@ -5,6 +5,7 @@ import {
   type UserRole,
   type UserStatus,
 } from "@/lib/accessTypes";
+import { hashPassword } from "@/lib/password";
 import {
   getRuntimeStorageMeta,
   readRuntimeJsonStore,
@@ -32,6 +33,7 @@ function normalizeEmail(email: string) {
 
 function buildDefaultOwner(): DashboardUser {
   const createdAt = nowIso();
+  const bootstrapPassword = process.env.DASHBOARD_BOOTSTRAP_PASSWORD;
 
   return {
     id: "user-owner-omar",
@@ -39,6 +41,7 @@ function buildDefaultOwner(): DashboardUser {
     email: DEFAULT_OWNER_EMAIL,
     role: "owner",
     status: "active",
+    passwordHash: bootstrapPassword ? hashPassword(bootstrapPassword) : null,
     createdAt,
     updatedAt: createdAt,
     lastLoginAt: null,
@@ -60,6 +63,7 @@ function normalizeState(state: AccessStoreState): AccessStoreState {
     ...user,
     email: normalizeEmail(user.email),
     status: user.status ?? "invited",
+    passwordHash: user.passwordHash ?? null,
     updatedAt: user.updatedAt ?? user.createdAt ?? nowIso(),
     lastLoginAt: user.lastLoginAt ?? null,
   }));
@@ -129,6 +133,7 @@ export async function createUser(input: {
   email: string;
   role: UserRole;
   status?: UserStatus;
+  password?: string;
   clientAssignments?: Array<{ clientId: string; accessLevel: ClientAccessLevel }>;
 }) {
   const name = input.name.trim();
@@ -149,6 +154,7 @@ export async function createUser(input: {
     email,
     role: input.role,
     status: input.status ?? "invited",
+    passwordHash: input.password ? hashPassword(input.password) : null,
     createdAt,
     updatedAt: createdAt,
     lastLoginAt: null,
@@ -186,6 +192,7 @@ export async function updateUser(input: {
   name?: string;
   role?: UserRole;
   status?: UserStatus;
+  password?: string;
   clientAssignments?: Array<{ clientId: string; accessLevel: ClientAccessLevel }>;
 }) {
   const updatedAt = nowIso();
@@ -216,6 +223,7 @@ export async function updateUser(input: {
             name: input.name?.trim() || user.name,
             role: input.role ?? user.role,
             status: input.status ?? user.status,
+            passwordHash: input.password ? hashPassword(input.password) : user.passwordHash,
             updatedAt,
           }
         : user
@@ -281,4 +289,12 @@ export async function getAssignedClientIds(userId: string) {
   return state.assignments
     .filter((assignment) => assignment.userId === userId)
     .map((assignment) => assignment.clientId);
+}
+
+export function sanitizeUser(user: DashboardUser) {
+  const { passwordHash, ...safeUser } = user;
+  return {
+    ...safeUser,
+    hasPassword: Boolean(passwordHash),
+  };
 }
