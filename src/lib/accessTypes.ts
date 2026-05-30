@@ -10,6 +10,7 @@ export type DashboardUser = {
   email: string;
   role: UserRole;
   status: UserStatus;
+  passwordHash: string | null;
   createdAt: string;
   updatedAt: string;
   lastLoginAt: string | null;
