@@ -7,6 +7,11 @@ import {
   listClients,
   updateClientStoreAccess,
 } from "@/lib/clientStore";
+import { getVisibleClientsForUser } from "@/lib/accessControl";
+import {
+  requireAuthenticatedUser,
+  requireClientManagementAccess,
+} from "@/lib/serverAccess";
 import {
   type ClientCurrencyCode,
   SUPPORTED_CLIENT_CURRENCIES,
@@ -22,21 +27,31 @@ const allowedPlatforms = new Set<WebsitePlatform>([
 ]);
 
 export async function GET(request: NextRequest) {
+  const access = await requireAuthenticatedUser();
+  if (access.response) return access.response;
+
   const requestedClientId = request.nextUrl.searchParams.get("clientId");
-  const [clients, activeClient, storage] = await Promise.all([
+  const [allClients, storage] = await Promise.all([
     listClients(),
-    getClientById(requestedClientId),
     Promise.resolve(getClientStoreMeta()),
   ]);
+  const clients = await getVisibleClientsForUser(access.user, allClients);
+  const requestedClient = requestedClientId
+    ? clients.find((client) => client.id === requestedClientId)
+    : null;
+  const activeClient = requestedClient ?? clients[0] ?? null;
 
   return NextResponse.json({
     clients,
-    activeClientId: activeClient.id,
+    activeClientId: activeClient?.id ?? "",
     storage,
   });
 }
 
 export async function POST(request: NextRequest) {
+  const access = await requireClientManagementAccess();
+  if (access.response) return access.response;
+
   const body = (await request.json().catch(() => ({}))) as {
     name?: string;
     websitePlatform?: WebsitePlatform;
@@ -77,6 +92,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const access = await requireClientManagementAccess();
+  if (access.response) return access.response;
+
   const body = (await request.json().catch(() => ({}))) as {
     clientId?: string;
     storeAccessDeclined?: boolean;
@@ -119,6 +137,9 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const access = await requireClientManagementAccess();
+  if (access.response) return access.response;
+
   const clientId =
     request.nextUrl.searchParams.get("clientId") ||
     ((await request.json().catch(() => ({}))) as { clientId?: string }).clientId ||
