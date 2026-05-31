@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
 import {
   BarChart3,
   Bell,
   Building2,
-  CalendarRange,
   Database,
   Gauge,
   LayoutDashboard,
+  LogOut,
   Palette,
   Rocket,
   ShieldCheck,
@@ -19,6 +20,7 @@ import {
 } from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getCurrencyMeta, type ClientCurrencyCode, type ClientRecord } from "@/lib/clientTypes";
+import { getRoleLabel, type UserRole } from "@/lib/accessTypes";
 
 export {
   DashboardLoadingState,
@@ -66,24 +68,26 @@ type NavItem = {
   icon: LucideIcon;
   label: string;
   href: string;
-  ownerOnly?: boolean;
+  roles?: UserRole[];
 };
 
 const OwnerModeContext = createContext<OwnerModeContextValue | null>(null);
 const DashboardDisplayContext = createContext<DashboardDisplayContextValue | null>(null);
 const DashboardDateContext = createContext<DashboardDateContextValue | null>(null);
 
+const adminRoles: UserRole[] = ["owner", "admin"];
+
 const navItems: NavItem[] = [
-  { icon: Building2, label: "Portfolio", href: "/portfolio", ownerOnly: true },
+  { icon: Building2, label: "Portfolio", href: "/portfolio", roles: adminRoles },
   { icon: LayoutDashboard, label: "Command Center", href: "/" },
   { icon: ShieldCheck, label: "Business Health", href: "/health" },
   { icon: Target, label: "Funnel", href: "/funnel" },
   { icon: BarChart3, label: "Paid Media", href: "/paid-media" },
   { icon: Rocket, label: "Scaling", href: "/scaling" },
   { icon: Bell, label: "Actions", href: "/action" },
-  { icon: Database, label: "Admin", href: "/admin" },
-  { icon: Users, label: "Access Management", href: "/admin/access", ownerOnly: true },
-  { icon: Palette, label: "Theme Settings", href: "/admin/theme", ownerOnly: true },
+  { icon: Database, label: "Admin", href: "/admin", roles: adminRoles },
+  { icon: Users, label: "Access Management", href: "/admin/access", roles: adminRoles },
+  { icon: Palette, label: "Theme Settings", href: "/admin/theme", roles: adminRoles },
 ];
 
 const dateOptions: Array<{ value: DashboardDatePreset; label: string }> = [
@@ -96,6 +100,14 @@ const dateOptions: Array<{ value: DashboardDatePreset; label: string }> = [
   { value: "custom", label: "Custom" },
 ];
 
+function canSeeNavItem(item: NavItem, role: UserRole | null) {
+  if (!item.roles) {
+    return true;
+  }
+
+  return Boolean(role && item.roles.includes(role));
+}
+
 export function AppShell({
   children,
   portfolioMode = false,
@@ -104,16 +116,15 @@ export function AppShell({
   portfolioMode?: boolean;
 }) {
   const pathname = usePathname();
-  const [ownerMode, setOwnerModeState] = useState(false);
+  const { data: session, status } = useSession();
+  const role = (session?.user as { role?: UserRole } | undefined)?.role ?? null;
+  const isPrivileged = role === "owner" || role === "admin";
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [activeClientId, setActiveClientId] = useState("");
   const [datePreset, setDatePresetState] = useState<DashboardDatePreset>("last_7d");
 
   useEffect(() => {
-    const storedOwnerMode = window.localStorage.getItem("media-dashboard-owner-mode");
     const storedDatePreset = window.localStorage.getItem("media-dashboard-date-preset") as DashboardDatePreset | null;
-
-    setOwnerModeState(storedOwnerMode === "true");
 
     if (storedDatePreset && dateOptions.some((option) => option.value === storedDatePreset)) {
       setDatePresetState(storedDatePreset);
@@ -145,8 +156,10 @@ export function AppShell({
       }
     }
 
-    void loadClients();
-  }, [pathname]);
+    if (status === "authenticated") {
+      void loadClients();
+    }
+  }, [pathname, status]);
 
   const activeClient = useMemo(
     () => clients.find((client) => client.id === activeClientId) ?? clients[0] ?? null,
@@ -155,13 +168,10 @@ export function AppShell({
   const currencyCode = activeClient?.currencyCode ?? "USD";
   const ownerContext = useMemo<OwnerModeContextValue>(
     () => ({
-      ownerMode,
-      setOwnerMode: (value: boolean) => {
-        setOwnerModeState(value);
-        window.localStorage.setItem("media-dashboard-owner-mode", String(value));
-      },
+      ownerMode: isPrivileged,
+      setOwnerMode: () => undefined,
     }),
-    [ownerMode]
+    [isPrivileged]
   );
   const displayContext = useMemo<DashboardDisplayContextValue>(
     () => ({
@@ -186,6 +196,7 @@ export function AppShell({
   const meta = getHeaderMeta(pathname);
   const clientLabel = portfolioMode ? "All configured stores" : activeClient?.name ?? "No client selected";
   const currencyLabel = portfolioMode ? "Portfolio scope" : getCurrencyMeta(currencyCode).label;
+  const visibleNavItems = navItems.filter((item) => canSeeNavItem(item, role));
 
   return (
     <OwnerModeContext.Provider value={ownerContext}>
@@ -206,53 +217,51 @@ export function AppShell({
               </div>
 
               <nav className="mt-6 flex-1 space-y-2 overflow-y-auto pr-2">
-                {navItems
-                  .filter((item) => !item.ownerOnly || ownerMode)
-                  .map(({ icon: Icon, label, href }) => {
-                    const active =
-                      href === "/"
-                        ? pathname === "/"
-                        : href === "/admin"
-                        ? pathname === "/admin"
-                        : pathname.startsWith(href);
+                {visibleNavItems.map(({ icon: Icon, label, href }) => {
+                  const active =
+                    href === "/"
+                      ? pathname === "/"
+                      : href === "/admin"
+                      ? pathname === "/admin"
+                      : pathname.startsWith(href);
 
-                    return (
-                      <Link
-                        key={href}
-                        href={href}
-                        className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
-                          active
-                            ? "bg-[var(--accent-soft)] text-[var(--accent)]"
-                            : "text-[var(--ink)] hover:bg-[var(--surface-muted)]"
-                        }`}
-                      >
-                        <Icon size={18} />
-                        <span>{label}</span>
-                      </Link>
-                    );
-                  })}
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition ${
+                        active
+                          ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                          : "text-[var(--ink)] hover:bg-[var(--surface-muted)]"
+                      }`}
+                    >
+                      <Icon size={18} />
+                      <span>{label}</span>
+                    </Link>
+                  );
+                })}
               </nav>
 
               <div className="mt-auto rounded-[24px] border border-[var(--line)] bg-[var(--surface)] p-4 shadow-[var(--shadow)]">
                 <div className="flex items-center justify-between gap-4">
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
-                      Owner Access
+                      Signed in as
                     </div>
-                    <p className="mt-1 text-sm text-[var(--muted)]">
-                      Keep portfolio-level views behind owner mode as we expand them.
+                    <p className="mt-1 text-sm font-semibold text-[var(--ink)]">
+                      {session?.user?.name ?? session?.user?.email ?? "Loading user"}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      {role ? getRoleLabel(role) : "Checking access"}
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => ownerContext.setOwnerMode(!ownerMode)}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                      ownerMode
-                        ? "bg-[var(--ink)] text-white"
-                        : "bg-[var(--surface-muted)] text-[var(--ink)]"
-                    }`}
+                    onClick={() => void signOut({ callbackUrl: "/login" })}
+                    className="rounded-full bg-[var(--surface-muted)] px-3 py-2 text-sm font-semibold text-[var(--ink)]"
+                    aria-label="Sign out"
                   >
-                    {ownerMode ? "On" : "Off"}
+                    <LogOut size={16} />
                   </button>
                 </div>
               </div>
@@ -265,8 +274,8 @@ export function AppShell({
                     <InfoChip>{clientLabel}</InfoChip>
                     <InfoChip>{currencyLabel}</InfoChip>
                     <InfoChip tone="good">Store sales truth first</InfoChip>
-                    <InfoChip tone={ownerMode ? "good" : "default"}>
-                      {ownerMode ? "Owner mode on" : "Owner mode off"}
+                    <InfoChip tone={isPrivileged ? "good" : "default"}>
+                      {role ? getRoleLabel(role) : "Checking access"}
                     </InfoChip>
                   </div>
 
