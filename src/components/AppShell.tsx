@@ -18,7 +18,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getCurrencyMeta, type ClientCurrencyCode, type ClientRecord } from "@/lib/clientTypes";
 import { getRoleLabel, type UserRole } from "@/lib/accessTypes";
 
@@ -180,24 +180,25 @@ export function AppShell({
     }),
     [currencyCode]
   );
+  const handleDatePresetChange = useCallback((value: DashboardDatePreset) => {
+    setDatePresetState(value);
+    window.localStorage.setItem("media-dashboard-date-preset", value);
+  }, []);
+
   const dateContext = useMemo<DashboardDateContextValue>(
     () => ({
       datePreset,
       metaPreviewQuery: `datePreset=${datePreset === "custom" ? "last_7d" : datePreset}`,
       activeLabel: dateOptions.find((option) => option.value === datePreset)?.label ?? "Last 7 days",
       activeSummary: getDateSummary(datePreset),
-      setDatePreset: (value: DashboardDatePreset) => {
-        setDatePresetState(value);
-        window.localStorage.setItem("media-dashboard-date-preset", value);
-      },
+      setDatePreset: handleDatePresetChange,
     }),
-    [datePreset]
+    [datePreset, handleDatePresetChange]
   );
   const meta = getHeaderMeta(pathname);
   const clientLabel = portfolioMode ? "All configured stores" : activeClient?.name ?? "No client selected";
   const currencyLabel = portfolioMode ? "Portfolio scope" : getCurrencyMeta(currencyCode).label;
   const visibleNavItems = navItems.filter((item) => canSeeNavItem(item, role));
-
   return (
     <OwnerModeContext.Provider value={ownerContext}>
       <DashboardDisplayContext.Provider value={displayContext}>
@@ -279,22 +280,17 @@ export function AppShell({
                     </InfoChip>
                   </div>
 
-                  {!portfolioMode && clients.length ? (
-                    <select
-                      value={activeClientId}
-                      onChange={(event) => {
-                        setActiveClientId(event.target.value);
-                        window.localStorage.setItem("media-dashboard-active-client", event.target.value);
-                      }}
-                      className="rounded-[12px] border border-[var(--line)] bg-[var(--surface-strong)] px-3 py-2 text-sm font-medium text-[var(--ink)] outline-none"
-                    >
-                      {clients.map((client) => (
-                        <option key={client.id} value={client.id}>
-                          {client.name} · {client.currencyCode}
-                        </option>
-                      ))}
-                    </select>
-                  ) : null}
+                  <HeaderUtilityControls
+                    clients={clients}
+                    activeClientId={activeClientId}
+                    portfolioMode={portfolioMode}
+                    datePreset={datePreset}
+                    onClientChange={(clientId) => {
+                      setActiveClientId(clientId);
+                      window.localStorage.setItem("media-dashboard-active-client", clientId);
+                    }}
+                    onDatePresetChange={handleDatePresetChange}
+                  />
                 </div>
 
                 <div className="mt-3 border-t border-[var(--line)] pt-3">
@@ -326,6 +322,62 @@ function InfoChip({ children, tone = "default" }: { children: ReactNode; tone?: 
       : "border-[var(--line)] bg-[var(--surface)] text-[var(--ink)]";
 
   return <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${style}`}>{children}</span>;
+}
+
+type HeaderUtilityControlsProps = {
+  clients: ClientRecord[];
+  activeClientId: string;
+  portfolioMode: boolean;
+  datePreset: DashboardDatePreset;
+  onClientChange: (clientId: string) => void;
+  onDatePresetChange: (value: DashboardDatePreset) => void;
+};
+
+function HeaderUtilityControls({
+  clients,
+  activeClientId,
+  portfolioMode,
+  datePreset,
+  onClientChange,
+  onDatePresetChange,
+}: HeaderUtilityControlsProps) {
+  return (
+    <div
+      className="flex flex-wrap items-center gap-2"
+      data-dashboard-header-controls="reporting-window active-client"
+    >
+      <label className="flex items-center gap-2 rounded-[12px] border border-[var(--line)] bg-[var(--surface-strong)] px-3 py-2 text-xs font-semibold text-[var(--muted)]">
+        <span className="uppercase tracking-[0.12em]">Reporting Window</span>
+        <select
+          value={datePreset}
+          onChange={(event) => onDatePresetChange(event.target.value as DashboardDatePreset)}
+          className="min-w-[132px] bg-transparent text-sm font-semibold text-[var(--ink)] outline-none"
+          aria-label="Reporting window"
+        >
+          {dateOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      {!portfolioMode && clients.length ? (
+        <select
+          value={activeClientId}
+          onChange={(event) => onClientChange(event.target.value)}
+          className="rounded-[12px] border border-[var(--line)] bg-[var(--surface-strong)] px-3 py-2 text-sm font-medium text-[var(--ink)] outline-none"
+          aria-label="Active client"
+        >
+          {clients.map((client) => (
+            <option key={client.id} value={client.id}>
+              {client.name} · {client.currencyCode}
+            </option>
+          ))}
+        </select>
+      ) : null}
+    </div>
+  );
 }
 
 export function StatusPill({ status }: { status: string }) {
