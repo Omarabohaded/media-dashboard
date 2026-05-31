@@ -14,6 +14,7 @@ import {
   type UserRole,
   type UserStatus,
 } from "@/lib/accessTypes";
+import { requireUserManagementAccess } from "@/lib/serverAccess";
 
 function isValidRole(value: unknown): value is UserRole {
   return typeof value === "string" && USER_ROLES.some((item) => item.role === value);
@@ -44,11 +45,17 @@ function parseAssignments(value: unknown) {
 }
 
 export async function GET() {
+  const access = await requireUserManagementAccess();
+  if (access.response) return access.response;
+
   const [users, assignments] = await Promise.all([listUsers(), listAssignments()]);
   return NextResponse.json({ users: users.map(sanitizeUser), assignments });
 }
 
 export async function POST(request: Request) {
+  const access = await requireUserManagementAccess();
+  if (access.response) return access.response;
+
   try {
     const body = (await request.json()) as {
       name?: unknown;
@@ -85,6 +92,9 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const access = await requireUserManagementAccess();
+  if (access.response) return access.response;
+
   try {
     const body = (await request.json()) as {
       userId?: unknown;
