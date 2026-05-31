@@ -14,6 +14,7 @@ import {
   Rocket,
   ShieldCheck,
   Target,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -81,6 +82,7 @@ const navItems: NavItem[] = [
   { icon: Rocket, label: "Scaling", href: "/scaling" },
   { icon: Bell, label: "Actions", href: "/action" },
   { icon: Database, label: "Admin", href: "/admin" },
+  { icon: Users, label: "Access Management", href: "/admin/access", ownerOnly: true },
   { icon: Palette, label: "Theme Settings", href: "/admin/theme", ownerOnly: true },
 ];
 
@@ -357,6 +359,14 @@ function getHeaderMeta(pathname: string) {
       eyebrow: "Theme System",
       title: "Dashboard Themes",
       summary: "Switch the global dashboard palette from one controlled Admin workspace.",
+    };
+  }
+
+  if (pathname.startsWith("/admin/access")) {
+    return {
+      eyebrow: "Access Control",
+      title: "Access Management",
+      summary: "Manage users, responsibilities, and client-level access without exposing setup controls to normal users.",
     };
   }
 
