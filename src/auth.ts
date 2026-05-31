@@ -4,6 +4,7 @@ import { getUserByEmail, updateUser } from "@/lib/accessStore";
 import { verifyPassword } from "@/lib/password";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "media-dashboard-dev-secret",
   session: {
     strategy: "jwt",
   },
@@ -14,14 +15,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Credentials({
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        accessKey: { label: "Access key", type: "text" },
       },
       async authorize(credentials) {
         const email = typeof credentials?.email === "string" ? credentials.email : "";
-        const password =
-          typeof credentials?.password === "string" ? credentials.password : "";
+        const accessKey =
+          typeof credentials?.accessKey === "string" ? credentials.accessKey : "";
 
-        if (!email || !password) {
+        if (!email || !accessKey) {
           return null;
         }
 
@@ -31,7 +32,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        if (!verifyPassword(password, user.passwordHash)) {
+        if (!verifyPassword(accessKey, user.passwordHash)) {
           return null;
         }
 
@@ -58,9 +59,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.sub ?? "";
-        session.user.role = typeof token.role === "string" ? token.role : "client_viewer";
-        session.user.status = typeof token.status === "string" ? token.status : "active";
+        (session.user as { id?: string }).id = token.sub ?? "";
+        (session.user as { role?: string }).role =
+          typeof token.role === "string" ? token.role : "client_viewer";
+        (session.user as { status?: string }).status =
+          typeof token.status === "string" ? token.status : "active";
       }
 
       return session;
