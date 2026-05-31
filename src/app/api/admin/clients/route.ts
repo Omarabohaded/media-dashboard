@@ -20,6 +20,7 @@ import {
 
 const allowedPlatforms = new Set<WebsitePlatform>([
   "shopify",
+  "woocommerce",
   "wordpress",
   "salla",
   "wix",
