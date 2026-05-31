@@ -1,5 +1,6 @@
 export type WebsitePlatform =
   | "shopify"
+  | "woocommerce"
   | "wordpress"
   | "salla"
   | "wix"
