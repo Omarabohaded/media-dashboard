@@ -1,10 +1,7 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { NextResponse, type NextRequest } from "next/server";
 
 const publicRoutes = ["/login"];
 const authRoutes = ["/api/auth"];
-const adminRoutes = ["/admin"];
-const adminApiRoutes = ["/api/admin"];
 
 function isPublicPath(pathname: string) {
   return (
@@ -13,29 +10,23 @@ function isPublicPath(pathname: string) {
   );
 }
 
-function isAdminPath(pathname: string) {
-  return adminRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+function hasSessionCookie(request: NextRequest) {
+  return Boolean(
+    request.cookies.get("authjs.session-token")?.value ||
+      request.cookies.get("__Secure-authjs.session-token")?.value ||
+      request.cookies.get("next-auth.session-token")?.value ||
+      request.cookies.get("__Secure-next-auth.session-token")?.value
+  );
 }
 
-function isAdminApiPath(pathname: string) {
-  return adminApiRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
-}
-
-function isPrivilegedRole(role: unknown) {
-  return role === "owner" || role === "admin";
-}
-
-export default auth((request) => {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const sessionUser = request.auth?.user as { role?: string; status?: string } | undefined;
-  const isAuthenticated = Boolean(request.auth?.user);
-  const isActive = sessionUser?.status !== "deactivated";
 
   if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
-  if (!isAuthenticated || !isActive) {
+  if (!hasSessionCookie(request)) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Sign in is required." }, { status: 401 });
     }
@@ -45,19 +36,8 @@ export default auth((request) => {
     return NextResponse.redirect(loginUrl);
   }
 
-  if ((isAdminPath(pathname) || isAdminApiPath(pathname)) && !isPrivilegedRole(sessionUser?.role)) {
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json(
-        { error: "You do not have permission to perform this action." },
-        { status: 403 }
-      );
-    }
-
-    return NextResponse.redirect(new URL("/", request.nextUrl.origin));
-  }
-
   return NextResponse.next();
-});
+}
 
 export const config = {
   matcher: [
