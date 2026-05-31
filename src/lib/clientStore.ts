@@ -27,12 +27,24 @@ export type ShopifyClientConnection = {
   lastError: string | null;
 };
 
+export type WooCommerceClientConnection = {
+  clientId: string;
+  storeUrl: string;
+  consumerKey: string;
+  consumerSecret: string;
+  connectedAt: string;
+  storeName: string | null;
+  currencyCode: string | null;
+  lastError: string | null;
+};
+
 type ClientStoreState = {
   version: 1;
   updatedAt: string | null;
   clients: ClientRecord[];
   metaConnections: MetaClientConnection[];
   shopifyConnections: ShopifyClientConnection[];
+  wooCommerceConnections: WooCommerceClientConnection[];
 };
 
 const CLIENT_STORE_KEY = "media-dashboard:client-state";
@@ -58,11 +70,12 @@ function defaultState(): ClientStoreState {
     clients: [buildDefaultClient()],
     metaConnections: [],
     shopifyConnections: [],
+    wooCommerceConnections: [],
   };
 }
 
 export async function readClientStore(): Promise<ClientStoreState> {
-  const parsed = await readRuntimeJsonStore<ClientStoreState>(
+  const parsed = await readRuntimeJsonStore<Partial<ClientStoreState>>(
     CLIENT_STORE_KEY,
     CLIENT_STORE_FILE,
     defaultState()
@@ -70,7 +83,7 @@ export async function readClientStore(): Promise<ClientStoreState> {
   const state = {
     ...defaultState(),
     ...parsed,
-  };
+  } as ClientStoreState;
 
   if (!state.clients.length) {
     state.clients = [buildDefaultClient()];
@@ -87,6 +100,15 @@ export async function readClientStore(): Promise<ClientStoreState> {
   state.shopifyConnections = (state.shopifyConnections ?? []).map((connection) => ({
     ...connection,
     accessToken: connection.accessToken ?? "",
+  }));
+  state.wooCommerceConnections = (state.wooCommerceConnections ?? []).map((connection) => ({
+    ...connection,
+    storeUrl: connection.storeUrl ?? "",
+    consumerKey: connection.consumerKey ?? "",
+    consumerSecret: connection.consumerSecret ?? "",
+    storeName: connection.storeName ?? null,
+    currencyCode: connection.currencyCode ?? null,
+    lastError: connection.lastError ?? null,
   }));
 
   return state;
@@ -249,6 +271,50 @@ export async function clearShopifyConnection(clientId: string) {
   }));
 }
 
+export async function getWooCommerceConnection(clientId: string) {
+  const state = await readClientStore();
+  return (
+    state.wooCommerceConnections.find(
+      (connection) => connection.clientId === clientId
+    ) ?? null
+  );
+}
+
+export async function upsertWooCommerceConnection(
+  connection: WooCommerceClientConnection
+) {
+  await updateClientStore((state) => ({
+    ...state,
+    clients: state.clients.map((client) =>
+      client.id === connection.clientId
+        ? {
+            ...client,
+            websitePlatform: "woocommerce",
+            storeAccessDeclined: false,
+            storeAccessDeclinedAt: null,
+          }
+        : client
+    ),
+    wooCommerceConnections: [
+      connection,
+      ...state.wooCommerceConnections.filter(
+        (item) => item.clientId !== connection.clientId
+      ),
+    ],
+  }));
+
+  return connection;
+}
+
+export async function clearWooCommerceConnection(clientId: string) {
+  await updateClientStore((state) => ({
+    ...state,
+    wooCommerceConnections: state.wooCommerceConnections.filter(
+      (connection) => connection.clientId !== clientId
+    ),
+  }));
+}
+
 export async function deleteClient(clientId: string) {
   const state = await readClientStore();
 
@@ -269,6 +335,9 @@ export async function deleteClient(clientId: string) {
       (connection) => connection.clientId !== clientId
     ),
     shopifyConnections: current.shopifyConnections.filter(
+      (connection) => connection.clientId !== clientId
+    ),
+    wooCommerceConnections: current.wooCommerceConnections.filter(
       (connection) => connection.clientId !== clientId
     ),
   }));
