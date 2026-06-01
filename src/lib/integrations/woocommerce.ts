@@ -7,6 +7,7 @@ export type WooCommerceStoreSnapshot = {
   shippingTotal: number;
   netSales: number;
   averageOrderValue: number;
+  rangeLabel: string;
 };
 
 export type WooCommerceOrderPreviewRow = {
@@ -26,6 +27,15 @@ export type WooCommerceConnectionInput = {
   consumerKey: string;
   consumerSecret: string;
 };
+
+export type WooCommerceDatePreset =
+  | "today"
+  | "yesterday"
+  | "last_7d"
+  | "last_30d"
+  | "this_month"
+  | "last_month"
+  | "custom";
 
 type WooCommerceOrder = {
   id: number;
@@ -111,6 +121,55 @@ async function wooCommerceGet<T>(
   }
 }
 
+function startOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function endOfDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
+}
+
+function resolveDateRange(preset: WooCommerceDatePreset | null | undefined) {
+  const now = new Date();
+  const activePreset = preset === "custom" || !preset ? "last_7d" : preset;
+
+  if (activePreset === "today") {
+    return { after: startOfDay(now), before: endOfDay(now), label: "Today" };
+  }
+
+  if (activePreset === "yesterday") {
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    return { after: startOfDay(yesterday), before: endOfDay(yesterday), label: "Yesterday" };
+  }
+
+  if (activePreset === "last_30d") {
+    const after = new Date(now);
+    after.setDate(now.getDate() - 30);
+    return { after, before: now, label: "Last 30 days" };
+  }
+
+  if (activePreset === "this_month") {
+    return {
+      after: new Date(now.getFullYear(), now.getMonth(), 1),
+      before: now,
+      label: "This month",
+    };
+  }
+
+  if (activePreset === "last_month") {
+    return {
+      after: new Date(now.getFullYear(), now.getMonth() - 1, 1),
+      before: endOfDay(new Date(now.getFullYear(), now.getMonth(), 0)),
+      label: "Last month",
+    };
+  }
+
+  const after = new Date(now);
+  after.setDate(now.getDate() - 7);
+  return { after, before: now, label: "Last 7 days" };
+}
+
 export async function validateWooCommerceConnection(connection: WooCommerceConnectionInput) {
   const storeUrl = normalizeWooCommerceStoreUrl(connection.storeUrl);
 
@@ -147,18 +206,22 @@ export async function validateWooCommerceConnection(connection: WooCommerceConne
   };
 }
 
-export async function fetchWooCommerceStoreTruthPreview(connection: WooCommerceConnectionInput) {
+export async function fetchWooCommerceStoreTruthPreview(
+  connection: WooCommerceConnectionInput,
+  options?: { datePreset?: WooCommerceDatePreset | null }
+) {
   const storeUrl = normalizeWooCommerceStoreUrl(connection.storeUrl);
-  const sinceDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const range = resolveDateRange(options?.datePreset);
 
   const orders = await wooCommerceGet<WooCommerceOrder[]>(
     { ...connection, storeUrl },
     "/orders",
     {
-      per_page: "50",
+      per_page: "100",
       orderby: "date",
       order: "desc",
-      after: sinceDate,
+      after: range.after.toISOString(),
+      before: range.before.toISOString(),
     }
   );
 
@@ -191,6 +254,7 @@ export async function fetchWooCommerceStoreTruthPreview(connection: WooCommerceC
     shippingTotal,
     netSales,
     averageOrderValue: rows.length ? grossSales / rows.length : 0,
+    rangeLabel: range.label,
   };
 
   return {
