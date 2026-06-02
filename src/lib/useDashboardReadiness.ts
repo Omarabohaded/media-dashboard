@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useDashboardDate } from "@/components/AppShell";
 import type { ClientRecord, WebsitePlatform } from "@/lib/clientTypes";
 import {
   DEFAULT_DASHBOARD_METRIC_LOGIC,
@@ -150,9 +151,6 @@ type HookOptions = {
   metaPreviewQuery?: string;
 };
 
-const DASHBOARD_DATE_PRESET_KEY = "media-dashboard-date-preset";
-const DASHBOARD_CUSTOM_START_KEY = "media-dashboard-custom-start";
-const DASHBOARD_CUSTOM_END_KEY = "media-dashboard-custom-end";
 const DEFAULT_META_PREVIEW_QUERY = "datePreset=last_7d";
 
 function getDeclinedStoreMessage(platform: WebsitePlatform) {
@@ -316,35 +314,14 @@ function normalizeStorePreview(
   };
 }
 
-function getStoredMetaPreviewQuery() {
-  if (typeof window === "undefined") {
-    return DEFAULT_META_PREVIEW_QUERY;
-  }
-
-  const savedPreset = window.localStorage.getItem(DASHBOARD_DATE_PRESET_KEY);
-
-  if (savedPreset === "custom") {
-    const startDate = window.localStorage.getItem(DASHBOARD_CUSTOM_START_KEY) ?? "";
-    const endDate = window.localStorage.getItem(DASHBOARD_CUSTOM_END_KEY) ?? "";
-
-    if (isStoredRangeValid(startDate, endDate)) {
-      return `since=${encodeURIComponent(startDate)}&until=${encodeURIComponent(endDate)}`;
-    }
-  }
-
-  return savedPreset ? `datePreset=${savedPreset}` : DEFAULT_META_PREVIEW_QUERY;
-}
-
 export function useDashboardReadiness(options: HookOptions = {}) {
   const {
     includeStorePreview = true,
     includeMetaPreview = true,
     metaPreviewQuery,
   } = options;
-  const [storedMetaPreviewQuery, setStoredMetaPreviewQuery] = useState(
-    DEFAULT_META_PREVIEW_QUERY
-  );
-  const effectiveMetaPreviewQuery = metaPreviewQuery ?? storedMetaPreviewQuery;
+  const dashboardDate = useDashboardDate();
+  const effectiveMetaPreviewQuery = metaPreviewQuery ?? dashboardDate.metaPreviewQuery ?? DEFAULT_META_PREVIEW_QUERY;
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [activeClientId, setActiveClientIdState] = useState("");
   const [metaStatus, setMetaStatus] = useState<DashboardMetaStatus | null>(null);
@@ -529,14 +506,8 @@ export function useDashboardReadiness(options: HookOptions = {}) {
   }
 
   useEffect(() => {
-    if (metaPreviewQuery) {
-      return;
-    }
-
-    setStoredMetaPreviewQuery(getStoredMetaPreviewQuery());
-  }, [metaPreviewQuery]);
-
-  useEffect(() => {
+    setMetaPreview(null);
+    setStorePreview(null);
     void refresh();
   }, [effectiveMetaPreviewQuery]);
 
@@ -563,19 +534,4 @@ export function useDashboardReadiness(options: HookOptions = {}) {
     setMessage,
     refresh,
   };
-}
-
-function isStoredRangeValid(startDate: string, endDate: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate)) {
-    return false;
-  }
-
-  const start = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
-
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return false;
-  }
-
-  return start.getTime() <= end.getTime();
 }
