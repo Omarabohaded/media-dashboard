@@ -183,6 +183,11 @@ export function AppShell({
   const handleDatePresetChange = useCallback((value: DashboardDatePreset) => {
     setDatePresetState(value);
     window.localStorage.setItem("media-dashboard-date-preset", value);
+    window.dispatchEvent(
+      new CustomEvent("media-dashboard-date-change", {
+        detail: { datePreset: value },
+      })
+    );
   }, []);
 
   const dateContext = useMemo<DashboardDateContextValue>(
@@ -418,67 +423,17 @@ function getHeaderMeta(pathname: string) {
   if (pathname.startsWith("/admin/theme")) {
     return {
       eyebrow: "Theme System",
-      title: "Dashboard Themes",
-      summary: "Switch the global dashboard palette from one controlled Admin workspace.",
+      title: "Theme Settings",
+      summary: "Control dashboard colors and theme tokens safely from the admin workspace.",
     };
   }
-
   if (pathname.startsWith("/admin/access")) {
     return {
       eyebrow: "Access Control",
       title: "Access Management",
-      summary: "Manage users, responsibilities, and client-level access without exposing setup controls to normal users.",
+      summary: "Manage dashboard users, roles, and client access from one protected workspace.",
     };
   }
-
-  if (pathname.startsWith("/portfolio") || pathname.startsWith("/multi-store")) {
-    return {
-      eyebrow: "Portfolio",
-      title: "Multi-store Overview",
-      summary: "Compare store performance quickly and rank the portfolio without losing operational context.",
-    };
-  }
-
-  if (pathname.startsWith("/paid-media")) {
-    return {
-      eyebrow: "Channel Analysis",
-      title: "Paid Media",
-      summary: "Use this workspace for campaign delivery, cost, and efficiency reads.",
-    };
-  }
-
-  if (pathname.startsWith("/health")) {
-    return {
-      eyebrow: "Business Truth",
-      title: "Business Health",
-      summary: "Check store truth, spend truth, and blended efficiency for decision-making.",
-    };
-  }
-
-  if (pathname.startsWith("/funnel")) {
-    return {
-      eyebrow: "Conversion Analysis",
-      title: "Funnel",
-      summary: "Read where conversion performance weakens across the funnel.",
-    };
-  }
-
-  if (pathname.startsWith("/scaling")) {
-    return {
-      eyebrow: "Decision Engine",
-      title: "Scaling",
-      summary: "Use scaling rules after source confidence is high enough to support bigger spend.",
-    };
-  }
-
-  if (pathname.startsWith("/action")) {
-    return {
-      eyebrow: "Priority Lane",
-      title: "Actions",
-      summary: "See which risks and opportunities need attention first.",
-    };
-  }
-
   if (pathname.startsWith("/admin")) {
     return {
       eyebrow: "Configuration",
@@ -486,34 +441,71 @@ function getHeaderMeta(pathname: string) {
       summary: "Connect sources, map clients, and control the logic that powers the dashboard.",
     };
   }
-
+  if (pathname.startsWith("/health")) {
+    return {
+      eyebrow: "Business Health",
+      title: "Health intelligence",
+      summary: "Read store truth, paid-media truth, and blended efficiency without hiding source limitations.",
+    };
+  }
+  if (pathname.startsWith("/funnel")) {
+    return {
+      eyebrow: "Funnel",
+      title: "Funnel diagnosis",
+      summary: "Track funnel progression, missing truth layers, and where analytics needs stronger instrumentation.",
+    };
+  }
+  if (pathname.startsWith("/paid-media")) {
+    return {
+      eyebrow: "Paid Media",
+      title: "Paid-media control room",
+      summary: "Review spend quality, platform attribution, and campaign-level operating signals.",
+    };
+  }
+  if (pathname.startsWith("/scaling")) {
+    return {
+      eyebrow: "Scaling",
+      title: "Scaling decisions",
+      summary: "Turn business health and campaign signals into controlled scale, hold, or cut recommendations.",
+    };
+  }
+  if (pathname.startsWith("/action")) {
+    return {
+      eyebrow: "Actions",
+      title: "Action queue",
+      summary: "Prioritize budget, tracking, and funnel fixes based on live risk and opportunity signals.",
+    };
+  }
+  if (pathname.startsWith("/portfolio")) {
+    return {
+      eyebrow: "Portfolio",
+      title: "Portfolio overview",
+      summary: "Compare configured stores, currencies, and readiness across the client portfolio.",
+    };
+  }
   return {
-    eyebrow: "Operating Surface",
-    title: "Command Center",
-    summary: "Scan the active client quickly across business truth, paid-media truth, and priority signals.",
+    eyebrow: "Command Center",
+    title: "Command center",
+    summary: "A live operating surface that blends business truth, paid-media signals, and source readiness.",
   };
 }
 
 function formatMetricValue(value: string, currencyCode: ClientCurrencyCode) {
-  if (!value.startsWith("$")) {
+  if (currencyCode === "USD") {
     return value;
   }
 
-  const parsed = Number(value.slice(1).replace(/,/g, ""));
-
-  if (!Number.isFinite(parsed)) {
-    return value;
-  }
-
-  const { locale } = getCurrencyMeta(currencyCode);
-
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency: currencyCode,
-    maximumFractionDigits: 0,
-  }).format(parsed);
+  return value
+    .replace(/\$/g, currencyCode === "AED" ? "AED " : `${currencyCode} `)
+    .replace(/USD/g, currencyCode);
 }
 
 function getDateSummary(preset: DashboardDatePreset) {
-  return dateOptions.find((option) => option.value === preset)?.label ?? "Last 7 days";
+  if (preset === "today") return "Today only";
+  if (preset === "yesterday") return "Yesterday";
+  if (preset === "last_30d") return "Trailing 30 days";
+  if (preset === "this_month") return "Month to date";
+  if (preset === "last_month") return "Previous full month";
+  if (preset === "custom") return "Custom range pending";
+  return "Trailing 7 days";
 }
