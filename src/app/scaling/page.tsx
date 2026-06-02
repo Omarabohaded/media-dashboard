@@ -9,7 +9,10 @@ import {
   SourcePill,
 } from "@/components/AppShell";
 import {
+  getEffectiveBlendedRoas,
+  getEffectiveCtr,
   getEffectiveMer,
+  getEffectiveOrders,
   getEffectiveStoreRevenue,
   getRevenueBasisLabel,
 } from "@/lib/dashboardMetricLogic";
@@ -49,8 +52,8 @@ export default function ScalingPage() {
   const hasStoreAnalytics = false;
   const totalSpend = metaPreview?.totals.spend ?? 0;
   const storeRevenue = getEffectiveStoreRevenue(storePreview, metricLogic);
-  const blendedRoas =
-    hasMeta && totalSpend > 0 ? metaPreview!.totals.purchaseValue / totalSpend : 0;
+  const orders = getEffectiveOrders(storePreview, metricLogic);
+  const blendedRoas = getEffectiveBlendedRoas(metaPreview, metricLogic) ?? 0;
   const mer = getEffectiveMer(storePreview, metaPreview, metricLogic) ?? 0;
   const purchaseVolume = metaPreview?.totals.purchases ?? 0;
   const averageFrequency =
@@ -58,10 +61,10 @@ export default function ScalingPage() {
       ? metaPreview.rows.reduce((sum, row) => sum + row.frequency, 0) /
         metaPreview.rows.length
       : 0;
-  const averageCtr =
-    metaPreview && metaPreview.rows.length
+  const averageCtr = getEffectiveCtr(metaPreview, metricLogic) ??
+    (metaPreview && metaPreview.rows.length
       ? metaPreview.rows.reduce((sum, row) => sum + row.ctr, 0) / metaPreview.rows.length
-      : 0;
+      : 0);
   const purchaseCvr =
     metaPreview && metaPreview.totals.clicks > 0
       ? (metaPreview.totals.purchases / metaPreview.totals.clicks) * 100
@@ -81,7 +84,7 @@ export default function ScalingPage() {
   const trackingGap = evaluateTrackingGap({
     storeRevenue: hasStoreTruth ? storeRevenue : undefined,
     platformRevenue: hasMeta ? metaPreview?.totals.purchaseValue : undefined,
-    storeOrders: hasStoreTruth ? storePreview?.ordersCount : undefined,
+    storeOrders: hasStoreTruth ? orders : undefined,
     platformPurchases: hasMeta ? metaPreview?.totals.purchases : undefined,
   });
   const funnelReadiness = getFunnelReadiness({
@@ -255,6 +258,12 @@ export default function ScalingPage() {
               tone={hasStoreTruth ? "good" : "warn"}
             />
             <MiniMetric
+              label="Orders"
+              value={hasStoreTruth ? formatNumber(orders) : "Waiting"}
+              hint="Store orders through the metric resolver"
+              tone={hasStoreTruth ? "good" : "warn"}
+            />
+            <MiniMetric
               label="Ad Spend"
               value={hasMeta ? formatMoney(totalSpend, metaStatus?.selectedAccount?.currency ?? "USD") : "Waiting"}
               hint="Platform spend layer"
@@ -269,7 +278,7 @@ export default function ScalingPage() {
             <MiniMetric
               label="Blended ROAS"
               value={hasMeta ? `${formatNumber(blendedRoas, 2)}x` : "Waiting"}
-              hint="Platform-attributed value divided by spend"
+              hint="Resolved from the metric mapping layer"
               tone={hasMeta ? "good" : "warn"}
             />
             <MiniMetric
@@ -281,7 +290,7 @@ export default function ScalingPage() {
             <MiniMetric
               label="Average CTR"
               value={hasMeta ? `${formatNumber(averageCtr, 2)}%` : "Waiting"}
-              hint="Traffic quality input"
+              hint="Traffic quality input through metric resolver when mapped"
               tone={hasMeta ? "good" : "warn"}
             />
             <MiniMetric
