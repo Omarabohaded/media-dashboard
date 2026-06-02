@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useDashboardDate } from "@/components/AppShell";
 import type { ClientRecord, WebsitePlatform } from "@/lib/clientTypes";
 import {
   DEFAULT_DASHBOARD_METRIC_LOGIC,
@@ -151,7 +150,35 @@ type HookOptions = {
   metaPreviewQuery?: string;
 };
 
-const DEFAULT_META_PREVIEW_QUERY = "datePreset=last_7d";
+type DashboardDateChangeEvent = CustomEvent<{ datePreset?: string }>;
+
+const DASHBOARD_DATE_PRESET_KEY = "media-dashboard-date-preset";
+const DEFAULT_DATE_PRESET = "last_7d";
+const DEFAULT_META_PREVIEW_QUERY = `datePreset=${DEFAULT_DATE_PRESET}`;
+const SUPPORTED_DATE_PRESETS = new Set([
+  "today",
+  "yesterday",
+  "last_7d",
+  "last_30d",
+  "this_month",
+  "last_month",
+  "custom",
+]);
+
+function getStoredDatePreset() {
+  if (typeof window === "undefined") {
+    return DEFAULT_DATE_PRESET;
+  }
+
+  const savedPreset = window.localStorage.getItem(DASHBOARD_DATE_PRESET_KEY);
+  return savedPreset && SUPPORTED_DATE_PRESETS.has(savedPreset)
+    ? savedPreset
+    : DEFAULT_DATE_PRESET;
+}
+
+function getDatePreviewQuery(datePreset: string) {
+  return `datePreset=${datePreset === "custom" ? DEFAULT_DATE_PRESET : datePreset}`;
+}
 
 function getDeclinedStoreMessage(platform: WebsitePlatform) {
   return platform === "shopify" || platform === "wordpress" || platform === "woocommerce"
@@ -320,8 +347,8 @@ export function useDashboardReadiness(options: HookOptions = {}) {
     includeMetaPreview = true,
     metaPreviewQuery,
   } = options;
-  const dashboardDate = useDashboardDate();
-  const effectiveMetaPreviewQuery = metaPreviewQuery ?? dashboardDate.metaPreviewQuery ?? DEFAULT_META_PREVIEW_QUERY;
+  const [datePreviewQuery, setDatePreviewQuery] = useState(DEFAULT_META_PREVIEW_QUERY);
+  const effectiveMetaPreviewQuery = metaPreviewQuery ?? datePreviewQuery;
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [activeClientId, setActiveClientIdState] = useState("");
   const [metaStatus, setMetaStatus] = useState<DashboardMetaStatus | null>(null);
@@ -504,6 +531,23 @@ export function useDashboardReadiness(options: HookOptions = {}) {
       setIsLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (metaPreviewQuery) {
+      return;
+    }
+
+    setDatePreviewQuery(getDatePreviewQuery(getStoredDatePreset()));
+
+    function handleDateChange(event: Event) {
+      const dateEvent = event as DashboardDateChangeEvent;
+      const nextDatePreset = dateEvent.detail?.datePreset ?? getStoredDatePreset();
+      setDatePreviewQuery(getDatePreviewQuery(nextDatePreset));
+    }
+
+    window.addEventListener("media-dashboard-date-change", handleDateChange);
+    return () => window.removeEventListener("media-dashboard-date-change", handleDateChange);
+  }, [metaPreviewQuery]);
 
   useEffect(() => {
     setMetaPreview(null);
