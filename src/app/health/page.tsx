@@ -11,7 +11,9 @@ import {
 import { getCurrencyMeta } from "@/lib/clientTypes";
 import {
   getEffectiveAov,
+  getEffectiveBlendedRoas,
   getEffectiveMer,
+  getEffectiveOrders,
   getEffectiveStoreRevenue,
   getRevenueBasisLabel,
 } from "@/lib/dashboardMetricLogic";
@@ -59,10 +61,9 @@ export default function HealthPage() {
   const storeCurrency = storePreview?.currencyCode ?? activeClient?.currencyCode ?? "USD";
   const totalSpend = metaPreview?.totals.spend ?? 0;
   const storeRevenue = getEffectiveStoreRevenue(storePreview, metricLogic);
-  const orders = storePreview?.ordersCount ?? 0;
+  const orders = getEffectiveOrders(storePreview, metricLogic);
   const mer = getEffectiveMer(storePreview, metaPreview, metricLogic) ?? 0;
-  const blendedRoas =
-    totalSpend > 0 && metaPreview ? metaPreview.totals.purchaseValue / totalSpend : 0;
+  const blendedRoas = getEffectiveBlendedRoas(metaPreview, metricLogic) ?? 0;
   const aov = getEffectiveAov(storePreview, metricLogic) ?? 0;
 
   const hasBusinessTruth = Boolean(storePreview);
@@ -163,7 +164,7 @@ export default function HealthPage() {
               <MiniMetric
                 label="Orders"
                 value={formatNumber(orders)}
-                hint="Website/store truth"
+                hint="Website/store truth via metric resolver"
                 tone="good"
               />
               <MiniMetric
@@ -199,7 +200,7 @@ export default function HealthPage() {
                 value={
                   hasMetaSpend ? `${formatNumber(blendedRoas, 2)}x` : "Needs spend source"
                 }
-                hint="Platform-attributed revenue divided by total ad spend"
+                hint="Resolved from the metric mapping layer"
                 tone={hasMetaSpend ? "good" : "warn"}
               />
               <MiniMetric
