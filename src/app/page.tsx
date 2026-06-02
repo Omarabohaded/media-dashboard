@@ -13,7 +13,10 @@ import {
 } from "@/components/AppShell";
 import {
   getEffectiveAov,
+  getEffectiveBlendedRoas,
+  getEffectiveCtr,
   getEffectiveMer,
+  getEffectiveOrders,
   getEffectiveStoreRevenue,
   getRevenueBasisLabel,
 } from "@/lib/dashboardMetricLogic";
@@ -21,7 +24,6 @@ import { getFunnelReadiness } from "@/lib/funnelReadiness";
 import { useDashboardReadiness } from "@/lib/useDashboardReadiness";
 import { evaluateTrackingGap } from "@/lib/workbookSignals";
 
-// Fresh deploy trigger after clearing queued production jobs.
 function formatMoney(value: number, currencyCode: string, digits = 0) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -81,14 +83,15 @@ export default function DashboardPage() {
   const adCurrency = metaStatus?.selectedAccount?.currency ?? storeCurrency;
   const spend = metaPreview?.totals.spend ?? 0;
   const revenue = getEffectiveStoreRevenue(storePreview, metricLogic);
-  const orders = storePreview?.ordersCount ?? 0;
+  const orders = getEffectiveOrders(storePreview, metricLogic);
   const mer = getEffectiveMer(storePreview, metaPreview, metricLogic);
-  const blendedRoas = hasMeta && spend > 0 ? metaPreview!.totals.purchaseValue / spend : null;
+  const blendedRoas = getEffectiveBlendedRoas(metaPreview, metricLogic);
   const aov = getEffectiveAov(storePreview, metricLogic);
   const clicks = metaPreview?.totals.clicks ?? 0;
   const platformPurchases = metaPreview?.totals.purchases ?? 0;
   const impressions = metaPreview?.totals.impressions ?? 0;
   const purchaseProxyCvr = hasMeta && clicks > 0 ? (platformPurchases / clicks) * 100 : null;
+  const trafficCtr = getEffectiveCtr(metaPreview, metricLogic);
   const trackingGap = evaluateTrackingGap({
     storeRevenue: hasStoreTruth ? revenue : undefined,
     platformRevenue: hasMeta ? metaPreview?.totals.purchaseValue : undefined,
@@ -117,7 +120,6 @@ export default function DashboardPage() {
     (sum, row) => sum + (row.checkoutInitiated ?? 0),
     0
   );
-  const trafficCtr = hasMeta && impressions > 0 ? (clicks / impressions) * 100 : null;
   const storeRevenueBasis = getRevenueBasisLabel(metricLogic.storeRevenueBasis);
   const merBasis = getRevenueBasisLabel(metricLogic.merRevenueBasis);
   const aovBasis = getRevenueBasisLabel(metricLogic.aovRevenueBasis);
@@ -313,7 +315,7 @@ export default function DashboardPage() {
           <MiniMetric
             label="Orders"
             value={hasStoreTruth ? formatNumber(orders) : "Waiting"}
-            hint="Completed website orders"
+            hint="Resolved website orders"
             tone={hasStoreTruth ? "good" : "warn"}
           />
           <MiniMetric
@@ -331,7 +333,7 @@ export default function DashboardPage() {
           <MiniMetric
             label="Blended ROAS"
             value={blendedRoas !== null ? `${formatNumber(blendedRoas, 2)}x` : "Waiting"}
-            hint="Platform-attributed revenue divided by spend"
+            hint="Resolved attributed revenue divided by spend"
             tone={blendedRoas !== null ? (blendedRoas >= 2 ? "good" : "warn") : "warn"}
           />
           <MiniMetric
@@ -378,7 +380,7 @@ export default function DashboardPage() {
               />
               <OperatorRow
                 label="Metric logic"
-                value="Admin registry"
+                value="Admin mapping resolver"
                 status="Connected"
               />
             </div>
@@ -489,7 +491,7 @@ export default function DashboardPage() {
               />
               <LogicRow
                 metric="Blended ROAS"
-                logic="Platform-attributed revenue divided by spend"
+                logic="Resolved platform value divided by spend"
               />
             </div>
           </Section>
@@ -519,16 +521,6 @@ export default function DashboardPage() {
                 title="Scaling"
                 detail="Whether growth is safe, blocked, or under pressure."
               />
-              <QuickLinkCard
-                href="/action"
-                title="Actions"
-                detail="Ranked next moves built from connected signals."
-              />
-              <QuickLinkCard
-                href="/admin"
-                title="Admin"
-                detail="Metric logic, client settings, and source configuration."
-              />
             </div>
           </Section>
         </div>
@@ -539,11 +531,15 @@ export default function DashboardPage() {
 
 function SignalCard({ signal }: { signal: CommandSignal }) {
   return (
-    <div className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.6)] p-4">
+    <div className="rounded-[22px] border border-[var(--line)] bg-[rgba(255,255,255,0.62)] p-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h3 className="text-base font-semibold text-[var(--ink)]">{signal.title}</h3>
-          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{signal.detail}</p>
+          <h3 className="font-serif-display text-xl font-semibold text-[var(--ink)]">
+            {signal.title}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+            {signal.detail}
+          </p>
         </div>
         <StatusPill status={signal.status} />
       </div>
@@ -551,83 +547,52 @@ function SignalCard({ signal }: { signal: CommandSignal }) {
   );
 }
 
-function OperatorRow({
-  label,
-  value,
-  status,
-}: {
-  label: string;
-  value: string;
-  status: string;
-}) {
+function OperatorRow({ label, value, status }: { label: string; value: string; status: string }) {
   return (
-    <div className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.6)] p-4">
-      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-        {label}
-      </div>
-      <div className="mt-2 text-sm font-semibold text-[var(--ink)]">{value}</div>
-      <div className="mt-3">
+    <div className="rounded-[18px] border border-[var(--line)] bg-[rgba(255,255,255,0.62)] p-3">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+            {label}
+          </div>
+          <div className="mt-1 text-sm font-semibold text-[var(--ink)]">{value}</div>
+        </div>
         <StatusPill status={status} />
       </div>
     </div>
   );
 }
 
-function ProxyMetric({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-}) {
+function ProxyMetric({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.6)] p-4">
+    <div className="rounded-[18px] border border-[var(--line)] bg-[rgba(255,255,255,0.62)] p-4">
       <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
         {label}
       </div>
-      <div className="mt-2 text-2xl font-semibold tracking-tight text-[var(--ink)]">
-        {value}
-      </div>
-      <div className="mt-2 text-sm text-[var(--muted)]">{hint}</div>
+      <div className="mt-2 text-2xl font-semibold text-[var(--ink)]">{value}</div>
+      <div className="mt-1 text-sm leading-6 text-[var(--muted)]">{hint}</div>
     </div>
   );
 }
 
-function LogicRow({
-  metric,
-  logic,
-}: {
-  metric: string;
-  logic: string;
-}) {
+function LogicRow({ metric, logic }: { metric: string; logic: string }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-[18px] border border-[var(--line)] bg-[rgba(255,255,255,0.58)] px-4 py-4">
-      <div>
-        <div className="text-sm font-semibold text-[var(--ink)]">{metric}</div>
-        <div className="mt-1 text-sm text-[var(--muted)]">{logic}</div>
+    <div className="rounded-[18px] border border-[var(--line)] bg-[rgba(255,255,255,0.62)] p-4">
+      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+        {metric}
       </div>
-      <StatusPill status="Live" />
+      <div className="mt-2 text-sm leading-6 text-[var(--ink)]">{logic}</div>
     </div>
   );
 }
 
-function QuickLinkCard({
-  href,
-  title,
-  detail,
-}: {
-  href: string;
-  title: string;
-  detail: string;
-}) {
+function QuickLinkCard({ href, title, detail }: { href: string; title: string; detail: string }) {
   return (
     <Link
       href={href}
-      className="rounded-[20px] border border-[var(--line)] bg-[rgba(255,255,255,0.6)] p-4 transition hover:border-[var(--accent)] hover:bg-[rgba(255,255,255,0.78)]"
+      className="rounded-[22px] border border-[var(--line)] bg-[rgba(255,255,255,0.62)] p-4 transition hover:border-[var(--accent)] hover:bg-white"
     >
-      <div className="text-base font-semibold text-[var(--ink)]">{title}</div>
+      <div className="font-serif-display text-xl font-semibold text-[var(--ink)]">{title}</div>
       <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{detail}</p>
     </Link>
   );
