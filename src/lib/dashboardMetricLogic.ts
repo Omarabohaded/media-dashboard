@@ -286,6 +286,42 @@ export function getEffectiveCtr(
   return impressions > 0 ? (clicks / impressions) * 100 : null;
 }
 
+export function getEffectiveCpc(
+  metaPreview: MetaMetricSnapshot | null | undefined,
+  metricLogic: DashboardMetricLogicConfig
+) {
+  const mapping = getMapping(metricLogic, "cpc");
+
+  if (mapping?.formulaTemplate && mapping.formulaTemplate !== "none") {
+    return calculateFormula(mapping.formulaTemplate, null, metaPreview);
+  }
+
+  const mappedValue = readMappedValue(mapping, null, metaPreview);
+  if (typeof mappedValue === "number") return mappedValue;
+
+  const spend = metaPreview?.totals.spend ?? 0;
+  const clicks = metaPreview?.totals.clicks ?? 0;
+  return clicks > 0 ? spend / clicks : null;
+}
+
+export function getEffectiveCpm(
+  metaPreview: MetaMetricSnapshot | null | undefined,
+  metricLogic: DashboardMetricLogicConfig
+) {
+  const mapping = getMapping(metricLogic, "cpm");
+
+  if (mapping?.formulaTemplate && mapping.formulaTemplate !== "none") {
+    return calculateFormula(mapping.formulaTemplate, null, metaPreview);
+  }
+
+  const mappedValue = readMappedValue(mapping, null, metaPreview);
+  if (typeof mappedValue === "number") return mappedValue;
+
+  const spend = metaPreview?.totals.spend ?? 0;
+  const impressions = metaPreview?.totals.impressions ?? 0;
+  return impressions > 0 ? (spend / impressions) * 1000 : null;
+}
+
 export function getEffectiveCpaCac(
   metaPreview: MetaMetricSnapshot | null | undefined,
   storePreview: StoreMetricSnapshot | null | undefined,
