@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { StatusPill } from "@/components/AppShell";
+import { StatusPill, useDashboardDate } from "@/components/AppShell";
 
 const fieldClass =
   "w-full rounded-[12px] border border-[var(--line)] bg-white/75 px-3 py-2.5 text-sm font-medium text-[var(--ink)] outline-none transition placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:bg-white";
@@ -30,6 +30,7 @@ type PreviewPayload = {
     ordersCount: number;
     grossSales: number;
     averageOrderValue: number;
+    rangeLabel?: string;
   };
   error?: string;
 };
@@ -57,6 +58,7 @@ function readyState(status: WooStatus | null) {
 }
 
 export function WooCommerceConnectionCard({ activeClientId, activeClientName }: { activeClientId: string; activeClientName: string }) {
+  const { datePreset, activeLabel } = useDashboardDate();
   const [status, setStatus] = useState<WooStatus | null>(null);
   const [storeUrl, setStoreUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -78,6 +80,10 @@ export function WooCommerceConnectionCard({ activeClientId, activeClientName }: 
   useEffect(() => {
     void loadStatus().catch(() => setMessage("Could not load WooCommerce status."));
   }, [activeClientId]);
+
+  useEffect(() => {
+    setPreview(null);
+  }, [datePreset, activeClientId]);
 
   async function saveConnection() {
     setBusy(true);
@@ -113,7 +119,11 @@ export function WooCommerceConnectionCard({ activeClientId, activeClientName }: 
 
   async function loadPreview() {
     setBusy(true);
-    const response = await fetch(`/api/integrations/woocommerce/store-truth-preview?clientId=${encodeURIComponent(activeClientId)}`, { cache: "no-store" });
+    const params = new URLSearchParams({
+      clientId: activeClientId,
+      datePreset,
+    });
+    const response = await fetch(`/api/integrations/woocommerce/store-truth-preview?${params.toString()}`, { cache: "no-store" });
     const payload = (await response.json()) as PreviewPayload;
     setBusy(false);
     if (!response.ok) {
@@ -121,8 +131,10 @@ export function WooCommerceConnectionCard({ activeClientId, activeClientName }: 
       return;
     }
     setPreview(payload);
-    setMessage("WooCommerce preview loaded from this client store.");
+    setMessage(`WooCommerce preview loaded for ${payload.snapshot?.rangeLabel ?? activeLabel}.`);
   }
+
+  const previewRangeLabel = preview?.snapshot?.rangeLabel ?? activeLabel;
 
   return (
     <div className="rounded-[16px] border border-[var(--line)] bg-white/52 p-4">
@@ -149,7 +161,7 @@ export function WooCommerceConnectionCard({ activeClientId, activeClientName }: 
             <input value={apiToken} onChange={(event) => setApiToken(event.target.value)} placeholder="REST API token" className={fieldClass} />
           </div>
         </div>
-        <div className="mt-2 text-xs leading-5 text-[var(--muted)]">Use read-only WooCommerce REST API credentials. The values are saved only for the selected client.</div>
+        <div className="mt-2 text-xs leading-5 text-[var(--muted)]">Use read-only WooCommerce REST API credentials. The preview uses the shared reporting window: {activeLabel}.</div>
         <div className="mt-4 flex flex-wrap gap-2">
           <button type="button" onClick={() => void saveConnection()} disabled={busy} className={primaryButtonClass}>{status?.connected ? "Reconnect WooCommerce" : "Connect WooCommerce"}</button>
           <button type="button" onClick={() => void loadStatus()} disabled={busy} className={secondaryButtonClass}>Refresh</button>
@@ -159,8 +171,8 @@ export function WooCommerceConnectionCard({ activeClientId, activeClientName }: 
       </div>
       {preview?.snapshot ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <AdminStat label="Orders" value={`${preview.snapshot.ordersCount}`} hint="Recent WooCommerce orders" />
-          <AdminStat label="Revenue" value={`${preview.snapshot.currencyCode} ${preview.snapshot.grossSales.toFixed(0)}`} hint={`AOV ${preview.snapshot.currencyCode} ${preview.snapshot.averageOrderValue.toFixed(0)}`} />
+          <AdminStat label="Orders" value={`${preview.snapshot.ordersCount}`} hint={`${previewRangeLabel} WooCommerce orders`} />
+          <AdminStat label="Revenue" value={`${preview.snapshot.currencyCode} ${preview.snapshot.grossSales.toFixed(0)}`} hint={`${previewRangeLabel} AOV ${preview.snapshot.currencyCode} ${preview.snapshot.averageOrderValue.toFixed(0)}`} />
         </div>
       ) : null}
     </div>
