@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   buildDashboardMetricLogic,
   getEffectiveAov,
+  getEffectiveCpaCac,
+  getEffectiveMer,
+  getEffectiveOrders,
   getEffectiveStoreRevenue,
 } from "@/lib/dashboardMetricLogic";
 import {
   getMetaConnection,
   getShopifyConnection,
+  getWooCommerceConnection,
   listClients,
 } from "@/lib/clientStore";
 import type { ClientCurrencyCode } from "@/lib/clientTypes";
@@ -16,9 +20,14 @@ import {
   getShopifyConfig,
 } from "@/lib/integrations/shopify";
 import {
+  fetchWooCommerceStoreTruthPreview,
+  type WooCommerceDatePreset,
+} from "@/lib/integrations/woocommerce";
+import {
   fetchWordPressStoreTruthPreview,
   getWordPressConfig,
 } from "@/lib/integrations/wordpress";
+import { listMetricMappings } from "@/lib/metricMappingStore";
 import { listMetricOverrides } from "@/lib/metricOverrideStore";
 
 type MultiStoreCard = {
@@ -51,11 +60,30 @@ function toClientCurrencyCode(
   return fallback;
 }
 
+function toWooCommerceDatePreset(value: string | null | undefined): WooCommerceDatePreset | undefined {
+  if (
+    value === "today" ||
+    value === "yesterday" ||
+    value === "last_7d" ||
+    value === "last_30d" ||
+    value === "this_month" ||
+    value === "last_month" ||
+    value === "custom"
+  ) {
+    return value;
+  }
+
+  return undefined;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const clients = await listClients();
-    const overrides = await listMetricOverrides();
-    const metricLogic = buildDashboardMetricLogic(overrides);
+    const [overrides, mappings] = await Promise.all([
+      listMetricOverrides(),
+      listMetricMappings(),
+    ]);
+    const metricLogic = buildDashboardMetricLogic(overrides, mappings);
 
     const datePreset = request.nextUrl.searchParams.get("datePreset") ?? undefined;
     const since = request.nextUrl.searchParams.get("since") ?? undefined;
@@ -92,6 +120,20 @@ export async function GET(request: NextRequest) {
               netSales: number;
               ordersCount: number;
               currencyCode: ClientCurrencyCode;
+              taxTotal?: number;
+              shippingTotal?: number;
+              averageOrderValue?: number;
+            }
+          | null = null;
+        let metaSnapshot:
+          | {
+              totals: {
+                spend: number;
+                purchases: number;
+                purchaseValue: number;
+                clicks: number;
+                impressions: number;
+              };
             }
           | null = null;
 
@@ -135,6 +177,43 @@ export async function GET(request: NextRequest) {
                   : "Shopify preview could not be loaded."
               );
               storeSourceLabel = connection.storeDomain;
+            }
+          }
+        } else if (client.websitePlatform === "woocommerce") {
+          const connection = await getWooCommerceConnection(client.id);
+
+          if (!connection?.storeUrl || !connection.consumerKey || !connection.consumerSecret) {
+            issues.push("WooCommerce is not connected for this client.");
+            storeSourceLabel = "WooCommerce not connected";
+          } else {
+            try {
+              const preview = await fetchWooCommerceStoreTruthPreview(
+                {
+                  storeUrl: connection.storeUrl,
+                  consumerKey: connection.consumerKey,
+                  consumerSecret: connection.consumerSecret,
+                },
+                { datePreset: toWooCommerceDatePreset(datePreset) }
+              );
+              storeSnapshot = {
+                grossSales: preview.snapshot.grossSales,
+                netSales: preview.snapshot.netSales,
+                ordersCount: preview.snapshot.ordersCount,
+                currencyCode: toClientCurrencyCode(preview.snapshot.currencyCode, currencyCode),
+                taxTotal: preview.snapshot.taxTotal,
+                shippingTotal: preview.snapshot.shippingTotal,
+                averageOrderValue: preview.snapshot.averageOrderValue,
+              };
+              currencyCode = toClientCurrencyCode(preview.snapshot.currencyCode, currencyCode);
+              storeConnected = true;
+              storeSourceLabel = connection.storeName || connection.storeUrl;
+            } catch (error) {
+              issues.push(
+                error instanceof Error
+                  ? error.message
+                  : "WooCommerce preview could not be loaded."
+              );
+              storeSourceLabel = connection.storeUrl;
             }
           }
         } else if (client.websitePlatform === "wordpress") {
@@ -189,7 +268,16 @@ export async function GET(request: NextRequest) {
                 until,
               }
             );
-            adSpend = rows.reduce((sum, row) => sum + row.spend, 0);
+            metaSnapshot = {
+              totals: {
+                spend: rows.reduce((sum, row) => sum + row.spend, 0),
+                purchases: rows.reduce((sum, row) => sum + row.purchases, 0),
+                purchaseValue: rows.reduce((sum, row) => sum + row.purchaseValue, 0),
+                clicks: rows.reduce((sum, row) => sum + (row.clicks ?? 0), 0),
+                impressions: rows.reduce((sum, row) => sum + (row.impressions ?? 0), 0),
+              },
+            };
+            adSpend = metaSnapshot.totals.spend;
             metaConnected = true;
             metaSourceLabel =
               metaConnection.selectedAccountName || metaConnection.selectedAccountId;
@@ -206,16 +294,19 @@ export async function GET(request: NextRequest) {
 
         if (storeSnapshot) {
           websiteSales = getEffectiveStoreRevenue(storeSnapshot, metricLogic);
-          orders = storeSnapshot.ordersCount;
+          orders = getEffectiveOrders(storeSnapshot, metricLogic);
           aov = getEffectiveAov(storeSnapshot, metricLogic);
         }
 
-        if (websiteSales !== null && adSpend !== null && adSpend > 0) {
-          roas = websiteSales / adSpend;
+        if (storeSnapshot && metaSnapshot) {
+          roas = getEffectiveMer(storeSnapshot, metaSnapshot, metricLogic);
         }
 
-        if (orders !== null && orders > 0 && adSpend !== null) {
-          costPerOrder = adSpend / orders;
+        if (metaSnapshot && storeSnapshot) {
+          costPerOrder = getEffectiveCpaCac(metaSnapshot, storeSnapshot, {
+            ...metricLogic,
+            cpaDenominatorChoice: "orders",
+          }).value;
         }
 
         const status =
