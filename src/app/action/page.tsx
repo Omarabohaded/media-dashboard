@@ -12,8 +12,12 @@ import { generateActions } from "@/lib/actionEngine";
 import { detectRootCauses } from "@/lib/crossMetricEngine";
 import {
   getCpaDenominatorLabel,
+  getEffectiveBlendedRoas,
   getEffectiveCpaCac,
+  getEffectiveCpc,
+  getEffectiveCtr,
   getEffectiveMer,
+  getEffectiveOrders,
   getEffectiveStoreRevenue,
 } from "@/lib/dashboardMetricLogic";
 import { getFunnelReadiness } from "@/lib/funnelReadiness";
@@ -35,34 +39,29 @@ export default function ActionPage() {
 
   const hasMeta = Boolean(metaPreview && metaStatus?.selectedAccountId);
   const hasStoreTruth = Boolean(storePreview);
-  const averageCtr =
-    metaPreview && metaPreview.rows.length
+  const averageCtr = getEffectiveCtr(metaPreview, metricLogic) ??
+    (metaPreview && metaPreview.rows.length
       ? metaPreview.rows.reduce((sum, row) => sum + row.ctr, 0) / metaPreview.rows.length
-      : 0;
+      : 0);
   const averageFrequency =
     metaPreview && metaPreview.rows.length
       ? metaPreview.rows.reduce((sum, row) => sum + row.frequency, 0) /
         metaPreview.rows.length
       : 0;
-  const averageCpc =
-    metaPreview && metaPreview.totals.clicks > 0
-      ? metaPreview.totals.spend / metaPreview.totals.clicks
-      : 0;
+  const averageCpc = getEffectiveCpc(metaPreview, metricLogic) ?? 0;
   const purchaseCvr =
     metaPreview && metaPreview.totals.clicks > 0
       ? (metaPreview.totals.purchases / metaPreview.totals.clicks) * 100
       : 0;
-  const roas =
-    metaPreview && metaPreview.totals.spend > 0
-      ? metaPreview.totals.purchaseValue / metaPreview.totals.spend
-      : 0;
+  const roas = getEffectiveBlendedRoas(metaPreview, metricLogic) ?? 0;
   const mer = getEffectiveMer(storePreview, metaPreview, metricLogic) ?? 0;
   const configuredCac = getEffectiveCpaCac(metaPreview, storePreview, metricLogic);
   const ncac = configuredCac.value ?? 999;
+  const storeOrders = getEffectiveOrders(storePreview, metricLogic);
   const checkoutRate =
     metaPreview && metaPreview.totals.purchases > 0
       ? (metaPreview.rows.reduce((sum, row) => sum + (row.checkoutInitiated ?? 0), 0) /
-          Math.max(metaPreview.rows.reduce((sum, row) => sum + (row.addToCart ?? 0), 0), 1)) *
+          Math.max(metaPreview.rows.reduce((sum, row) => sum + (row.addToCart ?? 0), 1), 1)) *
         100
       : 0;
   const checkoutCompletionRate =
@@ -80,7 +79,7 @@ export default function ActionPage() {
       ? getEffectiveStoreRevenue(storePreview, metricLogic)
       : undefined,
     platformRevenue: hasMeta ? metaPreview?.totals.purchaseValue : undefined,
-    storeOrders: hasStoreTruth ? storePreview?.ordersCount : undefined,
+    storeOrders: hasStoreTruth ? storeOrders : undefined,
     platformPurchases: hasMeta ? metaPreview?.totals.purchases : undefined,
   });
   const funnelReadiness = getFunnelReadiness({
@@ -101,7 +100,7 @@ export default function ActionPage() {
         ncac,
         frequency: averageFrequency,
         checkoutCompletionRate: checkoutCompletionRate || undefined,
-        backendConversions: hasStoreTruth ? storePreview?.ordersCount : undefined,
+        backendConversions: hasStoreTruth ? storeOrders : undefined,
         platformConversions: hasMeta ? metaPreview?.totals.purchases : undefined,
         trackingMismatch: trackingGap.active,
         checkoutFailure:
@@ -125,7 +124,7 @@ export default function ActionPage() {
         cvr: purchaseCvr,
         checkoutRate: checkoutRate || undefined,
         purchaseCvr,
-        backendConversions: hasStoreTruth ? storePreview?.ordersCount : undefined,
+        backendConversions: hasStoreTruth ? storeOrders : undefined,
         platformConversions: hasMeta ? metaPreview?.totals.purchases : undefined,
       })
     : [];
