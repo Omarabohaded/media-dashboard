@@ -12,7 +12,11 @@ import {
 } from "@/components/AppShell";
 import {
   getCpaDenominatorLabel,
+  getEffectiveBlendedRoas,
   getEffectiveCpaCac,
+  getEffectiveCpc,
+  getEffectiveCpm,
+  getEffectiveCtr,
 } from "@/lib/dashboardMetricLogic";
 import { useDashboardReadiness } from "@/lib/useDashboardReadiness";
 
@@ -48,14 +52,12 @@ export default function PaidMediaPage() {
   const hasMeta = Boolean(metaPreview && metaStatus?.selectedAccountId);
   const currency = metaStatus?.selectedAccount?.currency ?? "USD";
   const spend = metaPreview?.totals.spend ?? 0;
-  const clicks = metaPreview?.totals.clicks ?? 0;
-  const impressions = metaPreview?.totals.impressions ?? 0;
   const purchases = metaPreview?.totals.purchases ?? 0;
   const revenue = metaPreview?.totals.purchaseValue ?? 0;
-  const ctr = impressions > 0 ? (clicks / impressions) * 100 : null;
-  const cpc = clicks > 0 ? spend / clicks : null;
-  const cpm = impressions > 0 ? (spend / impressions) * 1000 : null;
-  const roas = spend > 0 ? revenue / spend : null;
+  const ctr = getEffectiveCtr(metaPreview, metricLogic);
+  const cpc = getEffectiveCpc(metaPreview, metricLogic);
+  const cpm = getEffectiveCpm(metaPreview, metricLogic);
+  const roas = getEffectiveBlendedRoas(metaPreview, metricLogic);
   const cpaCac = getEffectiveCpaCac(metaPreview, storePreview, metricLogic);
   const sortedRows = [...(metaPreview?.rows ?? [])].sort((a, b) => b.spend - a.spend);
   const avgFrequency =
@@ -117,7 +119,7 @@ export default function PaidMediaPage() {
 
         <Section
           title="Paid Media Snapshot"
-          subtitle="These are the delivery and efficiency metrics that belong on a real paid-media page, not inside the command center scroll."
+          subtitle="These metrics are resolved through the central metric mapping layer where supported."
         >
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-7">
             <MiniMetric
@@ -135,7 +137,7 @@ export default function PaidMediaPage() {
             <MiniMetric
               label="ROAS"
               value={roas !== null ? `${formatNumber(roas, 2)}x` : "Waiting"}
-              hint="Attributed revenue divided by spend"
+              hint="Resolved attributed revenue divided by spend"
               tone={roas !== null ? "good" : "warn"}
             />
             <MiniMetric
@@ -150,19 +152,19 @@ export default function PaidMediaPage() {
             <MiniMetric
               label="CTR"
               value={ctr !== null ? formatPercent(ctr) : "Waiting"}
-              hint="Clicks divided by impressions"
+              hint="Resolved clicks divided by impressions"
               tone={ctr !== null ? "good" : "warn"}
             />
             <MiniMetric
               label="CPC"
               value={cpc !== null ? formatMoney(cpc, currency) : "Waiting"}
-              hint="Spend divided by clicks"
+              hint="Resolved spend divided by clicks"
               tone={cpc !== null ? "good" : "warn"}
             />
             <MiniMetric
               label="CPM"
               value={cpm !== null ? formatMoney(cpm, currency) : "Waiting"}
-              hint="Spend per thousand impressions"
+              hint="Resolved spend per thousand impressions"
               tone={cpm !== null ? "good" : "warn"}
             />
           </div>
@@ -171,7 +173,7 @@ export default function PaidMediaPage() {
         <div className="grid gap-5 xl:grid-cols-[1.2fr,0.8fr]">
           <Section
             title="Campaign Table"
-            subtitle="This is where the deeper media numbers live now."
+            subtitle="Campaign rows still show row-level media values from the connected platform preview."
           >
             <div className="overflow-x-auto">
               <table className="w-full min-w-[900px]">
