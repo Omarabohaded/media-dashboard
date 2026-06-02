@@ -3,14 +3,18 @@ import {
   buildDashboardMetricLogic,
   DEFAULT_DASHBOARD_METRIC_LOGIC,
 } from "@/lib/dashboardMetricLogic";
+import { listMetricMappings } from "@/lib/metricMappingStore";
 import { listMetricOverrides } from "@/lib/metricOverrideStore";
 
 export async function GET() {
   try {
-    const overrides = await listMetricOverrides();
+    const [overrides, mappings] = await Promise.all([
+      listMetricOverrides(),
+      listMetricMappings(),
+    ]);
 
     return NextResponse.json({
-      metricLogic: buildDashboardMetricLogic(overrides),
+      metricLogic: buildDashboardMetricLogic(overrides, mappings),
     });
   } catch {
     return NextResponse.json({
