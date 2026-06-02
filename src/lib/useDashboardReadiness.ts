@@ -48,6 +48,18 @@ type WordPressStatusResponse = {
   recommendedNextStep: string;
 };
 
+type WooCommerceStatusResponse = {
+  configured: boolean;
+  connected: boolean;
+  previewReady: boolean;
+  storeUrl: string;
+  storeName: string | null;
+  currencyCode: string | null;
+  connectedAt: string | null;
+  connectionError: string | null;
+  recommendedNextStep: string;
+};
+
 type ShopifyPreviewResponse = {
   snapshot: {
     shopName: string;
@@ -62,7 +74,7 @@ type ShopifyPreviewResponse = {
   note: string;
 };
 
-type WordPressPreviewResponse = {
+type StoreTruthPreviewResponse = {
   snapshot: {
     storeName: string;
     currencyCode: string;
@@ -72,8 +84,9 @@ type WordPressPreviewResponse = {
     shippingTotal: number;
     netSales: number;
     averageOrderValue: number;
+    rangeLabel?: string;
   };
-  note: string;
+  note?: string;
 };
 
 type DashboardMetricLogicResponse = {
@@ -93,7 +106,7 @@ export type DashboardStoreStatus = {
 };
 
 export type DashboardStorePreview = {
-  platform: "shopify" | "wordpress";
+  platform: "shopify" | "wordpress" | "woocommerce";
   storeName: string;
   currencyCode: string;
   ordersCount: number;
@@ -143,9 +156,16 @@ const DASHBOARD_CUSTOM_END_KEY = "media-dashboard-custom-end";
 const DEFAULT_META_PREVIEW_QUERY = "datePreset=last_7d";
 
 function getDeclinedStoreMessage(platform: WebsitePlatform) {
-  return platform === "shopify" || platform === "wordpress"
+  return platform === "shopify" || platform === "wordpress" || platform === "woocommerce"
     ? "This client has not granted website access. Keep storefront truth optional unless they choose to share it later."
     : "This client has not granted website access, so storefront truth is intentionally unavailable right now.";
+}
+
+function getStoreSourceLabel(platform: WebsitePlatform) {
+  if (platform === "shopify") return "Shopify";
+  if (platform === "woocommerce") return "WooCommerce";
+  if (platform === "wordpress") return "WordPress / WooCommerce";
+  return "Store truth not wired yet";
 }
 
 function defaultStoreStatus(
@@ -167,7 +187,7 @@ function defaultStoreStatus(
       connectionError: null,
       recommendedNextStep: clientDeclinedAccess
         ? getDeclinedStoreMessage(platform)
-        : "This client website type is not connected yet. Start with Shopify or WordPress/WooCommerce first.",
+        : "This client website type is not connected yet. Start with Shopify or WooCommerce first.",
       clientDeclinedAccess,
     };
   }
@@ -179,9 +199,7 @@ function defaultStoreStatus(
     previewReady: false,
     sourceLabel: clientDeclinedAccess
       ? "Client declined website access"
-      : platform === "shopify"
-      ? "Shopify"
-      : "WordPress / WooCommerce",
+      : getStoreSourceLabel(platform),
     missingEnv: [],
     connectionError: null,
     recommendedNextStep: clientDeclinedAccess
@@ -193,12 +211,12 @@ function defaultStoreStatus(
 
 function normalizeStoreStatus(
   platform: WebsitePlatform,
-  payload: ShopifyStatusResponse | WordPressStatusResponse,
+  payload: ShopifyStatusResponse | WordPressStatusResponse | WooCommerceStatusResponse,
   client?: ClientRecord | null
 ): DashboardStoreStatus {
   const clientDeclinedAccess = Boolean(client?.storeAccessDeclined);
 
-  if (payload.platform === "shopify") {
+  if (platform === "shopify" && "storeDomain" in payload) {
     const connected = payload.connected && !clientDeclinedAccess;
     const previewReady = payload.previewReady && !clientDeclinedAccess;
     return {
@@ -219,29 +237,51 @@ function normalizeStoreStatus(
     };
   }
 
-  const connected = payload.connected && !clientDeclinedAccess;
-  const previewReady = payload.previewReady && !clientDeclinedAccess;
+  if (platform === "woocommerce" && "storeUrl" in payload) {
+    const connected = payload.connected && !clientDeclinedAccess;
+    const previewReady = payload.previewReady && !clientDeclinedAccess;
+    return {
+      platform,
+      configured: payload.configured,
+      connected,
+      previewReady,
+      sourceLabel: clientDeclinedAccess && !connected
+        ? "Client declined website access"
+        : payload.storeName || payload.storeUrl || "WooCommerce",
+      missingEnv: [],
+      connectionError: clientDeclinedAccess && !connected ? null : payload.connectionError,
+      recommendedNextStep:
+        clientDeclinedAccess && !connected
+          ? getDeclinedStoreMessage(platform)
+          : payload.recommendedNextStep,
+      clientDeclinedAccess,
+    };
+  }
+
+  const wordpressPayload = payload as WordPressStatusResponse;
+  const connected = wordpressPayload.connected && !clientDeclinedAccess;
+  const previewReady = wordpressPayload.previewReady && !clientDeclinedAccess;
   return {
     platform,
-    configured: payload.configured,
+    configured: wordpressPayload.configured,
     connected,
     previewReady,
     sourceLabel: clientDeclinedAccess && !connected
       ? "Client declined website access"
-      : payload.siteUrl || "WordPress / WooCommerce",
-    missingEnv: payload.missingEnv,
-    connectionError: clientDeclinedAccess && !connected ? null : payload.connectionError,
+      : wordpressPayload.siteUrl || "WordPress / WooCommerce",
+    missingEnv: wordpressPayload.missingEnv,
+    connectionError: clientDeclinedAccess && !connected ? null : wordpressPayload.connectionError,
     recommendedNextStep:
       clientDeclinedAccess && !connected
         ? getDeclinedStoreMessage(platform)
-        : payload.recommendedNextStep,
+        : wordpressPayload.recommendedNextStep,
     clientDeclinedAccess,
   };
 }
 
 function normalizeStorePreview(
-  platform: "shopify" | "wordpress",
-  payload: ShopifyPreviewResponse | WordPressPreviewResponse
+  platform: "shopify" | "wordpress" | "woocommerce",
+  payload: ShopifyPreviewResponse | StoreTruthPreviewResponse
 ): DashboardStorePreview {
   if (platform === "shopify") {
     const preview = payload as ShopifyPreviewResponse;
@@ -259,7 +299,7 @@ function normalizeStorePreview(
     };
   }
 
-  const preview = payload as WordPressPreviewResponse;
+  const preview = payload as StoreTruthPreviewResponse;
   return {
     platform,
     storeName: preview.snapshot.storeName,
@@ -270,7 +310,9 @@ function normalizeStorePreview(
     shippingTotal: preview.snapshot.shippingTotal,
     netSales: preview.snapshot.netSales,
     averageOrderValue: preview.snapshot.averageOrderValue,
-    note: preview.note,
+    note:
+      preview.note ??
+      `${platform === "woocommerce" ? "WooCommerce" : "WordPress"} store-truth preview loaded for ${preview.snapshot.rangeLabel ?? "the selected reporting window"}.`,
   };
 }
 
@@ -361,22 +403,24 @@ export function useDashboardReadiness(options: HookOptions = {}) {
   async function loadStoreForPlatform(client: ClientRecord) {
     const { websitePlatform: platform, id: clientId } = client;
 
-    if (platform !== "shopify" && platform !== "wordpress") {
+    if (platform !== "shopify" && platform !== "wordpress" && platform !== "woocommerce") {
       setStoreStatus(defaultStoreStatus(platform, client));
       setStorePreview(null);
       return;
     }
 
-    const query = `?clientId=${encodeURIComponent(clientId)}`;
+    const statusQuery = `?clientId=${encodeURIComponent(clientId)}`;
+    const previewQuery = `?clientId=${encodeURIComponent(clientId)}&${effectiveMetaPreviewQuery}`;
     const statusResponse = await fetch(
-      `/api/integrations/${platform}/status${query}`,
+      `/api/integrations/${platform}/status${statusQuery}`,
       {
         cache: "no-store",
       }
     );
     const statusPayload = (await statusResponse.json()) as
       | ShopifyStatusResponse
-      | WordPressStatusResponse;
+      | WordPressStatusResponse
+      | WooCommerceStatusResponse;
     const nextStoreStatus = normalizeStoreStatus(platform, statusPayload, client);
     setStoreStatus(nextStoreStatus);
 
@@ -390,14 +434,14 @@ export function useDashboardReadiness(options: HookOptions = {}) {
     }
 
     const previewResponse = await fetch(
-      `/api/integrations/${platform}/store-truth-preview${query}`,
+      `/api/integrations/${platform}/store-truth-preview${previewQuery}`,
       {
         cache: "no-store",
       }
     );
     const previewPayload = (await previewResponse.json()) as
       | ShopifyPreviewResponse
-      | WordPressPreviewResponse
+      | StoreTruthPreviewResponse
       | { error?: string };
 
     if (!previewResponse.ok || !("snapshot" in previewPayload)) {
