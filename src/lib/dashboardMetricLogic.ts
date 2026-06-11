@@ -34,7 +34,12 @@ export type DashboardMetricLogicConfig = {
   aovRevenueBasis: MetricRevenueBasis;
   merRevenueBasis: MetricRevenueBasis;
   cpaDenominatorChoice: MetricDenominatorChoice;
+  activeClientId: string | null;
   mappings: Record<string, MetricMappingOverride>;
+};
+
+export type DashboardMetricLogicOptions = {
+  clientId?: string | null;
 };
 
 export const DEFAULT_DASHBOARD_METRIC_LOGIC: DashboardMetricLogicConfig = {
@@ -42,12 +47,14 @@ export const DEFAULT_DASHBOARD_METRIC_LOGIC: DashboardMetricLogicConfig = {
   aovRevenueBasis: "gross_sales",
   merRevenueBasis: "gross_sales",
   cpaDenominatorChoice: "purchases",
+  activeClientId: null,
   mappings: {},
 };
 
 export function buildDashboardMetricLogic(
   overrides: MetricAdminOverride[],
-  mappings: MetricMappingOverride[] = []
+  mappings: MetricMappingOverride[] = [],
+  options: DashboardMetricLogicOptions = {}
 ): DashboardMetricLogicConfig {
   const overrideMap = new Map(
     overrides.map((override) => [override.metricId, override])
@@ -56,6 +63,8 @@ export function buildDashboardMetricLogic(
   const storeRevenueBasis =
     overrideMap.get("store_revenue")?.revenueBasis ??
     DEFAULT_DASHBOARD_METRIC_LOGIC.storeRevenueBasis;
+
+  const activeClientId = options.clientId?.trim() || null;
 
   return {
     storeRevenueBasis,
@@ -66,15 +75,27 @@ export function buildDashboardMetricLogic(
     cpaDenominatorChoice:
       overrideMap.get("cpa_cac")?.denominatorChoice ??
       DEFAULT_DASHBOARD_METRIC_LOGIC.cpaDenominatorChoice,
-    mappings: buildMappingRecord(mappings),
+    activeClientId,
+    mappings: buildMappingRecord(mappings, activeClientId),
   };
 }
 
-function buildMappingRecord(mappings: MetricMappingOverride[]) {
+function buildMappingRecord(
+  mappings: MetricMappingOverride[],
+  activeClientId: string | null
+) {
   return mappings.reduce<Record<string, MetricMappingOverride>>((record, mapping) => {
-    if (mapping.scope === "global" && mapping.enabled !== false) {
+    if (mapping.enabled === false) return record;
+
+    if (mapping.scope === "global") {
+      record[mapping.metricId] = mapping;
+      return record;
+    }
+
+    if (activeClientId && mapping.scope === "client" && mapping.clientId === activeClientId) {
       record[mapping.metricId] = mapping;
     }
+
     return record;
   }, {});
 }
