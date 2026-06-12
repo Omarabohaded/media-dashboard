@@ -392,9 +392,10 @@ export function useDashboardReadiness(options: HookOptions = {}) {
     };
   }
 
-  async function loadMetricLogic() {
+  async function loadMetricLogic(clientId?: string | null) {
     try {
-      const response = await fetch("/api/dashboard/metric-logic", {
+      const query = clientId ? `?clientId=${encodeURIComponent(clientId)}` : "";
+      const response = await fetch(`/api/dashboard/metric-logic${query}`, {
         cache: "no-store",
       });
       const payload = (await response.json()) as DashboardMetricLogicResponse;
@@ -470,7 +471,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
           ? window.localStorage.getItem("media-dashboard-active-client")
           : null);
       const { clientId: nextClientId, client } = await loadClients(clientId);
-      await loadMetricLogic();
+      await loadMetricLogic(nextClientId);
 
       if (!nextClientId || !client) {
         setMessage("Create a client in Admin first.");
