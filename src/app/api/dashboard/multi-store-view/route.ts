@@ -83,7 +83,6 @@ export async function GET(request: NextRequest) {
       listMetricOverrides(),
       listMetricMappings(),
     ]);
-    const metricLogic = buildDashboardMetricLogic(overrides, mappings);
 
     const datePreset = request.nextUrl.searchParams.get("datePreset") ?? undefined;
     const since = request.nextUrl.searchParams.get("since") ?? undefined;
@@ -102,6 +101,9 @@ export async function GET(request: NextRequest) {
 
     const cards = await Promise.all(
       clients.map(async (client): Promise<MultiStoreCard> => {
+        const metricLogic = buildDashboardMetricLogic(overrides, mappings, {
+          clientId: client.id,
+        });
         const issues: string[] = [];
         let adSpend: number | null = null;
         let websiteSales: number | null = null;
