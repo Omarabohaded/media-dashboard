@@ -1,5 +1,6 @@
 import type {
   MetricAdminOverride,
+  MetricChannel,
   MetricDenominatorChoice,
   MetricRevenueBasis,
 } from "@/lib/metricRegistry";
@@ -7,6 +8,7 @@ import type {
   MetricFormulaTemplate,
   MetricMappingOverride,
   MetricMappingSourceField,
+  MetricMappingSourceType,
 } from "@/lib/metricMappingStore";
 
 export type StoreMetricSnapshot = {
@@ -35,6 +37,7 @@ export type DashboardMetricLogicConfig = {
   merRevenueBasis: MetricRevenueBasis;
   cpaDenominatorChoice: MetricDenominatorChoice;
   activeClientId: string | null;
+  includedChannels: Record<string, MetricChannel[]>;
   mappings: Record<string, MetricMappingOverride>;
 };
 
@@ -48,6 +51,7 @@ export const DEFAULT_DASHBOARD_METRIC_LOGIC: DashboardMetricLogicConfig = {
   merRevenueBasis: "gross_sales",
   cpaDenominatorChoice: "purchases",
   activeClientId: null,
+  includedChannels: {},
   mappings: {},
 };
 
@@ -76,8 +80,18 @@ export function buildDashboardMetricLogic(
       overrideMap.get("cpa_cac")?.denominatorChoice ??
       DEFAULT_DASHBOARD_METRIC_LOGIC.cpaDenominatorChoice,
     activeClientId,
+    includedChannels: buildIncludedChannelRecord(overrides),
     mappings: buildMappingRecord(mappings, activeClientId),
   };
+}
+
+function buildIncludedChannelRecord(overrides: MetricAdminOverride[]) {
+  return overrides.reduce<Record<string, MetricChannel[]>>((record, override) => {
+    if (override.includedChannels?.length) {
+      record[override.metricId] = [...override.includedChannels];
+    }
+    return record;
+  }, {});
 }
 
 function buildMappingRecord(
@@ -103,6 +117,27 @@ function buildMappingRecord(
 function getMapping(metricLogic: DashboardMetricLogicConfig, metricId: string) {
   const mapping = metricLogic.mappings?.[metricId] ?? null;
   return mapping && mapping.enabled !== false ? mapping : null;
+}
+
+function isChannelIncluded(
+  metricLogic: DashboardMetricLogicConfig,
+  metricId: string,
+  channel: MetricChannel
+) {
+  const channels = metricLogic.includedChannels?.[metricId] ?? [];
+  return channels.length === 0 || channels.includes(channel);
+}
+
+function isSourceTypeIncluded(
+  metricLogic: DashboardMetricLogicConfig,
+  metricId: string,
+  sourceType: MetricMappingSourceType
+) {
+  if (sourceType === "meta" || sourceType === "google" || sourceType === "tiktok" || sourceType === "snap") {
+    return isChannelIncluded(metricLogic, metricId, sourceType);
+  }
+
+  return true;
 }
 
 function readStoreField(
@@ -142,9 +177,13 @@ function readMetaField(
 function readMappedValue(
   mapping: MetricMappingOverride | null,
   storePreview: StoreMetricSnapshot | null | undefined,
-  metaPreview: MetaMetricSnapshot | null | undefined
+  metaPreview: MetaMetricSnapshot | null | undefined,
+  metricLogic: DashboardMetricLogicConfig,
+  metricId: string
 ) {
-  if (!mapping) return null;
+  if (!mapping || !isSourceTypeIncluded(metricLogic, metricId, mapping.sourceType)) {
+    return null;
+  }
 
   if (mapping.sourceType === "woocommerce" || mapping.sourceType === "shopify") {
     return readStoreField(storePreview, mapping.sourceField);
@@ -209,8 +248,9 @@ export function getEffectiveStoreRevenue(
   storePreview: StoreMetricSnapshot | null | undefined,
   metricLogic: DashboardMetricLogicConfig
 ) {
-  const mapping = getMapping(metricLogic, "store_revenue");
-  const mappedValue = readMappedValue(mapping, storePreview, null);
+  const metricId = "store_revenue";
+  const mapping = getMapping(metricLogic, metricId);
+  const mappedValue = readMappedValue(mapping, storePreview, null, metricLogic, metricId);
 
   if (typeof mappedValue === "number") {
     return mappedValue;
@@ -223,8 +263,9 @@ export function getEffectiveOrders(
   storePreview: StoreMetricSnapshot | null | undefined,
   metricLogic: DashboardMetricLogicConfig
 ) {
-  const mapping = getMapping(metricLogic, "orders");
-  const mappedValue = readMappedValue(mapping, storePreview, null);
+  const metricId = "orders";
+  const mapping = getMapping(metricLogic, metricId);
+  const mappedValue = readMappedValue(mapping, storePreview, null, metricLogic, metricId);
 
   if (typeof mappedValue === "number") {
     return mappedValue;
@@ -237,13 +278,14 @@ export function getEffectiveAov(
   storePreview: StoreMetricSnapshot | null | undefined,
   metricLogic: DashboardMetricLogicConfig
 ) {
-  const mapping = getMapping(metricLogic, "aov");
+  const metricId = "aov";
+  const mapping = getMapping(metricLogic, metricId);
 
   if (mapping?.formulaTemplate && mapping.formulaTemplate !== "none") {
     return calculateFormula(mapping.formulaTemplate, storePreview, null, metricLogic.aovRevenueBasis);
   }
 
-  const mappedValue = readMappedValue(mapping, storePreview, null);
+  const mappedValue = readMappedValue(mapping, storePreview, null, metricLogic, metricId);
 
   if (typeof mappedValue === "number") {
     return mappedValue;
@@ -262,7 +304,12 @@ export function getEffectiveMer(
   metaPreview: MetaMetricSnapshot | null | undefined,
   metricLogic: DashboardMetricLogicConfig
 ) {
-  const mapping = getMapping(metricLogic, "mer");
+  const metricId = "mer";
+  const mapping = getMapping(metricLogic, metricId);
+
+  if (!isChannelIncluded(metricLogic, metricId, "meta")) {
+    return null;
+  }
 
   if (mapping?.formulaTemplate && mapping.formulaTemplate !== "none") {
     return calculateFormula(mapping.formulaTemplate, storePreview, metaPreview, metricLogic.merRevenueBasis);
@@ -282,7 +329,12 @@ export function getEffectiveBlendedRoas(
   metaPreview: MetaMetricSnapshot | null | undefined,
   metricLogic: DashboardMetricLogicConfig
 ) {
-  const mapping = getMapping(metricLogic, "blended_roas");
+  const metricId = "blended_roas";
+  const mapping = getMapping(metricLogic, metricId);
+
+  if (!isChannelIncluded(metricLogic, metricId, "meta")) {
+    return null;
+  }
 
   if (mapping?.formulaTemplate && mapping.formulaTemplate !== "none") {
     return calculateFormula(mapping.formulaTemplate, null, metaPreview);
@@ -296,7 +348,12 @@ export function getEffectiveCtr(
   metaPreview: MetaMetricSnapshot | null | undefined,
   metricLogic: DashboardMetricLogicConfig
 ) {
-  const mapping = getMapping(metricLogic, "ctr");
+  const metricId = "ctr";
+  const mapping = getMapping(metricLogic, metricId);
+
+  if (!isChannelIncluded(metricLogic, metricId, "meta")) {
+    return null;
+  }
 
   if (mapping?.formulaTemplate && mapping.formulaTemplate !== "none") {
     return calculateFormula(mapping.formulaTemplate, null, metaPreview);
@@ -311,13 +368,18 @@ export function getEffectiveCpc(
   metaPreview: MetaMetricSnapshot | null | undefined,
   metricLogic: DashboardMetricLogicConfig
 ) {
-  const mapping = getMapping(metricLogic, "cpc");
+  const metricId = "cpc";
+  const mapping = getMapping(metricLogic, metricId);
+
+  if (!isChannelIncluded(metricLogic, metricId, "meta")) {
+    return null;
+  }
 
   if (mapping?.formulaTemplate && mapping.formulaTemplate !== "none") {
     return calculateFormula(mapping.formulaTemplate, null, metaPreview);
   }
 
-  const mappedValue = readMappedValue(mapping, null, metaPreview);
+  const mappedValue = readMappedValue(mapping, null, metaPreview, metricLogic, metricId);
   if (typeof mappedValue === "number") return mappedValue;
 
   const spend = metaPreview?.totals.spend ?? 0;
@@ -329,13 +391,18 @@ export function getEffectiveCpm(
   metaPreview: MetaMetricSnapshot | null | undefined,
   metricLogic: DashboardMetricLogicConfig
 ) {
-  const mapping = getMapping(metricLogic, "cpm");
+  const metricId = "cpm";
+  const mapping = getMapping(metricLogic, metricId);
+
+  if (!isChannelIncluded(metricLogic, metricId, "meta")) {
+    return null;
+  }
 
   if (mapping?.formulaTemplate && mapping.formulaTemplate !== "none") {
     return calculateFormula(mapping.formulaTemplate, null, metaPreview);
   }
 
-  const mappedValue = readMappedValue(mapping, null, metaPreview);
+  const mappedValue = readMappedValue(mapping, null, metaPreview, metricLogic, metricId);
   if (typeof mappedValue === "number") return mappedValue;
 
   const spend = metaPreview?.totals.spend ?? 0;
@@ -350,6 +417,16 @@ export function getEffectiveCpaCac(
 ) {
   const mappedCpo = getMapping(metricLogic, "cost_per_order");
   const mappedCpa = getMapping(metricLogic, "cpa_cac");
+  const effectiveMetricId = mappedCpo ? "cost_per_order" : "cpa_cac";
+
+  if (!isChannelIncluded(metricLogic, effectiveMetricId, "meta")) {
+    return {
+      value: null,
+      appliedDenominator: mappedCpo ? "orders" as const : metricLogic.cpaDenominatorChoice,
+      blockedReason: "Meta is excluded from this metric's included channels.",
+    };
+  }
+
   const formulaResult = calculateFormula(
     mappedCpo?.formulaTemplate && mappedCpo.formulaTemplate !== "none"
       ? mappedCpo.formulaTemplate
