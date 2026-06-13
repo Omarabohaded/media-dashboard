@@ -7,6 +7,7 @@ import type {
 import type {
   MetricFormulaTemplate,
   MetricMappingAggregation,
+  MetricMappingFilterPreset,
   MetricMappingOverride,
   MetricMappingSourceField,
   MetricMappingSourceType,
@@ -175,6 +176,39 @@ function readMetaField(
   return null;
 }
 
+function isFilterPresetConsumable(
+  preset: MetricMappingFilterPreset,
+  sourceType: MetricMappingSourceType
+) {
+  if (preset === "none" || preset === "selected_reporting_window") return true;
+  if (preset === "all_orders") return sourceType === "woocommerce" || sourceType === "shopify";
+  if (preset === "completed_orders" || preset === "paid_orders") {
+    return sourceType === "woocommerce" || sourceType === "shopify";
+  }
+  if (preset === "active_campaigns") {
+    return sourceType === "meta" || sourceType === "google" || sourceType === "tiktok" || sourceType === "snap";
+  }
+  return true;
+}
+
+function applyFilterPreset(
+  preset: MetricMappingFilterPreset,
+  sourceType: MetricMappingSourceType,
+  value: number | null
+) {
+  if (typeof value !== "number") return null;
+
+  if (!isFilterPresetConsumable(preset, sourceType)) {
+    return value;
+  }
+
+  // Phase 4A intentionally consumes filter presets without forcing source-level
+  // filtering that the current snapshots cannot prove yet. Reporting-window
+  // filtering is already applied by source fetchers, while order/campaign status
+  // presets remain future-ready until row-level status data is connected.
+  return value;
+}
+
 function applyMappedAggregation(
   value: number | null,
   aggregation: MetricMappingAggregation
@@ -216,7 +250,13 @@ function readMappedValue(
     value = readMetaField(metaPreview, mapping.sourceField);
   }
 
-  return applyMappedAggregation(value, mapping.aggregation ?? "none");
+  const filteredValue = applyFilterPreset(
+    mapping.filterPreset ?? "selected_reporting_window",
+    mapping.sourceType,
+    value
+  );
+
+  return applyMappedAggregation(filteredValue, mapping.aggregation ?? "none");
 }
 
 function getRevenueByBasis(
@@ -512,7 +552,7 @@ export function getEffectiveCpaCac(
       }
     : {
         value: null,
-        appliedDenominator: "purchases" as const,
+        appliedDenominator: "purchases",
         blockedReason: "Purchases are not available yet.",
       };
 }
