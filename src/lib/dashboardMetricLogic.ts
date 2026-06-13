@@ -6,6 +6,7 @@ import type {
 } from "@/lib/metricRegistry";
 import type {
   MetricFormulaTemplate,
+  MetricMappingAggregation,
   MetricMappingOverride,
   MetricMappingSourceField,
   MetricMappingSourceType,
@@ -174,6 +175,28 @@ function readMetaField(
   return null;
 }
 
+function applyMappedAggregation(
+  value: number | null,
+  aggregation: MetricMappingAggregation
+) {
+  if (typeof value !== "number") return null;
+
+  if (
+    aggregation === "sum" ||
+    aggregation === "average" ||
+    aggregation === "ratio" ||
+    aggregation === "rule"
+  ) {
+    return value;
+  }
+
+  if (aggregation === "count") {
+    return value;
+  }
+
+  return value;
+}
+
 function readMappedValue(
   mapping: MetricMappingOverride | null,
   storePreview: StoreMetricSnapshot | null | undefined,
@@ -185,15 +208,15 @@ function readMappedValue(
     return null;
   }
 
+  let value: number | null = null;
+
   if (mapping.sourceType === "woocommerce" || mapping.sourceType === "shopify") {
-    return readStoreField(storePreview, mapping.sourceField);
+    value = readStoreField(storePreview, mapping.sourceField);
+  } else if (["meta", "google", "tiktok", "snap"].includes(mapping.sourceType)) {
+    value = readMetaField(metaPreview, mapping.sourceField);
   }
 
-  if (["meta", "google", "tiktok", "snap"].includes(mapping.sourceType)) {
-    return readMetaField(metaPreview, mapping.sourceField);
-  }
-
-  return null;
+  return applyMappedAggregation(value, mapping.aggregation ?? "none");
 }
 
 function getRevenueByBasis(
