@@ -1,3 +1,6 @@
+import type { SourceConversionMappingStatus } from "@/lib/paidMediaContract";
+import { resolveSourceConversionMapping } from "@/lib/sourceConversionMappingStore";
+
 export const META_STATE_COOKIE = "meta_oauth_state";
 export const META_OAUTH_CLIENT_COOKIE = "meta_oauth_client_id";
 
@@ -33,6 +36,9 @@ export type MetaInsightsPreviewRow = {
   purchaseValue: number;
   addToCart: number;
   checkoutInitiated: number;
+  conversionMappingStatus: SourceConversionMappingStatus;
+  purchasesEvent: string | null;
+  purchaseValueEvent: string | null;
 };
 
 export function getSecureCookieFlag() {
@@ -209,7 +215,8 @@ export async function fetchMetaAdAccounts(accessToken: string) {
   return accounts;
 }
 
-function getActionValue(actions: MetaInsightAction[] | undefined, actionType: string) {
+function getActionValue(actions: MetaInsightAction[] | undefined, actionType: string | null) {
+  if (!actionType) return 0;
   const match = actions?.find((item) => item.action_type === actionType);
   return Number(match?.value ?? 0);
 }
@@ -227,8 +234,10 @@ export async function fetchMetaInsightsPreviewForRange(
     datePreset?: string;
     since?: string;
     until?: string;
+    clientId?: string | null;
   }
 ) {
+  const conversionMapping = await resolveSourceConversionMapping("meta", options.clientId ?? null);
   const baseParams: Record<string, string> = {
     level: "campaign",
     limit: "25",
@@ -262,9 +271,18 @@ export async function fetchMetaInsightsPreviewForRange(
     cpm: Number(row.cpm ?? 0),
     frequency: Number(row.frequency ?? 0),
     reach: Number(row.reach ?? 0),
-    purchases: getActionValue(row.actions, "purchase"),
-    purchaseValue: getActionValue(row.action_values, "purchase"),
+    purchases:
+      conversionMapping.status === "mapped"
+        ? getActionValue(row.actions, conversionMapping.purchasesEvent)
+        : 0,
+    purchaseValue:
+      conversionMapping.status === "mapped"
+        ? getActionValue(row.action_values, conversionMapping.purchaseValueEvent)
+        : 0,
     addToCart: getActionValue(row.actions, "add_to_cart"),
     checkoutInitiated: getActionValue(row.actions, "initiate_checkout"),
+    conversionMappingStatus: conversionMapping.status,
+    purchasesEvent: conversionMapping.purchasesEvent,
+    purchaseValueEvent: conversionMapping.purchaseValueEvent,
   }));
 }
