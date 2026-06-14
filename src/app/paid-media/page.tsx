@@ -59,6 +59,9 @@ export default function PaidMediaPage() {
   const cpm = getEffectiveCpm(metaPreview, metricLogic);
   const roas = getEffectiveBlendedRoas(metaPreview, metricLogic);
   const cpaCac = getEffectiveCpaCac(metaPreview, storePreview, metricLogic);
+  const cpaDenominatorLabel = getCpaDenominatorLabel(
+    cpaCac.appliedDenominator as Parameters<typeof getCpaDenominatorLabel>[0]
+  );
   const sortedRows = [...(metaPreview?.rows ?? [])].sort((a, b) => b.spend - a.spend);
   const avgFrequency =
     sortedRows.length > 0
@@ -95,9 +98,7 @@ export default function PaidMediaPage() {
             tone={hasMeta ? "good" : "warn"}
           />
           <SourcePill
-            label={`CPA / CAC uses ${getCpaDenominatorLabel(
-              cpaCac.appliedDenominator
-            )}`}
+            label={`CPA / CAC uses ${cpaDenominatorLabel}`}
             tone={cpaCac.blockedReason ? "warn" : "default"}
           />
           <SourcePill label="Google pending" tone="default" />
@@ -145,7 +146,7 @@ export default function PaidMediaPage() {
               value={cpaCac.value !== null ? formatMoney(cpaCac.value, currency) : "Blocked"}
               hint={
                 cpaCac.blockedReason ??
-                `${getCpaDenominatorLabel(cpaCac.appliedDenominator)} denominator`
+                `${cpaDenominatorLabel} denominator`
               }
               tone={cpaCac.value !== null ? "good" : "warn"}
             />
