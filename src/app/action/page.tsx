@@ -176,7 +176,7 @@ export default function ActionPage() {
             />
             <SourcePill
               label={`CPA / CAC uses ${getCpaDenominatorLabel(
-                configuredCac.appliedDenominator
+                configuredCac.appliedDenominator as Parameters<typeof getCpaDenominatorLabel>[0]
               )}`}
               tone={configuredCac.blockedReason ? "warn" : "default"}
             />
