@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 const publicRoutes = ["/login"];
-const authRoutes = ["/api/auth"];
+const authRoutes = ["/api/auth", "/api/debug/auth-diagnostics"];
 
 function isPublicPath(pathname: string) {
   return (
