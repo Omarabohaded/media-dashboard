@@ -5,7 +5,7 @@ import {
   type UserRole,
   type UserStatus,
 } from "@/lib/accessTypes";
-import { hashPassword } from "@/lib/password";
+import { getPasswordHashFormat, hashPassword } from "@/lib/password";
 import {
   getRuntimeStorageMeta,
   readRuntimeJsonStore,
@@ -31,9 +31,13 @@ function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
+function getBootstrapPasswordHash() {
+  const bootstrapPassword = process.env.DASHBOARD_BOOTSTRAP_PASSWORD?.trim();
+  return bootstrapPassword ? hashPassword(bootstrapPassword) : null;
+}
+
 function buildDefaultOwner(): DashboardUser {
   const createdAt = nowIso();
-  const bootstrapPassword = process.env.DASHBOARD_BOOTSTRAP_PASSWORD;
 
   return {
     id: "user-owner-omar",
@@ -41,7 +45,7 @@ function buildDefaultOwner(): DashboardUser {
     email: DEFAULT_OWNER_EMAIL,
     role: "owner",
     status: "active",
-    passwordHash: bootstrapPassword ? hashPassword(bootstrapPassword) : null,
+    passwordHash: getBootstrapPasswordHash(),
     createdAt,
     updatedAt: createdAt,
     lastLoginAt: null,
@@ -57,16 +61,40 @@ function defaultState(): AccessStoreState {
   };
 }
 
+function shouldRepairDefaultOwnerPassword(user: DashboardUser) {
+  if (normalizeEmail(user.email) !== DEFAULT_OWNER_EMAIL) {
+    return false;
+  }
+
+  const format = getPasswordHashFormat(user.passwordHash);
+  return format === "missing" || format === "malformed";
+}
+
 function normalizeState(state: AccessStoreState): AccessStoreState {
   const fallback = defaultState();
-  const users = (state.users?.length ? state.users : fallback.users).map((user) => ({
-    ...user,
-    email: normalizeEmail(user.email),
-    status: user.status ?? "invited",
-    passwordHash: user.passwordHash ?? null,
-    updatedAt: user.updatedAt ?? user.createdAt ?? nowIso(),
-    lastLoginAt: user.lastLoginAt ?? null,
-  }));
+  const bootstrapPasswordHash = getBootstrapPasswordHash();
+  const users = (state.users?.length ? state.users : fallback.users).map((user) => {
+    const normalizedUser = {
+      ...user,
+      email: normalizeEmail(user.email),
+      status: user.status ?? "invited",
+      passwordHash: user.passwordHash ?? null,
+      updatedAt: user.updatedAt ?? user.createdAt ?? nowIso(),
+      lastLoginAt: user.lastLoginAt ?? null,
+    };
+
+    if (bootstrapPasswordHash && shouldRepairDefaultOwnerPassword(normalizedUser)) {
+      return {
+        ...normalizedUser,
+        role: normalizedUser.role === "owner" ? normalizedUser.role : "owner",
+        status: normalizedUser.status === "deactivated" ? "active" : normalizedUser.status,
+        passwordHash: bootstrapPasswordHash,
+        updatedAt: nowIso(),
+      };
+    }
+
+    return normalizedUser;
+  });
 
   const hasOwner = users.some(
     (user) => user.role === "owner" && user.status !== "deactivated"
@@ -154,7 +182,7 @@ export async function createUser(input: {
     email,
     role: input.role,
     status: input.status ?? "invited",
-    passwordHash: input.password ? hashPassword(input.password) : null,
+    passwordHash: input.password ? hashPassword(input.password.trim()) : null,
     createdAt,
     updatedAt: createdAt,
     lastLoginAt: null,
@@ -223,7 +251,7 @@ export async function updateUser(input: {
             name: input.name?.trim() || user.name,
             role: input.role ?? user.role,
             status: input.status ?? user.status,
-            passwordHash: input.password ? hashPassword(input.password) : user.passwordHash,
+            passwordHash: input.password ? hashPassword(input.password.trim()) : user.passwordHash,
             updatedAt,
           }
         : user
