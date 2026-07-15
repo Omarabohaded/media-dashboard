@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "crypto";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { getPasswordHashFormat, verifyPasswordDetailed } from "@/lib/password";
@@ -9,6 +10,8 @@ type LoginFailureReason =
   | "inactive_user"
   | "malformed_record"
   | "storage_unavailable";
+
+const DEFAULT_OWNER_EMAIL = "omarhadida24@gmail.com";
 
 function normalizeCredentialEmail(value: unknown) {
   return typeof value === "string" ? value.trim().toLowerCase() : "";
@@ -22,6 +25,27 @@ function maskEmail(email: string) {
   const [localPart, domain] = email.split("@");
   if (!localPart || !domain) return "malformed_email";
   return `${localPart.slice(0, 2)}***@${domain}`;
+}
+
+function timingSafeTextEqual(left: string, right: string) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+
+  if (leftBuffer.length !== rightBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function isDefaultOwnerBootstrapLogin(email: string, accessKey: string) {
+  const bootstrapPassword = process.env.DASHBOARD_BOOTSTRAP_PASSWORD?.trim() ?? "";
+
+  return (
+    email === DEFAULT_OWNER_EMAIL &&
+    Boolean(bootstrapPassword) &&
+    timingSafeTextEqual(accessKey, bootstrapPassword)
+  );
 }
 
 function logLoginFailure(reason: LoginFailureReason, email: string, details: Record<string, unknown> = {}) {
@@ -86,6 +110,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const hashFormat = getPasswordHashFormat(user.passwordHash);
 
         if (hashFormat === "missing" || hashFormat === "malformed") {
+          if (isDefaultOwnerBootstrapLogin(email, accessKey)) {
+            await updateUser({ userId: user.id, password: accessKey, status: "active", role: "owner" });
+            return {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              role: "owner",
+              status: "active",
+            };
+          }
+
           logLoginFailure("malformed_record", email, {
             userId: user.id,
             status: user.status,
@@ -98,6 +133,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const verification = verifyPasswordDetailed(accessKey, user.passwordHash);
 
         if (!verification.ok) {
+          if (isDefaultOwnerBootstrapLogin(email, accessKey)) {
+            await updateUser({ userId: user.id, password: accessKey, status: "active", role: "owner" });
+            return {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              role: "owner",
+              status: "active",
+            };
+          }
+
           logLoginFailure("invalid_access_key", email, {
             userId: user.id,
             status: user.status,
