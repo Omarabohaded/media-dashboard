@@ -1,7 +1,36 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
+import { getPasswordHashFormat, verifyPasswordDetailed } from "@/lib/password";
 import { getUserByEmail, updateUser } from "@/lib/accessStore";
-import { verifyPassword } from "@/lib/password";
+
+type LoginFailureReason =
+  | "user_not_found"
+  | "invalid_access_key"
+  | "inactive_user"
+  | "malformed_record"
+  | "storage_unavailable";
+
+function normalizeCredentialEmail(value: unknown) {
+  return typeof value === "string" ? value.trim().toLowerCase() : "";
+}
+
+function normalizeAccessKey(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function maskEmail(email: string) {
+  const [localPart, domain] = email.split("@");
+  if (!localPart || !domain) return "malformed_email";
+  return `${localPart.slice(0, 2)}***@${domain}`;
+}
+
+function logLoginFailure(reason: LoginFailureReason, email: string, details: Record<string, unknown> = {}) {
+  console.warn("dashboard_login_failed", {
+    reason,
+    email: maskEmail(email),
+    ...details,
+  });
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "media-dashboard-dev-secret",
@@ -18,21 +47,63 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         accessKey: { label: "Access key", type: "text" },
       },
       async authorize(credentials) {
-        const email = typeof credentials?.email === "string" ? credentials.email : "";
-        const accessKey =
-          typeof credentials?.accessKey === "string" ? credentials.accessKey : "";
+        const email = normalizeCredentialEmail(credentials?.email);
+        const accessKey = normalizeAccessKey(credentials?.accessKey);
 
         if (!email || !accessKey) {
+          logLoginFailure("malformed_record", email || "missing_email", {
+            missingEmail: !email,
+            missingAccessKey: !accessKey,
+          });
           return null;
         }
 
-        const user = await getUserByEmail(email);
+        let user: Awaited<ReturnType<typeof getUserByEmail>>;
 
-        if (!user || user.status === "deactivated") {
+        try {
+          user = await getUserByEmail(email);
+        } catch (error) {
+          logLoginFailure("storage_unavailable", email, {
+            message: error instanceof Error ? error.message : "unknown_storage_error",
+          });
           return null;
         }
 
-        if (!verifyPassword(accessKey, user.passwordHash)) {
+        if (!user) {
+          logLoginFailure("user_not_found", email);
+          return null;
+        }
+
+        if (user.status !== "active") {
+          logLoginFailure("inactive_user", email, {
+            userId: user.id,
+            status: user.status,
+            role: user.role,
+          });
+          return null;
+        }
+
+        const hashFormat = getPasswordHashFormat(user.passwordHash);
+
+        if (hashFormat === "missing" || hashFormat === "malformed") {
+          logLoginFailure("malformed_record", email, {
+            userId: user.id,
+            status: user.status,
+            role: user.role,
+            hashFormat,
+          });
+          return null;
+        }
+
+        const verification = verifyPasswordDetailed(accessKey, user.passwordHash);
+
+        if (!verification.ok) {
+          logLoginFailure("invalid_access_key", email, {
+            userId: user.id,
+            status: user.status,
+            role: user.role,
+            hashFormat: verification.format,
+          });
           return null;
         }
 
