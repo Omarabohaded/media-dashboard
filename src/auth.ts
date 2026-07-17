@@ -56,6 +56,23 @@ function logLoginFailure(reason: LoginFailureReason, email: string, details: Rec
   });
 }
 
+async function persistUserAfterLogin(
+  input: Parameters<typeof updateUser>[0],
+  email: string,
+  action: "login_touch" | "bootstrap_recovery"
+) {
+  try {
+    await updateUser(input);
+  } catch (error) {
+    console.warn("dashboard_login_persist_failed", {
+      action,
+      email: maskEmail(email),
+      userId: input.userId,
+      message: error instanceof Error ? error.message : "unknown_storage_error",
+    });
+  }
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "media-dashboard-dev-secret",
   session: {
@@ -111,7 +128,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (hashFormat === "missing" || hashFormat === "malformed") {
           if (isDefaultOwnerBootstrapLogin(email, accessKey)) {
-            await updateUser({ userId: user.id, password: accessKey, status: "active", role: "owner" });
+            await persistUserAfterLogin(
+              { userId: user.id, password: accessKey, status: "active", role: "owner" },
+              email,
+              "bootstrap_recovery"
+            );
             return {
               id: user.id,
               name: user.name,
@@ -134,7 +155,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!verification.ok) {
           if (isDefaultOwnerBootstrapLogin(email, accessKey)) {
-            await updateUser({ userId: user.id, password: accessKey, status: "active", role: "owner" });
+            await persistUserAfterLogin(
+              { userId: user.id, password: accessKey, status: "active", role: "owner" },
+              email,
+              "bootstrap_recovery"
+            );
             return {
               id: user.id,
               name: user.name,
@@ -153,7 +178,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-        await updateUser({ userId: user.id });
+        await persistUserAfterLogin({ userId: user.id }, email, "login_touch");
 
         return {
           id: user.id,
