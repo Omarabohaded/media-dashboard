@@ -2,6 +2,10 @@
 
 Last updated: 2026-07-21
 
+Current project completion: 49%
+
+Current milestone: M0.2 — Reproducible dependency and validation baseline (complete)
+
 ## Verified repository baseline
 
 - Repository: `Omarabohaded/media-dashboard`
@@ -49,3 +53,59 @@ Last updated: 2026-07-21
 - Reproducible install baseline: `npm ci` is blocked because the committed lockfile omits the existing `next-auth` dependency from `package.json`.
 
 Next: validate this milestone, then harden client-store diagnostics and production persistence evidence before completing TikTok Phase 5.1.
+
+### M0.2 — Reproducible dependency and validation baseline
+
+- Status: complete.
+- Synchronized the committed npm lockfile with the existing `next-auth` dependency in `package.json`.
+- `npm ci --ignore-scripts --cache /tmp/media-dashboard-npm-cache` passed from a clean dependency installation.
+- `npx tsc --noEmit` passed.
+- `npm run build` passed and generated all 45 routes.
+- `npm run lint` consistently reports the existing baseline of 14 errors and 14 warnings; this milestone introduced no application-source lint changes.
+- Architecture impact: none; this milestone changes dependency reproducibility and validation evidence only.
+- Rollback checkpoint: `4e80f51`.
+
+## Completed milestones
+
+- Metrics Platform Foundation v1 and previously recorded runtime-consumption work.
+- Shared normalized paid-media contract and source conversion mapping foundation.
+- Meta mapping resolution and integration routes.
+- TikTok connection storage, integration library, and OAuth connect route baseline.
+- M0.1 — Active-client selection propagation.
+- M0.2 — Reproducible dependency and validation baseline.
+
+## Remaining milestones
+
+1. Complete immediate client persistence validation and diagnostics.
+2. Phase 5.1 — TikTok authentication and event-discovery hardening.
+3. Phase 5.2 — TikTok production validation (requires external setup and credentials).
+4. Phase 5.3 — TikTok paid-media data normalization.
+5. Phase 5.4 — Blended paid-media reporting.
+6. Phase 5.5 — Admin mapping and client-management polish.
+7. Phase 5.6 — Production QA and monitoring.
+8. Phase 6 — Google Ads, then Snapchat, through the shared architecture.
+
+## Known issues
+
+- Production client create/read persistence still requires authenticated live validation.
+- TikTok event discovery requires API-contract verification.
+- Admin labels TikTok as planned despite the existing backend routes.
+- The lint baseline contains 14 errors and 14 warnings.
+
+## Technical debt
+
+- Resolve the existing React effect-state lint violations, hook dependency warnings, two explicit `any` usages, and unused declarations.
+- Add automated tests for active-client propagation, durable client persistence, mapping resolution, and integration failure states.
+- Pin the npm toolchain through project metadata if cross-environment lockfile churn becomes recurring.
+
+## Required external setup
+
+- TikTok: production app credentials, approved redirect URI and permissions; required for Phase 5.2, not for the next Phase 5.1 code milestone.
+- Google Ads: developer token, OAuth client, and account access; required in Phase 6.
+- Snapchat: developer app credentials and Ads API access; required in Phase 6.
+
+## Rollback and deployment
+
+- Current rollback commit: `4e80f51`.
+- Deployment status: `4e80f51` and M0.2 are local only; `origin/main` and the verified successful Vercel deployment remain at `6e58b3e` until the milestone commits are pushed.
+- Next milestone: complete immediate client persistence diagnostics and automated store validation without requiring production credentials.
