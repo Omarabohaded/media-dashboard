@@ -21,6 +21,7 @@ import {
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getCurrencyMeta, type ClientCurrencyCode, type ClientRecord } from "@/lib/clientTypes";
 import { getRoleLabel, type UserRole } from "@/lib/accessTypes";
+import { ACTIVE_CLIENT_STORAGE_KEY, persistActiveClient } from "@/lib/clientContext";
 
 export {
   DashboardLoadingState,
@@ -134,7 +135,7 @@ export function AppShell({
   useEffect(() => {
     async function loadClients() {
       try {
-        const storedClient = window.localStorage.getItem("media-dashboard-active-client");
+        const storedClient = window.localStorage.getItem(ACTIVE_CLIENT_STORAGE_KEY);
         const query = storedClient ? `?clientId=${encodeURIComponent(storedClient)}` : "";
         const response = await fetch(`/api/admin/clients${query}`, { cache: "no-store" });
 
@@ -292,7 +293,7 @@ export function AppShell({
                     datePreset={datePreset}
                     onClientChange={(clientId) => {
                       setActiveClientId(clientId);
-                      window.localStorage.setItem("media-dashboard-active-client", clientId);
+                      persistActiveClient(clientId);
                     }}
                     onDatePresetChange={handleDatePresetChange}
                   />

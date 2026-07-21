@@ -2,8 +2,7 @@
 
 import { Suspense, useEffect } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-
-const ACTIVE_CLIENT_STORAGE_KEY = "media-dashboard-active-client";
+import { ACTIVE_CLIENT_STORAGE_KEY } from "@/lib/clientContext";
 
 export default function AdminLayout({
   children,

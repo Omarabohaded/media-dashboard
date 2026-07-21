@@ -6,6 +6,11 @@ import {
   DEFAULT_DASHBOARD_METRIC_LOGIC,
   type DashboardMetricLogicConfig,
 } from "@/lib/dashboardMetricLogic";
+import {
+  ACTIVE_CLIENT_CHANGE_EVENT,
+  ACTIVE_CLIENT_STORAGE_KEY,
+  type ActiveClientChangeEvent,
+} from "@/lib/clientContext";
 
 type ClientDirectoryResponse = {
   clients: ClientRecord[];
@@ -468,7 +473,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
         clientIdOverride ||
         activeClientId ||
         (typeof window !== "undefined"
-          ? window.localStorage.getItem("media-dashboard-active-client")
+          ? window.localStorage.getItem(ACTIVE_CLIENT_STORAGE_KEY)
           : null);
       const { clientId: nextClientId, client } = await loadClients(clientId);
       await loadMetricLogic(nextClientId);
@@ -556,11 +561,27 @@ export function useDashboardReadiness(options: HookOptions = {}) {
     void refresh();
   }, [effectiveMetaPreviewQuery]);
 
+  useEffect(() => {
+    function handleClientChange(event: Event) {
+      const nextClientId = (event as ActiveClientChangeEvent).detail?.clientId;
+
+      if (nextClientId) {
+        setMetaPreview(null);
+        setStorePreview(null);
+        void refresh(nextClientId);
+      }
+    }
+
+    window.addEventListener(ACTIVE_CLIENT_CHANGE_EVENT, handleClientChange);
+    return () =>
+      window.removeEventListener(ACTIVE_CLIENT_CHANGE_EVENT, handleClientChange);
+  }, [activeClientId, effectiveMetaPreviewQuery]);
+
   function setActiveClientId(nextClientId: string) {
     setActiveClientIdState(nextClientId);
 
     if (typeof window !== "undefined") {
-      window.localStorage.setItem("media-dashboard-active-client", nextClientId);
+      window.localStorage.setItem(ACTIVE_CLIENT_STORAGE_KEY, nextClientId);
     }
   }
 

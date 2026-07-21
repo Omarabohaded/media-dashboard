@@ -11,6 +11,11 @@ import {
   type ClientRecord,
   type WebsitePlatform,
 } from "@/lib/clientTypes";
+import {
+  ACTIVE_CLIENT_CHANGE_EVENT,
+  ACTIVE_CLIENT_STORAGE_KEY,
+  type ActiveClientChangeEvent,
+} from "@/lib/clientContext";
 
 type ClientDirectoryResponse = {
   clients: ClientRecord[];
@@ -237,7 +242,7 @@ export default function AdminPage() {
     setClients(payload.clients);
     setActiveClientId(nextClientId);
     setClientStorage(payload.storage);
-    window.localStorage.setItem("media-dashboard-active-client", nextClientId);
+    window.localStorage.setItem(ACTIVE_CLIENT_STORAGE_KEY, nextClientId);
   }
 
   async function loadMetaStatus(clientId: string) {
@@ -261,7 +266,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const preferredClientId = params.get("clientId") ?? window.localStorage.getItem("media-dashboard-active-client");
+    const preferredClientId = params.get("clientId") ?? window.localStorage.getItem(ACTIVE_CLIENT_STORAGE_KEY);
     void loadClients(preferredClientId).then(() => loadReadiness()).catch(() => setClientMessage("Could not load the admin state."));
     const metaConnected = params.get("meta_connected");
     const metaError = params.get("meta_error");
@@ -274,6 +279,20 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
+    function handleSharedClientChange(event: Event) {
+      const nextClientId = (event as ActiveClientChangeEvent).detail?.clientId;
+
+      if (nextClientId && nextClientId !== activeClientId) {
+        handleClientSelection(nextClientId);
+      }
+    }
+
+    window.addEventListener(ACTIVE_CLIENT_CHANGE_EVENT, handleSharedClientChange);
+    return () =>
+      window.removeEventListener(ACTIVE_CLIENT_CHANGE_EVENT, handleSharedClientChange);
+  }, [activeClientId]);
+
+  useEffect(() => {
     if (!activeClientId) return;
     void Promise.all([loadMetaStatus(activeClientId), loadShopifyStatus(activeClientId)]).catch(() => setMetaMessage("Could not load integration status."));
   }, [activeClientId]);
@@ -281,7 +300,7 @@ export default function AdminPage() {
   function handleClientSelection(nextClientId: string) {
     setActiveClientId(nextClientId);
     setMetaPreview(null);
-    window.localStorage.setItem("media-dashboard-active-client", nextClientId);
+    window.localStorage.setItem(ACTIVE_CLIENT_STORAGE_KEY, nextClientId);
     const url = new URL(window.location.href);
     url.searchParams.set("clientId", nextClientId);
     window.history.replaceState({}, "", url.toString());
