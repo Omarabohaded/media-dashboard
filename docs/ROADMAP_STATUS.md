@@ -78,6 +78,9 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 - Validation: `npm run test:client-storage` passed (2 tests); `npx tsc --noEmit` passed; targeted lint passed; `npm run build` passed and generated all 45 routes.
 - Architecture impact: preserved the shared runtime storage adapter and client store as the only ownership layer.
 - Rollback checkpoint: `742cef7da4649570f3633b5211437989008e78a5`.
+- Recreated GitHub commit: `a1879a374c93b3dce57dbb6969c57b948ee4176c` (local milestone commit: `395d2bf`).
+- Deployment timestamp: `2026-07-21 13:36:46 UTC`; deployment reached READY at `2026-07-21 13:37:18 UTC`.
+- Deployment status: READY (production); root smoke test returned `200` and the unauthenticated clients endpoint returned the expected `401`.
 
 ## Completed milestones
 
@@ -122,7 +125,7 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 
 - Current rollback commit: `6e58b3e` (last production state before M0.1/M0.2).
 - Recreated GitHub commits: M0.1 `f77f30e830d9163b8fa5047999cfaf4cefbeb8e2`; M0.2 `7404b719603e33c6c4f095fef3a43d5cf7c70469`. These differ from local hashes `4e80f51` and `89792dd` because the connector recreated commit metadata; their Git trees match the validated local commits exactly.
-- Deployed commit: `7404b719603e33c6c4f095fef3a43d5cf7c70469`.
-- Deployment timestamp: `2026-07-21 13:29:40 UTC`.
+- Deployed commit: `a1879a374c93b3dce57dbb6969c57b948ee4176c`.
+- Deployment timestamp: `2026-07-21 13:36:46 UTC` (READY at `2026-07-21 13:37:18 UTC`).
 - Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
 - Next milestone: Phase 5.1 TikTok authentication and event-discovery hardening.
