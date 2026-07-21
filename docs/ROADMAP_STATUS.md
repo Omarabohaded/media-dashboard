@@ -10,7 +10,7 @@ Current milestone: M0.2 — Reproducible dependency and validation baseline (com
 
 - Repository: `Omarabohaded/media-dashboard`
 - Branch: `main`
-- Baseline commit: `6e58b3e`
+- Deployed baseline commit: `7404b719603e33c6c4f095fef3a43d5cf7c70469`
 - Working tree at inspection: clean
 - Deployment evidence: the Vercel status check for `6e58b3e` is successful.
 - Client store: `media-dashboard:client-state` through the shared runtime storage adapter.
@@ -64,6 +64,10 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 - `npm run lint` consistently reports the existing baseline of 14 errors and 14 warnings; this milestone introduced no application-source lint changes.
 - Architecture impact: none; this milestone changes dependency reproducibility and validation evidence only.
 - Rollback checkpoint: `4e80f51`.
+- Recreated GitHub commit: `7404b719603e33c6c4f095fef3a43d5cf7c70469` (local milestone commit: `89792dd`).
+- GitHub lockfile verification: remote blob `7f5c4313e0c10d740f365387359946b6389ea5e4` and SHA-256 `c96cffdc60cae08a796021220490013db470c0a1f8e7a8c9cb3a6d208f7a328d` match the validated local file exactly.
+- Remote-state validation: `npm ci`, manifest/lock consistency, `npx tsc --noEmit`, and `npm run build` passed from an archive of the GitHub commit; all 45 routes were generated.
+- Production smoke tests: production alias and login returned `200`; unauthenticated Admin clients and TikTok status routes returned the expected `401` JSON response.
 
 ## Completed milestones
 
@@ -106,6 +110,9 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 
 ## Rollback and deployment
 
-- Current rollback commit: `4e80f51`.
-- Deployment status: `4e80f51` and M0.2 are local only; `origin/main` and the verified successful Vercel deployment remain at `6e58b3e` until the milestone commits are pushed.
+- Current rollback commit: `6e58b3e` (last production state before M0.1/M0.2).
+- Recreated GitHub commits: M0.1 `f77f30e830d9163b8fa5047999cfaf4cefbeb8e2`; M0.2 `7404b719603e33c6c4f095fef3a43d5cf7c70469`. These differ from local hashes `4e80f51` and `89792dd` because the connector recreated commit metadata; their Git trees match the validated local commits exactly.
+- Deployed commit: `7404b719603e33c6c4f095fef3a43d5cf7c70469`.
+- Deployment timestamp: `2026-07-21 13:29:40 UTC`.
+- Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
 - Next milestone: complete immediate client persistence diagnostics and automated store validation without requiring production credentials.
