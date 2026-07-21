@@ -2,9 +2,9 @@
 
 Last updated: 2026-07-21
 
-Current project completion: 51%
+Current project completion: 58%
 
-Current milestone: M0.3 — Client persistence diagnostics and automated validation (complete)
+Current milestone: Phase 5.1 — TikTok authentication and event-discovery hardening (complete; deployment pending)
 
 ## Verified repository baseline
 
@@ -39,8 +39,25 @@ Current milestone: M0.3 — Client persistence diagnostics and automated validat
 - Shared source mapping resolver: called by TikTok normalization.
 - TikTok conversion values: not yet implemented; current normalizer explicitly returns zero and therefore Phase 5.3 is not complete.
 - Admin TikTok connection/mapping UI: not yet integrated; Admin still labels TikTok as planned.
+- Rollback checkpoint for Phase 5.1: `33e99625d7b80565d90fe66e9295a8b6b3ae4a90`.
+- Contract verification: TikTok's official Business API SDK documents the synchronous integrated report as `GET /open_api/v1.3/report/integrated/get/`; the current implementation incorrectly uses POST and is being corrected in this milestone.
 
 ## Milestone log
+
+### Phase 5.1 — TikTok authentication and event-discovery hardening
+
+- Status: code complete and locally validated; deployment pending.
+- Corrected synchronous TikTok reporting calls to the documented GET contract with JSON-encoded array query parameters.
+- Added a raw event catalog that keeps conversion count and conversion value as distinct selectable source events with accurate roles; events absent from the API response are not advertised as detected.
+- Event preview now performs one upstream request, returns raw event evidence, records discovery success/failure time, and returns the shared conversion-mapping resolution.
+- TikTok status now reports shared mapping health, last discovery state, token expiry metadata, and integration readiness without exposing tokens.
+- OAuth callback now handles provider denial and missing client cookies safely and stores token expiry metadata.
+- TikTok routes now require an exact existing client ID instead of silently falling back to another client.
+- Added `docs/TIKTOK_PRODUCTION_SETUP.md` with the non-secret portal/Vercel configuration and Phase 5.2 validation sequence.
+- Tests: `npm run test:tiktok-contract` passed (3/3); `npm run test:client-storage` passed (2/2).
+- Validation: clean `npm ci`, `npx tsc --noEmit`, targeted lint, and `npm run build` passed; all 45 routes generated.
+- Architecture impact: reused the TikTok adapter, shared connection store, shared mapping resolver, normalized paid-media contract, client store, and runtime storage. No parallel store, resolver, or dashboard formula was added.
+- Rollback checkpoint: `33e99625d7b80565d90fe66e9295a8b6b3ae4a90`.
 
 ### M0.1 — Active-client selection propagation
 
@@ -91,21 +108,21 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 - M0.1 — Active-client selection propagation.
 - M0.2 — Reproducible dependency and validation baseline.
 - M0.3 — Client persistence diagnostics and automated validation.
+- Phase 5.1 — TikTok authentication and event-discovery hardening.
 
 ## Remaining milestones
 
-1. Phase 5.1 — TikTok authentication and event-discovery hardening.
-2. Phase 5.2 — TikTok production validation (requires external setup and credentials).
-3. Phase 5.3 — TikTok paid-media data normalization.
-4. Phase 5.4 — Blended paid-media reporting.
-5. Phase 5.5 — Admin mapping and client-management polish.
-6. Phase 5.6 — Production QA and monitoring.
-7. Phase 6 — Google Ads, then Snapchat, through the shared architecture.
+1. Phase 5.2 — TikTok production validation (requires external setup and credentials).
+2. Phase 5.3 — TikTok paid-media data normalization.
+3. Phase 5.4 — Blended paid-media reporting.
+4. Phase 5.5 — Admin mapping and client-management polish.
+5. Phase 5.6 — Production QA and monitoring.
+6. Phase 6 — Google Ads, then Snapchat, through the shared architecture.
 
 ## Known issues
 
 - Production client create/read persistence still requires authenticated live validation.
-- TikTok event discovery requires API-contract verification.
+- TikTok production OAuth, advertiser discovery, and event discovery require authenticated Phase 5.2 validation.
 - Admin labels TikTok as planned despite the existing backend routes.
 - The lint baseline contains 14 errors and 14 warnings.
 
@@ -117,7 +134,7 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 
 ## Required external setup
 
-- TikTok: production app credentials, approved redirect URI and permissions; required for Phase 5.2, not for the next Phase 5.1 code milestone.
+- TikTok: production app credentials, approved redirect URI, and advertiser/reporting permissions are now the Phase 5.2 blocker; see `docs/TIKTOK_PRODUCTION_SETUP.md`.
 - Google Ads: developer token, OAuth client, and account access; required in Phase 6.
 - Snapchat: developer app credentials and Ads API access; required in Phase 6.
 
@@ -128,4 +145,4 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 - Deployed commit: `a1879a374c93b3dce57dbb6969c57b948ee4176c`.
 - Deployment timestamp: `2026-07-21 13:36:46 UTC` (READY at `2026-07-21 13:37:18 UTC`).
 - Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
-- Next milestone: Phase 5.1 TikTok authentication and event-discovery hardening.
+- Next milestone: Phase 5.2 TikTok production validation.

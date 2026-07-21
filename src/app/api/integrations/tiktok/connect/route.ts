@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientById } from "@/lib/clientStore";
+import { getRequiredClientById } from "@/lib/clientStore";
 import {
   buildTikTokOauthUrl,
   getSecureCookieFlag,
@@ -11,7 +11,7 @@ import {
 export async function GET(request: NextRequest) {
   const config = getTikTokConfig();
   const origin = request.nextUrl.origin;
-  const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+  const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
 
   if (config.missingEnv.length > 0) {
     return NextResponse.redirect(

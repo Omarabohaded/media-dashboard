@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:client-storage": "node --test tests/runtimeStorage.test.mjs"
+    "test:client-storage": "node --test tests/runtimeStorage.test.mjs",
+    "test:tiktok-contract": "node --test tests/tiktokReportContract.test.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.39.0",

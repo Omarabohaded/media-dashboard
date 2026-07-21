@@ -4,6 +4,11 @@ import type {
   PaidMediaDateRange,
 } from "@/lib/paidMediaContract";
 import { resolveSourceConversionMapping } from "@/lib/sourceConversionMappingStore";
+import {
+  buildTikTokEventDiscoveryQuery,
+  extractTikTokReportEvents,
+  type TikTokReportRow,
+} from "@/lib/integrations/tiktokReportContract";
 
 export const TIKTOK_STATE_COOKIE = "tiktok_oauth_state";
 export const TIKTOK_OAUTH_CLIENT_COOKIE = "tiktok_oauth_client_id";
@@ -26,6 +31,7 @@ export type TikTokAdvertiserAccount = {
 export type TikTokRawEvent = {
   eventName: string;
   label: string;
+  roles: Array<"purchases" | "purchaseValue">;
   raw: unknown;
 };
 
@@ -51,12 +57,6 @@ type TikTokAdvertiserResponse = {
     [key: string]: unknown;
   }>;
   advertiser_ids?: string[];
-};
-
-type TikTokReportRow = {
-  dimensions?: Record<string, unknown>;
-  metrics?: Record<string, unknown>;
-  [key: string]: unknown;
 };
 
 type TikTokReportResponse = {
@@ -125,10 +125,14 @@ async function parseTikTokResponse<T>(response: Response): Promise<T> {
 async function tiktokGet<T>(
   path: string,
   accessToken: string,
-  searchParams: Record<string, string> = {}
+  searchParams: Record<string, string | number | boolean | readonly string[] | undefined> = {}
 ) {
   const config = getTikTokConfig();
-  const params = new URLSearchParams(searchParams);
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (value === undefined) continue;
+    params.set(key, Array.isArray(value) ? JSON.stringify(value) : String(value));
+  }
   const response = await fetch(`${config.apiBase}${path}?${params.toString()}`, {
     method: "GET",
     headers: {
@@ -200,64 +204,31 @@ export async function fetchTikTokAdvertisers(accessToken: string) {
   }));
 }
 
-function extractEventName(row: TikTokReportRow) {
-  const dimensions = row.dimensions ?? {};
-  const metrics = row.metrics ?? {};
-  const candidates = [
-    dimensions.event,
-    dimensions.event_name,
-    dimensions.conversion_event,
-    dimensions.conversion_event_name,
-    dimensions.statistical_type,
-    metrics.event,
-    metrics.event_name,
-    metrics.conversion_event,
-    metrics.conversion_event_name,
-  ];
-
-  return candidates.find((value) => typeof value === "string" && value.trim()) as string | undefined;
-}
-
 export async function fetchTikTokRawConversionEvents(
   accessToken: string,
   advertiserId: string,
   options: PaidMediaDateRange = {}
 ) {
   const today = new Date().toISOString().slice(0, 10);
-  const body = {
-    advertiser_id: advertiserId,
-    report_type: "BASIC",
-    data_level: "AUCTION_CAMPAIGN",
-    dimensions: ["campaign_id"],
-    metrics: ["spend", "impressions", "clicks", "conversion", "conversion_value"],
-    start_date: options.since ?? today,
-    end_date: options.until ?? today,
-    page: 1,
-    page_size: 100,
-  };
+  const query = buildTikTokEventDiscoveryQuery({
+    advertiserId,
+    startDate: options.since ?? today,
+    endDate: options.until ?? today,
+  });
 
-  const response = await tiktokPost<TikTokReportResponse>(
+  const response = await tiktokGet<TikTokReportResponse>(
     "/report/integrated/get/",
     accessToken,
-    body
+    query
   );
 
-  const eventsByName = new Map<string, TikTokRawEvent>();
-
-  for (const row of response.list ?? []) {
-    const eventName = extractEventName(row);
-    if (!eventName || eventsByName.has(eventName)) continue;
-    eventsByName.set(eventName, {
-      eventName,
-      label: eventName,
-      raw: row,
-    });
-  }
+  const rows = response.list ?? [];
+  const events: TikTokRawEvent[] = extractTikTokReportEvents(rows);
 
   return {
     advertiserId,
-    rawRows: response.list ?? [],
-    events: [...eventsByName.values()],
+    rawRows: rows,
+    events,
   };
 }
 
@@ -268,16 +239,22 @@ export async function discoverTikTokConversionEvents(
   options: PaidMediaDateRange = {}
 ): Promise<DiscoveredSourceConversionEvent[]> {
   const discovered = await fetchTikTokRawConversionEvents(accessToken, advertiserId, options);
-  const now = new Date().toISOString();
+  return toDiscoveredTikTokConversionEvents(discovered.events, clientId);
+}
 
-  return discovered.events.map((event) => ({
+export function toDiscoveredTikTokConversionEvents(
+  events: TikTokRawEvent[],
+  clientId: string,
+  discoveredAt = new Date().toISOString()
+): DiscoveredSourceConversionEvent[] {
+  return events.map((event) => ({
     sourceType: "tiktok",
     clientId,
     eventName: event.eventName,
     label: event.label,
-    roles: ["purchases", "purchaseValue"],
-    firstSeenAt: now,
-    lastSeenAt: now,
+    roles: event.roles,
+    firstSeenAt: discoveredAt,
+    lastSeenAt: discoveredAt,
   }));
 }
 

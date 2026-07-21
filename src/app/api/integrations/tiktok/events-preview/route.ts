@@ -1,19 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientById } from "@/lib/clientStore";
+import { getRequiredClientById } from "@/lib/clientStore";
 import {
-  discoverTikTokConversionEvents,
   fetchTikTokRawConversionEvents,
+  toDiscoveredTikTokConversionEvents,
 } from "@/lib/integrations/tiktok";
-import { getTikTokConnection } from "@/lib/tiktokConnectionStore";
+import { resolveSourceConversionMapping } from "@/lib/sourceConversionMappingStore";
+import { getTikTokConnection, recordTikTokEventDiscovery } from "@/lib/tiktokConnectionStore";
 
 export async function GET(request: NextRequest) {
   try {
-    const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+    const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
     const connection = await getTikTokConnection(client.id);
     const accessToken = connection?.accessToken;
-    const advertiserId =
-      request.nextUrl.searchParams.get("advertiserId") ??
-      connection?.selectedAdvertiserId;
+    const advertiserId = connection?.selectedAdvertiserId;
     const datePreset = request.nextUrl.searchParams.get("datePreset") ?? undefined;
     const since = request.nextUrl.searchParams.get("since") ?? undefined;
     const until = request.nextUrl.searchParams.get("until") ?? undefined;
@@ -33,10 +32,15 @@ export async function GET(request: NextRequest) {
     }
 
     const dateRange = { datePreset, since, until };
-    const [rawPreview, discoveredEvents] = await Promise.all([
-      fetchTikTokRawConversionEvents(accessToken, advertiserId, dateRange),
-      discoverTikTokConversionEvents(accessToken, advertiserId, client.id, dateRange),
-    ]);
+    const rawPreview = await fetchTikTokRawConversionEvents(accessToken, advertiserId, dateRange);
+    const discoveredAt = new Date().toISOString();
+    const discoveredEvents = toDiscoveredTikTokConversionEvents(
+      rawPreview.events,
+      client.id,
+      discoveredAt
+    );
+    const mapping = await resolveSourceConversionMapping("tiktok", client.id);
+    await recordTikTokEventDiscovery(client.id, { discoveredAt, error: null });
 
     return NextResponse.json({
       clientId: client.id,
@@ -45,10 +49,19 @@ export async function GET(request: NextRequest) {
       events: discoveredEvents,
       rawEvents: rawPreview.events,
       rawRowsCount: rawPreview.rawRows.length,
+      discoveredAt,
+      mapping,
       note:
         "This is a TikTok event discovery preview. Map purchase and purchase value events before using TikTok conversion metrics for decisions.",
     });
   } catch (error) {
+    const clientId = request.nextUrl.searchParams.get("clientId");
+    if (clientId) {
+      await recordTikTokEventDiscovery(clientId, {
+        discoveredAt: null,
+        error: error instanceof Error ? error.message : "TikTok event discovery failed.",
+      });
+    }
     return NextResponse.json(
       {
         error:

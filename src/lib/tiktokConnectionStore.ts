@@ -8,6 +8,9 @@ export type TikTokClientConnection = {
   selectedAdvertiserId: string | null;
   selectedAdvertiserName: string | null;
   lastError: string | null;
+  accessTokenExpiresAt?: string | null;
+  lastDiscoveryAt?: string | null;
+  lastDiscoveryError?: string | null;
 };
 
 type TikTokConnectionState = {
@@ -43,8 +46,25 @@ export async function readTikTokConnectionStore() {
       selectedAdvertiserId: connection.selectedAdvertiserId ?? null,
       selectedAdvertiserName: connection.selectedAdvertiserName ?? null,
       lastError: connection.lastError ?? null,
+      accessTokenExpiresAt: connection.accessTokenExpiresAt ?? null,
+      lastDiscoveryAt: connection.lastDiscoveryAt ?? null,
+      lastDiscoveryError: connection.lastDiscoveryError ?? null,
     })),
   } satisfies TikTokConnectionState;
+}
+
+export async function recordTikTokEventDiscovery(
+  clientId: string,
+  result: { discoveredAt: string | null; error: string | null }
+) {
+  const connection = await getTikTokConnection(clientId);
+  if (!connection) return null;
+
+  return upsertTikTokConnection({
+    ...connection,
+    lastDiscoveryAt: result.discoveredAt,
+    lastDiscoveryError: result.error,
+  });
 }
 
 async function updateTikTokConnectionStore(

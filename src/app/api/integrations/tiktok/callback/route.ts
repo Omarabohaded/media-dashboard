@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientById } from "@/lib/clientStore";
+import { getRequiredClientById } from "@/lib/clientStore";
 import {
   exchangeTikTokCodeForToken,
   fetchTikTokAdvertisers,
@@ -16,7 +16,22 @@ export async function GET(request: NextRequest) {
   const state = request.nextUrl.searchParams.get("state");
   const expectedState = request.cookies.get(TIKTOK_STATE_COOKIE)?.value;
   const oauthClientId = request.cookies.get(TIKTOK_OAUTH_CLIENT_COOKIE)?.value;
-  const client = await getClientById(oauthClientId);
+  const oauthError = request.nextUrl.searchParams.get("error_description") ?? request.nextUrl.searchParams.get("error");
+
+  if (!oauthClientId) {
+    return NextResponse.redirect(new URL("/admin?tiktok_error=missing_oauth_client", origin));
+  }
+
+  const client = await getRequiredClientById(oauthClientId);
+
+  if (oauthError) {
+    const response = NextResponse.redirect(
+      new URL(`/admin?clientId=${client.id}&tiktok_error=${encodeURIComponent(oauthError)}`, origin)
+    );
+    response.cookies.delete(TIKTOK_STATE_COOKIE);
+    response.cookies.delete(TIKTOK_OAUTH_CLIENT_COOKIE);
+    return response;
+  }
 
   if (!code || !state || !expectedState || state !== expectedState) {
     return NextResponse.redirect(
@@ -57,6 +72,11 @@ export async function GET(request: NextRequest) {
       selectedAdvertiserId: selectedAdvertiser?.advertiserId ?? null,
       selectedAdvertiserName: selectedAdvertiser?.advertiserName ?? null,
       lastError: null,
+      accessTokenExpiresAt: token.expires_in
+        ? new Date(Date.now() + token.expires_in * 1000).toISOString()
+        : null,
+      lastDiscoveryAt: null,
+      lastDiscoveryError: null,
     });
 
     return response;
@@ -72,6 +92,9 @@ export async function GET(request: NextRequest) {
       selectedAdvertiserId: null,
       selectedAdvertiserName: null,
       lastError: message,
+      accessTokenExpiresAt: null,
+      lastDiscoveryAt: null,
+      lastDiscoveryError: null,
     });
 
     return NextResponse.redirect(

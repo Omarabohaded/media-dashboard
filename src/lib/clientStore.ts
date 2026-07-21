@@ -160,6 +160,21 @@ export async function getClientById(clientId: string | null | undefined) {
   return state.clients.find((client) => client.id === clientId) ?? fallback;
 }
 
+export async function getRequiredClientById(clientId: string | null | undefined) {
+  if (!clientId) {
+    throw new Error("A client ID is required.");
+  }
+
+  const state = await readClientStore();
+  const client = state.clients.find((item) => item.id === clientId);
+
+  if (!client) {
+    throw new Error("Client was not found.");
+  }
+
+  return client;
+}
+
 export async function createClient(input: {
   name: string;
   websitePlatform: WebsitePlatform;

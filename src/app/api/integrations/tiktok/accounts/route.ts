@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getClientById } from "@/lib/clientStore";
+import { getRequiredClientById } from "@/lib/clientStore";
 import { fetchTikTokAdvertisers } from "@/lib/integrations/tiktok";
 import {
   getTikTokConnection,
@@ -8,7 +8,7 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
-    const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+    const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
     const connection = await getTikTokConnection(client.id);
 
     if (!connection?.accessToken) {
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+    const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
     const connection = await getTikTokConnection(client.id);
 
     if (!connection?.accessToken) {
