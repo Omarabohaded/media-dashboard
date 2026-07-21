@@ -4,6 +4,7 @@ import {
   type WebsitePlatform,
 } from "@/lib/clientTypes";
 import {
+  checkRuntimeJsonStoreHealth,
   getRuntimeStorageMeta,
   readRuntimeJsonStore,
   writeRuntimeJsonStore,
@@ -126,6 +127,21 @@ async function updateClientStore(
 
 export function getClientStoreMeta() {
   return getRuntimeStorageMeta(CLIENT_STORE_FILE);
+}
+
+export async function getClientStoreHealth() {
+  const [state, storage] = await Promise.all([
+    readClientStore(),
+    checkRuntimeJsonStoreHealth(CLIENT_STORE_KEY, CLIENT_STORE_FILE),
+  ]);
+
+  return {
+    ...storage,
+    storeKey: CLIENT_STORE_KEY,
+    stateVersion: state.version,
+    updatedAt: state.updatedAt,
+    clientCount: state.clients.length,
+  };
 }
 
 export async function listClients() {

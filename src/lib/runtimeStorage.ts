@@ -10,6 +10,12 @@ type StorageMeta = {
   durable: boolean;
 };
 
+export type RuntimeStorageHealth = StorageMeta & {
+  status: "healthy" | "degraded";
+  checkedAt: string;
+  message: string;
+};
+
 const STORE_DIR = path.join(tmpdir(), "media-dashboard");
 
 function getKvConfig() {
@@ -155,4 +161,41 @@ export function getRuntimeStorageMeta(fileName: string): StorageMeta {
     location: resolveFilePath(fileName),
     durable: false,
   };
+}
+
+export async function checkRuntimeJsonStoreHealth(
+  key: string,
+  fileName: string
+): Promise<RuntimeStorageHealth> {
+  const meta = getRuntimeStorageMeta(fileName);
+  const checkedAt = new Date().toISOString();
+
+  if (!meta.durable) {
+    return {
+      ...meta,
+      status: "degraded",
+      checkedAt,
+      message: "Durable storage is not configured; data can reset between deployments.",
+    };
+  }
+
+  try {
+    await readFromKv<unknown>(key);
+    return {
+      ...meta,
+      status: "healthy",
+      checkedAt,
+      message: "Durable storage is configured and reachable.",
+    };
+  } catch (error) {
+    return {
+      ...meta,
+      status: "degraded",
+      checkedAt,
+      message:
+        error instanceof Error
+          ? `Durable storage check failed: ${error.message}`
+          : "Durable storage check failed.",
+    };
+  }
 }

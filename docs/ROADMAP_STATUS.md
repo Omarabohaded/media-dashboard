@@ -2,9 +2,9 @@
 
 Last updated: 2026-07-21
 
-Current project completion: 49%
+Current project completion: 51%
 
-Current milestone: M0.2 — Reproducible dependency and validation baseline (complete)
+Current milestone: M0.3 — Client persistence diagnostics and automated validation (complete)
 
 ## Verified repository baseline
 
@@ -24,7 +24,7 @@ Current milestone: M0.2 — Reproducible dependency and validation baseline (com
 | --- | --- | --- |
 | Client creation | Implemented | Authenticated Admin `POST /api/admin/clients` calls the shared `createClient` store function. |
 | Client listing | Implemented | Authenticated `GET /api/admin/clients` returns access-filtered records from the shared client store. |
-| Client persistence | Code-verified | Writes use durable KV when configured; production refresh/deployment persistence still requires an authenticated live create/read validation. |
+| Client persistence | Code-verified with automated storage test | Writes use durable KV when configured; the Admin API now reports live reachability, store version, update time, and client count. Authenticated production create/read evidence remains an operational validation. |
 | Active-client selection | Fixed, validation pending | Shared header changes now notify dashboard and Admin consumers immediately. Browser validation remains. |
 | Existing client recovery | Location identified | Runtime key `media-dashboard:client-state`; live contents require production access. |
 
@@ -69,6 +69,16 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 - Remote-state validation: `npm ci`, manifest/lock consistency, `npx tsc --noEmit`, and `npm run build` passed from an archive of the GitHub commit; all 45 routes were generated.
 - Production smoke tests: production alias and login returned `200`; unauthenticated Admin clients and TikTok status routes returned the expected `401` JSON response.
 
+### M0.3 — Client persistence diagnostics and automated validation
+
+- Status: complete.
+- Added a read-only runtime storage health check that distinguishes configured-and-reachable durable storage from degraded ephemeral storage or an unreachable durable backend.
+- Extended the existing Admin clients response with storage health, store key, state version, last update timestamp, and client count; no new store or schema was introduced.
+- Added an automated JSON persistence round-trip and explicit ephemeral-risk health test.
+- Validation: `npm run test:client-storage` passed (2 tests); `npx tsc --noEmit` passed; targeted lint passed; `npm run build` passed and generated all 45 routes.
+- Architecture impact: preserved the shared runtime storage adapter and client store as the only ownership layer.
+- Rollback checkpoint: `742cef7da4649570f3633b5211437989008e78a5`.
+
 ## Completed milestones
 
 - Metrics Platform Foundation v1 and previously recorded runtime-consumption work.
@@ -77,17 +87,17 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 - TikTok connection storage, integration library, and OAuth connect route baseline.
 - M0.1 — Active-client selection propagation.
 - M0.2 — Reproducible dependency and validation baseline.
+- M0.3 — Client persistence diagnostics and automated validation.
 
 ## Remaining milestones
 
-1. Complete immediate client persistence validation and diagnostics.
-2. Phase 5.1 — TikTok authentication and event-discovery hardening.
-3. Phase 5.2 — TikTok production validation (requires external setup and credentials).
-4. Phase 5.3 — TikTok paid-media data normalization.
-5. Phase 5.4 — Blended paid-media reporting.
-6. Phase 5.5 — Admin mapping and client-management polish.
-7. Phase 5.6 — Production QA and monitoring.
-8. Phase 6 — Google Ads, then Snapchat, through the shared architecture.
+1. Phase 5.1 — TikTok authentication and event-discovery hardening.
+2. Phase 5.2 — TikTok production validation (requires external setup and credentials).
+3. Phase 5.3 — TikTok paid-media data normalization.
+4. Phase 5.4 — Blended paid-media reporting.
+5. Phase 5.5 — Admin mapping and client-management polish.
+6. Phase 5.6 — Production QA and monitoring.
+7. Phase 6 — Google Ads, then Snapchat, through the shared architecture.
 
 ## Known issues
 
@@ -99,7 +109,7 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 ## Technical debt
 
 - Resolve the existing React effect-state lint violations, hook dependency warnings, two explicit `any` usages, and unused declarations.
-- Add automated tests for active-client propagation, durable client persistence, mapping resolution, and integration failure states.
+- Add automated tests for active-client propagation, durable-KV integration, mapping resolution, and integration failure states.
 - Pin the npm toolchain through project metadata if cross-environment lockfile churn becomes recurring.
 
 ## Required external setup
@@ -115,4 +125,4 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 - Deployed commit: `7404b719603e33c6c4f095fef3a43d5cf7c70469`.
 - Deployment timestamp: `2026-07-21 13:29:40 UTC`.
 - Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
-- Next milestone: complete immediate client persistence diagnostics and automated store validation without requiring production credentials.
+- Next milestone: Phase 5.1 TikTok authentication and event-discovery hardening.

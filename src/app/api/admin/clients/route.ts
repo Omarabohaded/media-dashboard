@@ -3,7 +3,7 @@ import {
   createClient,
   deleteClient,
   getClientStoreMeta,
-  getClientById,
+  getClientStoreHealth,
   listClients,
   updateClientStoreAccess,
 } from "@/lib/clientStore";
@@ -32,9 +32,10 @@ export async function GET(request: NextRequest) {
   if (access.response) return access.response;
 
   const requestedClientId = request.nextUrl.searchParams.get("clientId");
-  const [allClients, storage] = await Promise.all([
+  const [allClients, storage, storageHealth] = await Promise.all([
     listClients(),
     Promise.resolve(getClientStoreMeta()),
+    getClientStoreHealth(),
   ]);
   const clients = await getVisibleClientsForUser(access.user, allClients);
   const requestedClient = requestedClientId
@@ -46,6 +47,7 @@ export async function GET(request: NextRequest) {
     clients,
     activeClientId: activeClient?.id ?? "",
     storage,
+    storageHealth,
   });
 }
 
