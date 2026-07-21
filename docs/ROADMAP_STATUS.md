@@ -4,13 +4,13 @@ Last updated: 2026-07-21
 
 Current project completion: 58%
 
-Current milestone: Phase 5.1 — TikTok authentication and event-discovery hardening (complete; deployment pending)
+Current milestone: Phase 5.1 — TikTok authentication and event-discovery hardening (complete and deployed)
 
 ## Verified repository baseline
 
 - Repository: `Omarabohaded/media-dashboard`
 - Branch: `main`
-- Deployed baseline commit: `7404b719603e33c6c4f095fef3a43d5cf7c70469`
+- Deployed baseline commit: `1245d4647b290aa795ef725fad40f90cc10d8a28`
 - Working tree at inspection: clean
 - Deployment evidence: the Vercel status check for `6e58b3e` is successful.
 - Client store: `media-dashboard:client-state` through the shared runtime storage adapter.
@@ -46,7 +46,7 @@ Current milestone: Phase 5.1 — TikTok authentication and event-discovery harde
 
 ### Phase 5.1 — TikTok authentication and event-discovery hardening
 
-- Status: code complete and locally validated; deployment pending.
+- Status: complete and deployed.
 - Corrected synchronous TikTok reporting calls to the documented GET contract with JSON-encoded array query parameters.
 - Added a raw event catalog that keeps conversion count and conversion value as distinct selectable source events with accurate roles; events absent from the API response are not advertised as detected.
 - Event preview now performs one upstream request, returns raw event evidence, records discovery success/failure time, and returns the shared conversion-mapping resolution.
@@ -58,6 +58,10 @@ Current milestone: Phase 5.1 — TikTok authentication and event-discovery harde
 - Validation: clean `npm ci`, `npx tsc --noEmit`, targeted lint, and `npm run build` passed; all 45 routes generated.
 - Architecture impact: reused the TikTok adapter, shared connection store, shared mapping resolver, normalized paid-media contract, client store, and runtime storage. No parallel store, resolver, or dashboard formula was added.
 - Rollback checkpoint: `33e99625d7b80565d90fe66e9295a8b6b3ae4a90`.
+- Local milestone commit: `19bb5fa643145fbba6344cfc6d5c112196f7b591`; recreated GitHub commit: `1245d4647b290aa795ef725fad40f90cc10d8a28`. Both point to tree `018d7aedcbbc43b6bd0a1c7a2b45098afedd835d`.
+- Remote-state validation: clean `npm ci`, TikTok contract tests, TypeScript, and production build passed from GitHub commit `1245d464`; all 45 routes generated.
+- Deployment timestamp: `2026-07-21 14:02:31 UTC`; Vercel deployment `dpl_CaxdLK6dJgMNFSdwcZUFp2Tjx4fP` reached READY.
+- Production smoke tests: root redirected to authentication (`307`), login returned `200`, and unauthenticated TikTok status/event-preview endpoints returned the expected `401` JSON responses.
 
 ### M0.1 — Active-client selection propagation
 
@@ -140,9 +144,9 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 
 ## Rollback and deployment
 
-- Current rollback commit: `6e58b3e` (last production state before M0.1/M0.2).
+- Current rollback commit: `33e99625d7b80565d90fe66e9295a8b6b3ae4a90` (last production state before Phase 5.1).
 - Recreated GitHub commits: M0.1 `f77f30e830d9163b8fa5047999cfaf4cefbeb8e2`; M0.2 `7404b719603e33c6c4f095fef3a43d5cf7c70469`. These differ from local hashes `4e80f51` and `89792dd` because the connector recreated commit metadata; their Git trees match the validated local commits exactly.
-- Deployed commit: `a1879a374c93b3dce57dbb6969c57b948ee4176c`.
-- Deployment timestamp: `2026-07-21 13:36:46 UTC` (READY at `2026-07-21 13:37:18 UTC`).
+- Deployed commit: `1245d4647b290aa795ef725fad40f90cc10d8a28`.
+- Deployment timestamp: `2026-07-21 14:02:31 UTC` (READY).
 - Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
 - Next milestone: Phase 5.2 TikTok production validation.
