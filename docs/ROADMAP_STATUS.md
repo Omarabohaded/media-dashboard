@@ -1,10 +1,19 @@
 # Paid Media Dashboard Roadmap Status
 
-Last updated: 2026-07-21
+Last updated: 2026-07-22
 
-Current project completion: 58%
+Current project completion: 64%
 
-Current milestone: Phase 5.1 — TikTok authentication and event-discovery hardening (complete and deployed)
+Current milestone: Phase 5.3 — TikTok paid-media data normalization (implemented, awaiting live validation)
+
+## Execution strategy — code-first completion
+
+- Complete every credential-independent implementation milestone before opening TikTok, Google Ads, or Snapchat developer portals.
+- Platform code must use official API contracts, the shared normalized paid-media contract, the shared source-conversion mapping resolver, and shared runtime/integration patterns.
+- Credential-independent validation uses contract tests, deterministic fixtures, mocked API responses, TypeScript validation, production builds, and smoke tests.
+- A platform may be labelled **implemented, awaiting live validation** after its complete code path passes those checks. It must not be labelled connected or production-validated until authenticated production evidence exists.
+- No dashboard page may introduce platform-specific metric calculations. Single-client and portfolio views must consume the shared metric engine.
+- All external setup and authenticated production verification is deferred to the final roadmap stage, **Combined External Setup and End-to-End Validation**.
 
 ## Verified repository baseline
 
@@ -43,6 +52,22 @@ Current milestone: Phase 5.1 — TikTok authentication and event-discovery harde
 - Contract verification: TikTok's official Business API SDK documents the synchronous integrated report as `GET /open_api/v1.3/report/integrated/get/`; the current implementation incorrectly uses POST and is being corrected in this milestone.
 
 ## Milestone log
+
+### Phase 5.3 — TikTok paid-media data normalization
+
+- Status: credential-independent implementation complete; awaiting live validation in the final combined stage.
+- Added the documented campaign-level synchronous reporting query with pagination and an explicit date range.
+- The reporting query requests base delivery metrics plus exactly the configured purchases and purchase-value metrics; it does not add implicit conversion events or sum multiple events.
+- Added normalized reporting fetch and preview route at `GET /api/integrations/tiktok/report-preview`.
+- Normalized spend, impressions, clicks, purchases, purchase value, CTR, CPC, CPM, ROAS, source, channel, client, date range, mapping status, and selected event identifiers.
+- Preserved campaign identifiers, campaign names when returned, raw dimensions, and raw source metrics as metadata.
+- Moved derived paid-media calculations into the shared paid-media contract helper so dashboard pages do not own TikTok formulas.
+- Missing mappings produce explicit mapping status and zero conversion values; unrelated TikTok conversion fields are never substituted.
+- Contract fixtures cover query construction, distinct event roles, exact mapped-event extraction, missing mappings, and duplicate metric avoidance (7/7 passed).
+- Validation: clean `npm ci`, client-storage tests (2/2), TikTok contract tests (7/7), TypeScript, targeted lint, and production build passed; 46 routes generated after adding the normalized preview endpoint.
+- Architecture impact: extended the existing TikTok adapter and normalized contract only; reused the shared conversion-mapping resolver and connection store. No platform-specific dashboard calculation layer was added.
+- Rollback checkpoint: `a13d4eecc1bc8355e88169eb6c82b1f8d6fb6949`.
+
 
 ### Phase 5.1 — TikTok authentication and event-discovery hardening
 
@@ -116,17 +141,36 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 
 ## Remaining milestones
 
-1. Phase 5.2 — TikTok production validation (requires external setup and credentials).
-2. Phase 5.3 — TikTok paid-media data normalization.
-3. Phase 5.4 — Blended paid-media reporting.
-4. Phase 5.5 — Admin mapping and client-management polish.
-5. Phase 5.6 — Production QA and monitoring.
-6. Phase 6 — Google Ads, then Snapchat, through the shared architecture.
+1. Phase 5.4 — Blended Meta and TikTok reporting.
+2. Phase 5.5 — Admin mapping and client-management polish.
+3. Phase 5.6 — Production QA infrastructure and monitoring code.
+4. Phase 6.1 — Google Ads complete credential-independent integration.
+5. Phase 6.2 — Snapchat complete credential-independent integration.
+6. Phase 7 — Single-client reporting.
+7. Phase 8 — Portfolio reporting.
+8. Phase 9 — Integration-health, token-expiry, failed-sync, data-freshness, and missing-mapping interfaces.
+9. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
+10. Combined External Setup and End-to-End Validation.
+
+## Combined External Setup and End-to-End Validation
+
+This is the only final stage that requires developer portals, credentials, secrets, or live advertiser accounts. It contains:
+
+- TikTok developer app setup, environment variables, OAuth validation, advertiser validation, and event validation.
+- Google Ads developer setup, environment variables, OAuth validation, and reporting validation.
+- Snapchat developer setup, environment variables, OAuth validation, and reporting validation.
+- Meta revalidation.
+- Real client creation and persistence validation.
+- Real conversion mapping validation.
+- Blended reporting verification.
+- Single-client reporting verification.
+- Portfolio reporting verification.
+- Production monitoring verification.
 
 ## Known issues
 
 - Production client create/read persistence still requires authenticated live validation.
-- TikTok production OAuth, advertiser discovery, and event discovery require authenticated Phase 5.2 validation.
+- TikTok production OAuth, advertiser discovery, event discovery, and reporting remain implemented/implementing but awaiting live validation in the final combined stage.
 - Admin labels TikTok as planned despite the existing backend routes.
 - The lint baseline contains 14 errors and 14 warnings.
 
@@ -138,9 +182,9 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 
 ## Required external setup
 
-- TikTok: production app credentials, approved redirect URI, and advertiser/reporting permissions are now the Phase 5.2 blocker; see `docs/TIKTOK_PRODUCTION_SETUP.md`.
-- Google Ads: developer token, OAuth client, and account access; required in Phase 6.
-- Snapchat: developer app credentials and Ads API access; required in Phase 6.
+- TikTok: production app credentials, approved redirect URI, and advertiser/reporting permissions; deferred to the final combined validation stage. See `docs/TIKTOK_PRODUCTION_SETUP.md`.
+- Google Ads: developer token, OAuth client, and account access; deferred to the final combined validation stage.
+- Snapchat: developer app credentials and Ads API access; deferred to the final combined validation stage.
 
 ## Rollback and deployment
 
@@ -149,4 +193,4 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 - Deployed commit: `1245d4647b290aa795ef725fad40f90cc10d8a28`.
 - Deployment timestamp: `2026-07-21 14:02:31 UTC` (READY).
 - Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
-- Next milestone: Phase 5.2 TikTok production validation.
+- Next milestone: Phase 5.4 blended Meta and TikTok reporting. TikTok production validation remains reclassified into Combined External Setup and End-to-End Validation.

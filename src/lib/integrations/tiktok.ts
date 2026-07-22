@@ -3,9 +3,12 @@ import type {
   NormalizedPaidMediaRow,
   PaidMediaDateRange,
 } from "@/lib/paidMediaContract";
+import { derivePaidMediaMetrics } from "@/lib/paidMediaContract";
 import { resolveSourceConversionMapping } from "@/lib/sourceConversionMappingStore";
 import {
   buildTikTokEventDiscoveryQuery,
+  buildTikTokPaidMediaQuery,
+  extractTikTokMappedMetrics,
   extractTikTokReportEvents,
   type TikTokReportRow,
 } from "@/lib/integrations/tiktokReportContract";
@@ -61,7 +64,12 @@ type TikTokAdvertiserResponse = {
 
 type TikTokReportResponse = {
   list?: TikTokReportRow[];
-  page_info?: unknown;
+  page_info?: {
+    page?: number;
+    page_size?: number;
+    total_page?: number;
+    total_number?: number;
+  };
 };
 
 function requiredEnv(name: string): string {
@@ -259,7 +267,43 @@ export function toDiscoveredTikTokConversionEvents(
 }
 
 function numberValue(value: unknown) {
-  return Number(value ?? 0);
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export async function fetchTikTokPaidMediaRows(
+  accessToken: string,
+  advertiserId: string,
+  input: { clientId: string; dateRange: PaidMediaDateRange }
+): Promise<NormalizedPaidMediaRow[]> {
+  const mapping = await resolveSourceConversionMapping("tiktok", input.clientId);
+  const today = new Date().toISOString().slice(0, 10);
+  const startDate = input.dateRange.since ?? today;
+  const endDate = input.dateRange.until ?? today;
+  const rows: TikTokReportRow[] = [];
+  let page = 1;
+
+  while (true) {
+    const query = buildTikTokPaidMediaQuery({
+      advertiserId,
+      startDate,
+      endDate,
+      purchasesEvent: mapping.purchasesEvent,
+      purchaseValueEvent: mapping.purchaseValueEvent,
+      page,
+    });
+    const response = await tiktokGet<TikTokReportResponse>(
+      "/report/integrated/get/",
+      accessToken,
+      query
+    );
+    rows.push(...(response.list ?? []));
+    const totalPages = numberValue(response.page_info?.total_page);
+    if (!totalPages || page >= totalPages) break;
+    page += 1;
+  }
+
+  return normalizeTikTokRows(rows, input, mapping);
 }
 
 export async function normalizeTikTokRows(
@@ -267,33 +311,38 @@ export async function normalizeTikTokRows(
   input: {
     clientId: string;
     dateRange: PaidMediaDateRange;
-  }
+  },
+  resolvedMapping?: Awaited<ReturnType<typeof resolveSourceConversionMapping>>
 ): Promise<NormalizedPaidMediaRow[]> {
-  const mapping = await resolveSourceConversionMapping("tiktok", input.clientId);
+  const mapping = resolvedMapping ?? await resolveSourceConversionMapping("tiktok", input.clientId);
 
   return rows.map((row) => {
     const metrics = row.metrics ?? {};
-    const spend = numberValue(metrics.spend);
-    const impressions = numberValue(metrics.impressions);
-    const clicks = numberValue(metrics.clicks);
+    const { spend, impressions, clicks, purchases, purchaseValue } =
+      extractTikTokMappedMetrics(row, mapping);
+    const dimensions = row.dimensions ?? {};
+    const campaignId = String(dimensions.campaign_id ?? "") || null;
 
     return {
       spend,
       impressions,
       clicks,
-      purchases: 0,
-      purchaseValue: 0,
+      purchases,
+      purchaseValue,
       sourceType: "tiktok",
       channel: "tiktok",
       clientId: input.clientId,
       dateRange: input.dateRange,
-      ctr: impressions > 0 ? (clicks / impressions) * 100 : undefined,
-      cpc: clicks > 0 ? spend / clicks : undefined,
-      cpm: impressions > 0 ? (spend / impressions) * 1000 : undefined,
-      roas: undefined,
+      ...derivePaidMediaMetrics({ spend, impressions, clicks, purchaseValue }),
       conversionMappingStatus: mapping.status,
       purchasesEvent: mapping.purchasesEvent,
       purchaseValueEvent: mapping.purchaseValueEvent,
+      sourceRecordId: campaignId,
+      sourceRecordName: String(dimensions.campaign_name ?? "") || null,
+      rawMetadata: {
+        dimensions,
+        sourceMetrics: metrics,
+      },
     };
   });
 }

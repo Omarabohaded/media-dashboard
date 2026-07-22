@@ -41,4 +41,21 @@ export type NormalizedPaidMediaRow = {
   conversionMappingStatus: SourceConversionMappingStatus;
   purchasesEvent: string | null;
   purchaseValueEvent: string | null;
+  sourceRecordId?: string | null;
+  sourceRecordName?: string | null;
+  rawMetadata?: Record<string, unknown>;
 };
+
+export function derivePaidMediaMetrics(input: {
+  spend: number;
+  impressions: number;
+  clicks: number;
+  purchaseValue: number;
+}) {
+  return {
+    ctr: input.impressions > 0 ? (input.clicks / input.impressions) * 100 : undefined,
+    cpc: input.clicks > 0 ? input.spend / input.clicks : undefined,
+    cpm: input.impressions > 0 ? (input.spend / input.impressions) * 1000 : undefined,
+    roas: input.spend > 0 ? input.purchaseValue / input.spend : undefined,
+  };
+}
