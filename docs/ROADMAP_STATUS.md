@@ -67,6 +67,9 @@ Current milestone: Phase 5.4 — Blended Meta and TikTok reporting (implemented,
 - Validation: TypeScript, targeted lint, and production build passed; 47 routes generated.
 - Architecture impact: the shared paid-media contract owns normalization-derived metrics and aggregation. The endpoint orchestrates existing adapters/stores; the page displays the shared result only.
 - Rollback checkpoint: `7f36cb47559c55b9a38fc0aa0d4e7fce1d069ffc`.
+- Local milestone commit: `8ac6ee787531f60c08bf676ee0ac3dbe018a2abe`; recreated GitHub commit: `8846815697717b66fd1b1d738dddcc95e1374857`. Both point to tree `7959ebd95443ff775eb6ffc4d5d5ed03eccc1629`.
+- Deployment timestamp: `2026-07-22 13:38:37 UTC`; Vercel deployment `dpl_HYMiS5h1ExnFtFDzSdzrCYTb3FZp` reached READY.
+- Production smoke tests: root, Paid Media, and the blended-report API enforced authentication (`307`, `307`, and `401`); login returned `200`.
 
 
 ### Phase 5.3 — TikTok paid-media data normalization
@@ -208,7 +211,7 @@ This is the only final stage that requires developer portals, credentials, secre
 
 - Current rollback commit: `33e99625d7b80565d90fe66e9295a8b6b3ae4a90` (last production state before Phase 5.1).
 - Recreated GitHub commits: M0.1 `f77f30e830d9163b8fa5047999cfaf4cefbeb8e2`; M0.2 `7404b719603e33c6c4f095fef3a43d5cf7c70469`. These differ from local hashes `4e80f51` and `89792dd` because the connector recreated commit metadata; their Git trees match the validated local commits exactly.
-- Deployed commit: `f805982f7326c6f1861f14408c5c24a4f4cead0d`.
-- Deployment timestamp: `2026-07-22 13:28:46 UTC` (READY).
+- Deployed commit: `8846815697717b66fd1b1d738dddcc95e1374857`.
+- Deployment timestamp: `2026-07-22 13:38:37 UTC` (READY).
 - Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
 - Next milestone: Phase 5.5 Admin mapping and client-management polish. TikTok production validation remains reclassified into Combined External Setup and End-to-End Validation.
