@@ -67,6 +67,9 @@ Current milestone: Phase 5.3 — TikTok paid-media data normalization (implement
 - Validation: clean `npm ci`, client-storage tests (2/2), TikTok contract tests (7/7), TypeScript, targeted lint, and production build passed; 46 routes generated after adding the normalized preview endpoint.
 - Architecture impact: extended the existing TikTok adapter and normalized contract only; reused the shared conversion-mapping resolver and connection store. No platform-specific dashboard calculation layer was added.
 - Rollback checkpoint: `a13d4eecc1bc8355e88169eb6c82b1f8d6fb6949`.
+- Local milestone commit: `298875a94f01bbf3990d6e4494168e70724c9759`; recreated GitHub commit: `f805982f7326c6f1861f14408c5c24a4f4cead0d`. Both point to tree `695dff74b7a1414f1c6ee80884e9f70970ddf5c5`.
+- Deployment timestamp: `2026-07-22 13:28:46 UTC`; Vercel deployment `dpl_3d4pmuDGSpcaY2nGyJsU3NTSt3P6` reached READY.
+- Production smoke tests: root redirected to authentication (`307`), login returned `200`, and the unauthenticated normalized TikTok report endpoint returned the expected `401` JSON response.
 
 
 ### Phase 5.1 — TikTok authentication and event-discovery hardening
@@ -190,7 +193,7 @@ This is the only final stage that requires developer portals, credentials, secre
 
 - Current rollback commit: `33e99625d7b80565d90fe66e9295a8b6b3ae4a90` (last production state before Phase 5.1).
 - Recreated GitHub commits: M0.1 `f77f30e830d9163b8fa5047999cfaf4cefbeb8e2`; M0.2 `7404b719603e33c6c4f095fef3a43d5cf7c70469`. These differ from local hashes `4e80f51` and `89792dd` because the connector recreated commit metadata; their Git trees match the validated local commits exactly.
-- Deployed commit: `1245d4647b290aa795ef725fad40f90cc10d8a28`.
-- Deployment timestamp: `2026-07-21 14:02:31 UTC` (READY).
+- Deployed commit: `f805982f7326c6f1861f14408c5c24a4f4cead0d`.
+- Deployment timestamp: `2026-07-22 13:28:46 UTC` (READY).
 - Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
 - Next milestone: Phase 5.4 blended Meta and TikTok reporting. TikTok production validation remains reclassified into Combined External Setup and End-to-End Validation.
