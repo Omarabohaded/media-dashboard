@@ -1,4 +1,4 @@
-import type { SourceConversionMappingStatus } from "@/lib/paidMediaContract";
+import { derivePaidMediaMetrics, type NormalizedPaidMediaRow, type PaidMediaDateRange, type SourceConversionMappingStatus } from "@/lib/paidMediaContract";
 import { resolveSourceConversionMapping } from "@/lib/sourceConversionMappingStore";
 
 export const META_STATE_COOKIE = "meta_oauth_state";
@@ -284,5 +284,34 @@ export async function fetchMetaInsightsPreviewForRange(
     conversionMappingStatus: conversionMapping.status,
     purchasesEvent: conversionMapping.purchasesEvent,
     purchaseValueEvent: conversionMapping.purchaseValueEvent,
+  }));
+}
+
+export function normalizeMetaPreviewRows(
+  rows: MetaInsightsPreviewRow[],
+  input: { clientId: string; dateRange: PaidMediaDateRange }
+): NormalizedPaidMediaRow[] {
+  return rows.map((row) => ({
+    spend: row.spend,
+    impressions: row.impressions,
+    clicks: row.clicks,
+    purchases: row.purchases,
+    purchaseValue: row.purchaseValue,
+    sourceType: "meta",
+    channel: "meta",
+    clientId: input.clientId,
+    dateRange: input.dateRange,
+    ...derivePaidMediaMetrics(row),
+    conversionMappingStatus: row.conversionMappingStatus,
+    purchasesEvent: row.purchasesEvent,
+    purchaseValueEvent: row.purchaseValueEvent,
+    sourceRecordId: row.campaignId,
+    sourceRecordName: row.campaignName,
+    rawMetadata: {
+      frequency: row.frequency,
+      reach: row.reach,
+      addToCart: row.addToCart,
+      checkoutInitiated: row.checkoutInitiated,
+    },
   }));
 }

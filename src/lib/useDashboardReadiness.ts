@@ -11,6 +11,7 @@ import {
   ACTIVE_CLIENT_STORAGE_KEY,
   type ActiveClientChangeEvent,
 } from "@/lib/clientContext";
+import type { NormalizedPaidMediaRow, PaidMediaChannelSummary, PaidMediaSourceType } from "@/lib/paidMediaContract";
 
 type ClientDirectoryResponse = {
   clients: ClientRecord[];
@@ -147,6 +148,16 @@ export type DashboardMetaPreview = {
     clicks: number;
   };
   note: string;
+};
+
+export type DashboardPaidMediaReport = {
+  clientId: string;
+  rows: NormalizedPaidMediaRow[];
+  channels: PaidMediaChannelSummary[];
+  blended: Omit<PaidMediaChannelSummary, "sourceType">;
+  includedChannels: PaidMediaSourceType[];
+  issues: Array<{ sourceType: PaidMediaSourceType; message: string }>;
+  implementationStatus: string;
 };
 
 type HookOptions = {
@@ -358,6 +369,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
   const [activeClientId, setActiveClientIdState] = useState("");
   const [metaStatus, setMetaStatus] = useState<DashboardMetaStatus | null>(null);
   const [metaPreview, setMetaPreview] = useState<DashboardMetaPreview | null>(null);
+  const [paidMediaReport, setPaidMediaReport] = useState<DashboardPaidMediaReport | null>(null);
   const [storeStatus, setStoreStatus] = useState<DashboardStoreStatus | null>(null);
   const [storePreview, setStorePreview] = useState<DashboardStorePreview | null>(null);
   const [metricLogic, setMetricLogic] = useState<DashboardMetricLogicConfig>(
@@ -482,6 +494,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
         setMessage("Create a client in Admin first.");
         setMetaStatus(null);
         setMetaPreview(null);
+        setPaidMediaReport(null);
         setStoreStatus(null);
         setStorePreview(null);
         return;
@@ -495,6 +508,19 @@ export function useDashboardReadiness(options: HookOptions = {}) {
       );
       const nextMetaStatus = (await metaStatusResponse.json()) as DashboardMetaStatus;
       setMetaStatus(nextMetaStatus);
+
+      if (includeMetaPreview) {
+        const paidMediaResponse = await fetch(
+          `/api/dashboard/paid-media?clientId=${encodeURIComponent(nextClientId)}&${effectiveMetaPreviewQuery}`,
+          { cache: "no-store" }
+        );
+        const paidMediaPayload = (await paidMediaResponse.json()) as DashboardPaidMediaReport | { error?: string };
+        setPaidMediaReport(
+          paidMediaResponse.ok && "blended" in paidMediaPayload ? paidMediaPayload : null
+        );
+      } else {
+        setPaidMediaReport(null);
+      }
 
       if (
         includeMetaPreview &&
@@ -530,6 +556,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
       setMessage("Could not load the dashboard state.");
       setMetaStatus(null);
       setMetaPreview(null);
+      setPaidMediaReport(null);
       setStoreStatus(null);
       setStorePreview(null);
       setMetricLogic(DEFAULT_DASHBOARD_METRIC_LOGIC);
@@ -557,6 +584,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
 
   useEffect(() => {
     setMetaPreview(null);
+    setPaidMediaReport(null);
     setStorePreview(null);
     void refresh();
   }, [effectiveMetaPreviewQuery]);
@@ -567,6 +595,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
 
       if (nextClientId) {
         setMetaPreview(null);
+        setPaidMediaReport(null);
         setStorePreview(null);
         void refresh(nextClientId);
       }
@@ -592,6 +621,7 @@ export function useDashboardReadiness(options: HookOptions = {}) {
     activeClient,
     metaStatus,
     metaPreview,
+    paidMediaReport,
     storeStatus,
     storePreview,
     metricLogic,

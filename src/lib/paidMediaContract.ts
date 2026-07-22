@@ -59,3 +59,46 @@ export function derivePaidMediaMetrics(input: {
     roas: input.spend > 0 ? input.purchaseValue / input.spend : undefined,
   };
 }
+
+export function summarizePaidMediaRows(rows: NormalizedPaidMediaRow[]) {
+  const totals = rows.reduce(
+    (sum, row) => ({
+      spend: sum.spend + row.spend,
+      impressions: sum.impressions + row.impressions,
+      clicks: sum.clicks + row.clicks,
+      purchases: sum.purchases + row.purchases,
+      purchaseValue: sum.purchaseValue + row.purchaseValue,
+    }),
+    { spend: 0, impressions: 0, clicks: 0, purchases: 0, purchaseValue: 0 }
+  );
+
+  return {
+    ...totals,
+    ...derivePaidMediaMetrics(totals),
+    mappingStatuses: [...new Set(rows.map((row) => row.conversionMappingStatus))],
+  };
+}
+
+export type PaidMediaChannelSummary = ReturnType<typeof summarizePaidMediaRows> & {
+  sourceType: PaidMediaSourceType;
+};
+
+export function buildBlendedPaidMediaReport(
+  rows: NormalizedPaidMediaRow[],
+  includedChannels: PaidMediaSourceType[] = ["meta", "google", "tiktok", "snap"]
+) {
+  const included = new Set(includedChannels);
+  const includedRows = rows.filter((row) => included.has(row.channel));
+  const sourceTypes = [...new Set(rows.map((row) => row.sourceType))];
+  const channels = sourceTypes.map<PaidMediaChannelSummary>((sourceType) => ({
+    sourceType,
+    ...summarizePaidMediaRows(rows.filter((row) => row.sourceType === sourceType)),
+  }));
+
+  return {
+    rows: includedRows,
+    channels,
+    blended: summarizePaidMediaRows(includedRows),
+    includedChannels,
+  };
+}

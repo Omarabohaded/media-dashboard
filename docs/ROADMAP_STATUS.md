@@ -2,9 +2,9 @@
 
 Last updated: 2026-07-22
 
-Current project completion: 64%
+Current project completion: 70%
 
-Current milestone: Phase 5.3 — TikTok paid-media data normalization (implemented, awaiting live validation)
+Current milestone: Phase 5.4 — Blended Meta and TikTok reporting (implemented, awaiting live validation)
 
 ## Execution strategy — code-first completion
 
@@ -52,6 +52,22 @@ Current milestone: Phase 5.3 — TikTok paid-media data normalization (implement
 - Contract verification: TikTok's official Business API SDK documents the synchronous integrated report as `GET /open_api/v1.3/report/integrated/get/`; the current implementation incorrectly uses POST and is being corrected in this milestone.
 
 ## Milestone log
+
+### Phase 5.4 — Blended Meta and TikTok reporting
+
+- Status: credential-independent implementation complete; TikTok data remains awaiting live validation in the final combined stage.
+- Added `GET /api/dashboard/paid-media` as the unified Meta/TikTok reporting endpoint for the selected client and reporting window.
+- Meta rows are now converted into the same normalized paid-media contract used by TikTok before aggregation.
+- Added shared contract aggregation for channel summaries and one blended summary; dashboard pages do not calculate platform-specific totals.
+- Included-channel configuration for `total_ad_spend` controls which channel rows enter the blended report.
+- Channel totals remain visible separately from blended totals, preventing hidden double counting.
+- Source failures, unavailable connections, and conversion-mapping statuses are returned explicitly instead of being hidden or replaced.
+- Updated the Paid Media page to consume the unified report, show Meta and TikTok campaign rows together, identify each channel, and distinguish channel totals from blended totals.
+- Tests: paid-media aggregation fixtures passed (2/2), covering blended arithmetic, channel separation, and included-channel exclusion; TikTok contract tests remained 7/7.
+- Validation: TypeScript, targeted lint, and production build passed; 47 routes generated.
+- Architecture impact: the shared paid-media contract owns normalization-derived metrics and aggregation. The endpoint orchestrates existing adapters/stores; the page displays the shared result only.
+- Rollback checkpoint: `7f36cb47559c55b9a38fc0aa0d4e7fce1d069ffc`.
+
 
 ### Phase 5.3 — TikTok paid-media data normalization
 
@@ -144,16 +160,15 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 
 ## Remaining milestones
 
-1. Phase 5.4 — Blended Meta and TikTok reporting.
-2. Phase 5.5 — Admin mapping and client-management polish.
-3. Phase 5.6 — Production QA infrastructure and monitoring code.
-4. Phase 6.1 — Google Ads complete credential-independent integration.
-5. Phase 6.2 — Snapchat complete credential-independent integration.
-6. Phase 7 — Single-client reporting.
-7. Phase 8 — Portfolio reporting.
-8. Phase 9 — Integration-health, token-expiry, failed-sync, data-freshness, and missing-mapping interfaces.
-9. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
-10. Combined External Setup and End-to-End Validation.
+1. Phase 5.5 — Admin mapping and client-management polish.
+2. Phase 5.6 — Production QA infrastructure and monitoring code.
+3. Phase 6.1 — Google Ads complete credential-independent integration.
+4. Phase 6.2 — Snapchat complete credential-independent integration.
+5. Phase 7 — Single-client reporting.
+6. Phase 8 — Portfolio reporting.
+7. Phase 9 — Integration-health, token-expiry, failed-sync, data-freshness, and missing-mapping interfaces.
+8. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
+9. Combined External Setup and End-to-End Validation.
 
 ## Combined External Setup and End-to-End Validation
 
@@ -196,4 +211,4 @@ This is the only final stage that requires developer portals, credentials, secre
 - Deployed commit: `f805982f7326c6f1861f14408c5c24a4f4cead0d`.
 - Deployment timestamp: `2026-07-22 13:28:46 UTC` (READY).
 - Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
-- Next milestone: Phase 5.4 blended Meta and TikTok reporting. TikTok production validation remains reclassified into Combined External Setup and End-to-End Validation.
+- Next milestone: Phase 5.5 Admin mapping and client-management polish. TikTok production validation remains reclassified into Combined External Setup and End-to-End Validation.
