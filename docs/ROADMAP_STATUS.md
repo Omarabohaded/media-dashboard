@@ -2,12 +2,50 @@
 
 Last updated: 2026-07-23
 
-Current project completion: 96%
+Current project completion: 99%
 
-Current milestone: Final credential-independent production-readiness audit
+Current milestone: Combined External Setup and End-to-End Validation
 
-Credential-independent code completion: 96%
-Remaining completion attributable to authenticated live validation: not yet isolated; credential-independent audit remediation is active
+Credential-independent code completion: 100%
+Remaining completion attributable to authenticated live validation: 1%
+
+## Route and rendered-component acceptance closure
+
+The two remaining repository-only partial areas from the final remediation audit
+are now closed with executable request/response and DOM evidence.
+
+- Added a Vitest/jsdom/React Testing Library layer alongside the existing Node
+  contract suite; the existing architecture remains intact.
+- Direct route tests execute Admin client CRUD, source conversion mappings,
+  session/authentication rejection, client visibility, Meta, TikTok, Google
+  Ads, Snapchat, OAuth connect/callback failure paths, account selection,
+  event/metric preview, report preview, single-client reporting, Portfolio,
+  Integration Health, sync state/execution, and runtime metric diagnostics.
+- Route cases cover no session, fabricated/expired session responses,
+  unauthorized clients, non-admin access, malformed payloads, missing
+  connections/accounts/mappings, provider HTTP failure, success responses,
+  status codes, response shapes, and secret non-disclosure.
+- Rendered tests exercise real DOM output and user actions for Admin client
+  management, active-client propagation, conversion mapping, TikTok setup,
+  Google Ads setup, Snapchat setup, Paid Media, Portfolio, and Health.
+- Rendered states cover loading, empty/disconnected, connected, partial data,
+  missing account, missing mapping, expired token, refresh failure, stale data,
+  failed sync, healthy, unauthorized, mixed currency, and platform unavailable.
+- Google Ads and Snapchat account routes now convert upstream account-discovery
+  failures into stable JSON `500` responses rather than allowing unshaped
+  exceptions to escape.
+- Rollback checkpoint: `route-dom-testing-baseline-20260723`
+  (`8063805471b6ce2e5b9d29fb5319b0c9dcf5d630`).
+- Validation: clean `npm ci`; 220/220 tests (86 Node contract/workflow,
+  113 isolated route, 21 rendered DOM/component); TypeScript; warning-free
+  targeted lint; 63-route production build.
+- Publication/deployment evidence is recorded below after GitHub and Vercel
+  verification.
+
+This 100% figure applies only to credential-independent repository work. It
+does not claim that any provider is live-validated. Overall completion remains
+99% until the authenticated provider and real production-data checklist is
+complete.
 
 Latest validated remediation deployment:
 
@@ -20,7 +58,8 @@ Latest validated remediation deployment:
 - Rollback tag/checkpoint: `audit-remediation-baseline-20260723`
   (`f42994b3e372311bbf2e8cedf5dbde94485a1b38`).
 
-Final repository-only audit classification:
+Previous repository-only audit classification (superseded by the acceptance
+closure above):
 
 - Fully implemented: session/client authorization guards; client CRUD and
   scoped cleanup; shared paid-media normalization and aggregation; paid-media

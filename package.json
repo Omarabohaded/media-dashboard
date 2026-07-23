@@ -15,7 +15,11 @@
     "test:snap-contract": "node --test tests/snapContract.test.mjs",
     "test:portfolio-reporting": "node --test tests/portfolioReporting.test.mjs",
     "test:access-control": "node --test tests/accessControl.test.mjs tests/protectedRouteCoverage.test.mjs",
-    "test": "node --experimental-loader ./tests/alias-loader.mjs --test tests/*.test.mjs",
+    "test:node": "node --experimental-loader ./tests/alias-loader.mjs --test tests/*.test.mjs",
+    "test:routes": "vitest run tests/routes",
+    "test:components": "vitest run tests/components",
+    "test:dom": "vitest run",
+    "test": "npm run test:node && npm run test:dom",
     "smoke:production": "node scripts/production-smoke.mjs"
   },
   "dependencies": {
@@ -29,12 +33,18 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^7.0.0",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.0.4",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "jsdom": "^29.1.1",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }
