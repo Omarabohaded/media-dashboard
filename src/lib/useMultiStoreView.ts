@@ -36,6 +36,14 @@ type MultiStoreResponse = {
   summary: MultiStoreSummary;
   error?: string;
 };
+type PortfolioPaidMediaResponse = {
+  clients: Array<{
+    clientId: string;
+    blended: { spend: number; roas?: number };
+    channels: Array<{ sourceType: string }>;
+    issues: Array<{ sourceType: string; message: string }>;
+  }>;
+};
 
 const EMPTY_SUMMARY: MultiStoreSummary = {
   totalStores: 0,
@@ -61,25 +69,38 @@ export function useMultiStoreView() {
       setError(null);
 
       try {
-        const response = await fetch(
-          `/api/dashboard/multi-store-view?${metaPreviewQuery}`,
-          {
-            cache: "no-store",
-          }
-        );
+        const [response, paidResponse] = await Promise.all([
+          fetch(`/api/dashboard/multi-store-view?${metaPreviewQuery}`, { cache: "no-store" }),
+          fetch(`/api/reports/portfolio?${metaPreviewQuery}`, { cache: "no-store" }),
+        ]);
         const payload = (await response.json()) as MultiStoreResponse;
+        const paidPayload = (await paidResponse.json()) as PortfolioPaidMediaResponse;
 
         if (!response.ok) {
           throw new Error(
             payload.error ?? "Could not load the portfolio-level store comparison."
           );
         }
+        if (!paidResponse.ok) throw new Error("Could not load shared portfolio paid-media reporting.");
 
         if (cancelled) {
           return;
         }
 
-        setCards(payload.cards ?? []);
+        setCards((payload.cards ?? []).map((card) => {
+          const paid = paidPayload.clients.find((item) => item.clientId === card.clientId);
+          if (!paid) return card;
+          const connected = paid.channels.length > 0;
+          return {
+            ...card,
+            adSpend: paid.blended.spend,
+            roas: paid.blended.roas ?? null,
+            metaConnected: connected,
+            metaSourceLabel: paid.channels.map((item) => item.sourceType).join(" + ") || "Paid media unavailable",
+            issues: [...card.issues.filter((issue) => !issue.startsWith("Meta is not connected")), ...paid.issues.map((issue) => `${issue.sourceType}: ${issue.message}`)],
+            status: card.storeConnected && connected ? "ready" : card.storeConnected || connected ? "partial" : "blocked",
+          };
+        }));
         setSummary(payload.summary ?? EMPTY_SUMMARY);
       } catch (loadError) {
         if (cancelled) {

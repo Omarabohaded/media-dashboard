@@ -2,9 +2,9 @@
 
 Last updated: 2026-07-22
 
-Current project completion: 94%
+Current project completion: 96%
 
-Current milestone: Phase 7 — Single-client reporting (credential-independent implementation complete)
+Current milestone: Phase 8 — Portfolio reporting (credential-independent implementation complete)
 
 ## Execution strategy — code-first completion
 
@@ -52,6 +52,16 @@ Current milestone: Phase 7 — Single-client reporting (credential-independent i
 - Contract verification: TikTok's official Business API SDK documents the synchronous integrated report as `GET /open_api/v1.3/report/integrated/get/`; the current implementation incorrectly uses POST and is being corrected in this milestone.
 
 ## Milestone log
+
+### Phase 8 — Portfolio reporting
+
+- Added authenticated owner/admin `GET /api/reports/portfolio`, which runs every visible client through the same shared paid-media reporting service.
+- Portfolio results preserve client, channel, currency, issue, mapping, and blended-total boundaries; client totals are never merged across currencies.
+- The existing Portfolio UI now combines store truth with the shared four-platform paid-media report instead of treating Meta as the only paid source.
+- Readiness and issue displays reflect all included paid channels and explicitly retain partial/missing-source states.
+- Deterministic portfolio contract test passed, covering client boundaries, reporting-client counts, and action-needed counts.
+- Validation: all suites (21/21), TypeScript, targeted lint, and production build passed; 63 routes generated.
+- Rollback checkpoint: single-client reporting GitHub checkpoint (deployment record pending publication).
 
 ### Phase 7 — Single-client reporting
 
@@ -232,13 +242,13 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 - Phase 6.1 — Google Ads integration (awaiting live validation).
 - Phase 6.2 — Snapchat integration (awaiting live validation).
 - Phase 7 — Single-client reporting (awaiting live validation).
+- Phase 8 — Portfolio reporting (awaiting live validation).
 
 ## Remaining milestones
 
-1. Phase 8 — Portfolio reporting.
-2. Phase 9 — Integration-health, token-expiry, failed-sync, data-freshness, and missing-mapping interfaces.
-3. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
-4. Combined External Setup and End-to-End Validation.
+1. Phase 9 — Integration-health, token-expiry, failed-sync, data-freshness, and missing-mapping interfaces.
+2. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
+3. Combined External Setup and End-to-End Validation.
 
 ## Combined External Setup and End-to-End Validation
 
@@ -280,4 +290,4 @@ This is the only final stage that requires developer portals, credentials, secre
 - Deployed commit: `8846815697717b66fd1b1d738dddcc95e1374857`.
 - Deployment timestamp: `2026-07-22 13:38:37 UTC` (READY).
 - Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
-- Next milestone: Phase 8 Portfolio reporting. All paid-platform live validation remains in Combined External Setup and End-to-End Validation.
+- Next milestone: Phase 9 Integration health interfaces. All paid-platform live validation remains in Combined External Setup and End-to-End Validation.
