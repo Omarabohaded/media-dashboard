@@ -9,6 +9,41 @@ Current milestone: Final credential-independent production-readiness audit
 Credential-independent code completion: 96%
 Remaining completion attributable to authenticated live validation: not yet isolated; credential-independent audit remediation is active
 
+Latest validated remediation deployment:
+
+- GitHub code commit: `07555cabfc9706742cdc21f3448c26535564c1cb`.
+- Validated/deployed tree: `22614a7fe79818c080a7134345929d0f457e01c3`.
+- Vercel: `READY`.
+- Validation: clean `npm ci`; 86/86 tests; TypeScript; targeted lint;
+  63-route production build; 12/12 credential-independent production smoke
+  checks.
+- Rollback tag/checkpoint: `audit-remediation-baseline-20260723`
+  (`f42994b3e372311bbf2e8cedf5dbde94485a1b38`).
+
+Final repository-only audit classification:
+
+- Fully implemented: session/client authorization guards; client CRUD and
+  scoped cleanup; shared paid-media normalization and aggregation; paid-media
+  sync recording; provider refresh orchestration; Google metadata enrichment;
+  Snapchat metric-catalog modeling; client currency handling; portfolio
+  readiness/currency boundaries; mocked lifecycle workflow.
+- Awaiting live validation: provider OAuth/account/report behavior with real
+  TikTok, Google Ads, Snapchat, and Meta accounts; durable production client
+  persistence; live reporting and monitoring.
+- Partial: route behavior is covered by authorization-surface, provider HTTP,
+  service, storage, and workflow tests, but not every Next.js handler has a
+  direct isolated request/response test; presentation logic has deterministic
+  state tests, but the repository still lacks a browser/DOM component-render
+  harness for every Admin, Paid Media, Portfolio, and Health state.
+- Stubbed/placeholder: none remain in provider event discovery or paid-platform
+  monitoring.
+- Not implemented: FX conversion remains intentionally out of scope; money is
+  kept in explicit per-currency boundaries.
+
+The evidence-based 96% figure is retained. It must not be raised to 100% until
+direct route-handler and rendered-component coverage is added or the final
+acceptance criteria are explicitly revised.
+
 ## Final implementation audit remediation
 
 The repository-only Final Implementation Verification Report supersedes earlier
