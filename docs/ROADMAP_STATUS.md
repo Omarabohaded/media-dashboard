@@ -2,9 +2,9 @@
 
 Last updated: 2026-07-22
 
-Current project completion: 76%
+Current project completion: 80%
 
-Current milestone: Phase 5.5 — Admin mapping and client-management polish (credential-independent implementation complete)
+Current milestone: Phase 5.6 — Production QA infrastructure and monitoring (credential-independent implementation complete)
 
 ## Execution strategy — code-first completion
 
@@ -52,6 +52,18 @@ Current milestone: Phase 5.5 — Admin mapping and client-management polish (cre
 - Contract verification: TikTok's official Business API SDK documents the synchronous integrated report as `GET /open_api/v1.3/report/integrated/get/`; the current implementation incorrectly uses POST and is being corrected in this milestone.
 
 ## Milestone log
+
+### Phase 5.6 — Production QA infrastructure and monitoring
+
+- Status: credential-independent implementation complete; authenticated live monitoring verification remains in the final combined stage.
+- Added one shared integration-health evaluator with deterministic priority for missing connection, expired token, missing account, failed request, missing mapping, stale data, and first-live-validation states.
+- Added authenticated `GET /api/health/integrations` fleet health for every client across Meta, TikTok, Google Ads, and Snapchat.
+- Health output includes selected-account state, shared mapping status, token expiry, latest attempt, latest successful sync, last error, data freshness, recommended action, durable-store health, and summary counts.
+- Data freshness is explicit (`fresh`, `stale`, or `never`) and never implies a successful sync when none exists.
+- Added deterministic monitoring tests covering healthy data, token-expiry precedence, and never-synced live-validation state (3/3).
+- Validation: clean `npm ci`, all existing tests (14/14 total), TypeScript, targeted lint, and production build passed; 49 routes generated.
+- Architecture impact: health reads the existing connection, mapping, sync, client, and runtime stores. It adds no alternate persistence or calculation engine.
+- Rollback checkpoint: `6b05e590553fa85edc0bd67e8dd79e636db1f670`.
 
 ### Phase 5.5 — Admin mapping and client-management polish
 
@@ -176,17 +188,17 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 - Phase 5.3 — TikTok paid-media normalization (awaiting live validation).
 - Phase 5.4 — Blended Meta and TikTok reporting (awaiting live validation).
 - Phase 5.5 — Admin mapping and client-management polish.
+- Phase 5.6 — Production QA infrastructure and monitoring.
 
 ## Remaining milestones
 
-1. Phase 5.6 — Production QA infrastructure and monitoring code.
-2. Phase 6.1 — Google Ads complete credential-independent integration.
-3. Phase 6.2 — Snapchat complete credential-independent integration.
-4. Phase 7 — Single-client reporting.
-5. Phase 8 — Portfolio reporting.
-6. Phase 9 — Integration-health, token-expiry, failed-sync, data-freshness, and missing-mapping interfaces.
-7. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
-8. Combined External Setup and End-to-End Validation.
+1. Phase 6.1 — Google Ads complete credential-independent integration.
+2. Phase 6.2 — Snapchat complete credential-independent integration.
+3. Phase 7 — Single-client reporting.
+4. Phase 8 — Portfolio reporting.
+5. Phase 9 — Integration-health, token-expiry, failed-sync, data-freshness, and missing-mapping interfaces.
+6. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
+7. Combined External Setup and End-to-End Validation.
 
 ## Combined External Setup and End-to-End Validation
 
@@ -228,4 +240,4 @@ This is the only final stage that requires developer portals, credentials, secre
 - Deployed commit: `8846815697717b66fd1b1d738dddcc95e1374857`.
 - Deployment timestamp: `2026-07-22 13:38:37 UTC` (READY).
 - Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
-- Next milestone: Phase 5.6 Production QA infrastructure and monitoring code. TikTok production validation remains reclassified into Combined External Setup and End-to-End Validation.
+- Next milestone: Phase 6.1 Google Ads credential-independent integration. TikTok production validation remains reclassified into Combined External Setup and End-to-End Validation.
