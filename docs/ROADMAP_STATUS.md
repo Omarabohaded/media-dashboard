@@ -2,9 +2,9 @@
 
 Last updated: 2026-07-22
 
-Current project completion: 80%
+Current project completion: 86%
 
-Current milestone: Phase 5.6 — Production QA infrastructure and monitoring (credential-independent implementation complete)
+Current milestone: Phase 6.1 — Google Ads integration (implemented, awaiting live validation)
 
 ## Execution strategy — code-first completion
 
@@ -52,6 +52,22 @@ Current milestone: Phase 5.6 — Production QA infrastructure and monitoring (cr
 - Contract verification: TikTok's official Business API SDK documents the synchronous integrated report as `GET /open_api/v1.3/report/integrated/get/`; the current implementation incorrectly uses POST and is being corrected in this milestone.
 
 ## Milestone log
+
+### Phase 6.1 — Google Ads integration
+
+- Status: credential-independent implementation complete; awaiting live validation.
+- Added per-client OAuth connection storage, access/refresh token metadata, token expiry, selected customer, optional manager login customer, discovery history, and error state.
+- Added OAuth connect/callback/disconnect, accessible-customer discovery and selection, conversion-action discovery, status, and normalized report-preview routes.
+- Uses Google Ads REST accessible-customer and `searchStream` contracts with configurable API version.
+- Campaign reporting normalizes cost micros, impressions, clicks, purchases, purchase value, CTR, CPC, CPM, ROAS, campaign identity, date range, and raw metadata into the shared paid-media contract.
+- Conversion reporting requests only the two explicitly mapped conversion actions. Unrelated conversions are never substituted or summed into purchases/value.
+- Added Google Ads to the unified paid-media endpoint and shared included-channel behavior.
+- Admin now exposes connection, customer/manager selection, conversion discovery, missing environment requirements, token state, and shared mapping health.
+- Client deletion clears the client-scoped Google Ads and TikTok connection records.
+- Contract fixtures passed (3/3): exact conversion-action query, no unrelated fallback, and distinct purchase/value role extraction.
+- Validation: clean `npm ci`, all suites (17/17), TypeScript, targeted lint, and production build passed; 55 routes generated.
+- Architecture impact: follows the existing connection-store, shared mapping, normalized adapter, and unified-report pattern. No Google-specific dashboard calculations were added.
+- Rollback checkpoint: `628264899243ae0ef704e4a22bbd7c27ecb76bd0`.
 
 ### Phase 5.6 — Production QA infrastructure and monitoring
 
@@ -189,16 +205,16 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 - Phase 5.4 — Blended Meta and TikTok reporting (awaiting live validation).
 - Phase 5.5 — Admin mapping and client-management polish.
 - Phase 5.6 — Production QA infrastructure and monitoring.
+- Phase 6.1 — Google Ads integration (awaiting live validation).
 
 ## Remaining milestones
 
-1. Phase 6.1 — Google Ads complete credential-independent integration.
-2. Phase 6.2 — Snapchat complete credential-independent integration.
-3. Phase 7 — Single-client reporting.
-4. Phase 8 — Portfolio reporting.
-5. Phase 9 — Integration-health, token-expiry, failed-sync, data-freshness, and missing-mapping interfaces.
-6. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
-7. Combined External Setup and End-to-End Validation.
+1. Phase 6.2 — Snapchat complete credential-independent integration.
+2. Phase 7 — Single-client reporting.
+3. Phase 8 — Portfolio reporting.
+4. Phase 9 — Integration-health, token-expiry, failed-sync, data-freshness, and missing-mapping interfaces.
+5. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
+6. Combined External Setup and End-to-End Validation.
 
 ## Combined External Setup and End-to-End Validation
 
@@ -240,4 +256,4 @@ This is the only final stage that requires developer portals, credentials, secre
 - Deployed commit: `8846815697717b66fd1b1d738dddcc95e1374857`.
 - Deployment timestamp: `2026-07-22 13:38:37 UTC` (READY).
 - Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
-- Next milestone: Phase 6.1 Google Ads credential-independent integration. TikTok production validation remains reclassified into Combined External Setup and End-to-End Validation.
+- Next milestone: Phase 6.2 Snapchat credential-independent integration. TikTok and Google Ads production validation remain in Combined External Setup and End-to-End Validation.

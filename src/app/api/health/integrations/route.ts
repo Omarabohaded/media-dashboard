@@ -5,6 +5,7 @@ import { readSyncStateStore } from "@/lib/prototypeSyncStore";
 import { resolveSourceConversionMapping } from "@/lib/sourceConversionMappingStore";
 import { requireAuthenticatedUser } from "@/lib/serverAccess";
 import { getTikTokConnection } from "@/lib/tiktokConnectionStore";
+import { getGoogleAdsConnection } from "@/lib/googleAdsConnectionStore";
 
 export async function GET() {
   const access = await requireAuthenticatedUser();
@@ -18,12 +19,13 @@ export async function GET() {
     await Promise.all(
       clients.flatMap((client) =>
         (["meta", "tiktok", "google", "snap"] as const).map(async (sourceType) => {
-          const [mapping, meta, tiktok] = await Promise.all([
+          const [mapping, meta, tiktok, google] = await Promise.all([
             resolveSourceConversionMapping(sourceType, client.id),
             sourceType === "meta" ? getMetaConnection(client.id) : Promise.resolve(null),
             sourceType === "tiktok" ? getTikTokConnection(client.id) : Promise.resolve(null),
+            sourceType === "google" ? getGoogleAdsConnection(client.id) : Promise.resolve(null),
           ]);
-          const connection = meta ?? tiktok;
+          const connection = meta ?? tiktok ?? google;
           const runs = syncState.syncRuns.filter(
             (run) => run.clientId === client.id && run.platform === sourceType
           );
@@ -39,10 +41,16 @@ export async function GET() {
                 ? meta?.selectedAccountId ?? null
                 : sourceType === "tiktok"
                   ? tiktok?.selectedAdvertiserId ?? null
+                  : sourceType === "google"
+                    ? google?.selectedCustomerId ?? null
                   : null,
             mappingStatus: mapping.status,
             tokenExpiresAt:
-              sourceType === "tiktok" ? tiktok?.accessTokenExpiresAt ?? null : null,
+              sourceType === "tiktok"
+                ? tiktok?.accessTokenExpiresAt ?? null
+                : sourceType === "google"
+                  ? google?.accessTokenExpiresAt ?? null
+                  : null,
             lastSuccessfulSyncAt: success?.finishedAt ?? null,
             lastAttemptAt: latest?.finishedAt ?? latest?.startedAt ?? null,
             lastError: latest?.error ?? connection?.lastError ?? null,

@@ -18,6 +18,8 @@ import {
   SUPPORTED_CLIENT_CURRENCIES,
   type WebsitePlatform,
 } from "@/lib/clientTypes";
+import { clearTikTokConnection } from "@/lib/tiktokConnectionStore";
+import { clearGoogleAdsConnection } from "@/lib/googleAdsConnectionStore";
 
 const allowedPlatforms = new Set<WebsitePlatform>([
   "shopify",
@@ -182,6 +184,10 @@ export async function DELETE(request: NextRequest) {
 
   try {
     await deleteClient(clientId.trim());
+    await Promise.all([
+      clearTikTokConnection(clientId.trim()),
+      clearGoogleAdsConnection(clientId.trim()),
+    ]);
     const clients = await listClients();
 
     return NextResponse.json({

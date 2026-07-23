@@ -7,6 +7,8 @@ import { listMetricMappings } from "@/lib/metricMappingStore";
 import { listMetricOverrides } from "@/lib/metricOverrideStore";
 import { buildBlendedPaidMediaReport, type PaidMediaSourceType } from "@/lib/paidMediaContract";
 import { getTikTokConnection } from "@/lib/tiktokConnectionStore";
+import { getGoogleAdsConnection } from "@/lib/googleAdsConnectionStore";
+import { fetchGoogleAdsPaidMediaRows } from "@/lib/integrations/googleAds";
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,9 +18,10 @@ export async function GET(request: NextRequest) {
       since: request.nextUrl.searchParams.get("since") ?? undefined,
       until: request.nextUrl.searchParams.get("until") ?? undefined,
     };
-    const [metaConnection, tiktokConnection, overrides, mappings] = await Promise.all([
+    const [metaConnection, tiktokConnection, googleConnection, overrides, mappings] = await Promise.all([
       getMetaConnection(client.id),
       getTikTokConnection(client.id),
+      getGoogleAdsConnection(client.id),
       listMetricOverrides(),
       listMetricMappings(),
     ]);
@@ -59,6 +62,26 @@ export async function GET(request: NextRequest) {
         });
       } else {
         issues.push({ sourceType: "tiktok", message: "TikTok is not connected or has no selected advertiser." });
+      }
+    }
+
+    if (includedChannels.includes("google")) {
+      if (googleConnection?.accessToken && googleConnection.selectedCustomerId) {
+        const until = dateRange.until ?? new Date().toISOString().slice(0, 10);
+        const since = dateRange.since ?? new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10);
+        fetchers.push({
+          sourceType: "google",
+          request: fetchGoogleAdsPaidMediaRows({
+            accessToken: googleConnection.accessToken,
+            customerId: googleConnection.selectedCustomerId,
+            loginCustomerId: googleConnection.loginCustomerId,
+            clientId: client.id,
+            since,
+            until,
+          }),
+        });
+      } else {
+        issues.push({ sourceType: "google", message: "Google Ads is not connected or has no selected customer." });
       }
     }
 
