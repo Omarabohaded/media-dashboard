@@ -7,6 +7,12 @@ import {
   readAccessStore,
 } from "@/lib/accessStore";
 import { type DashboardUser } from "@/lib/accessTypes";
+import {
+  canAccessClientWithAssignments,
+  canManageClientsByRole,
+} from "@/lib/authorizationPolicy";
+
+export { canAccessClientWithAssignments } from "@/lib/authorizationPolicy";
 
 export function isOwner(user: DashboardUser | null | undefined) {
   return user?.role === "owner" && user.status !== "deactivated";
@@ -33,7 +39,7 @@ export function canManageIntegrations(user: DashboardUser | null | undefined) {
 }
 
 export function canManageClients(user: DashboardUser | null | undefined) {
-  return isOwnerOrAdmin(user);
+  return canManageClientsByRole(user);
 }
 
 export function canAccessPortfolio(user: DashboardUser | null | undefined) {
@@ -41,16 +47,10 @@ export function canAccessPortfolio(user: DashboardUser | null | undefined) {
 }
 
 export async function canAccessClient(user: DashboardUser | null | undefined, clientId: string) {
-  if (!user || user.status === "deactivated") {
-    return false;
-  }
-
-  if (isOwnerOrAdmin(user)) {
-    return true;
-  }
-
+  if (!user || user.status === "deactivated") return false;
+  if (isOwnerOrAdmin(user)) return true;
   const assignedClientIds = await getAssignedClientIds(user.id);
-  return assignedClientIds.includes(clientId);
+  return canAccessClientWithAssignments(user, clientId, assignedClientIds);
 }
 
 export async function canManageClient(user: DashboardUser | null | undefined, clientId: string) {

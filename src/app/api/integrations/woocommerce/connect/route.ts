@@ -7,12 +7,9 @@ import {
   getClientById,
   upsertWooCommerceConnection,
 } from "@/lib/clientStore";
-import { requireClientManagementAccess } from "@/lib/serverAccess";
+import { requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function POST(request: NextRequest) {
-  const access = await requireClientManagementAccess();
-  if (access.response) return access.response;
-
   try {
     const body = (await request.json().catch(() => ({}))) as {
       clientId?: string;
@@ -20,8 +17,10 @@ export async function POST(request: NextRequest) {
       consumerKey?: string;
       consumerSecret?: string;
     };
+    const access = await requireClientIntegrationAccess(body.clientId);
+    if (access.response) return access.response;
 
-    const client = await getClientById(body.clientId);
+    const client = await getClientById(access.clientId);
     const storeUrl = normalizeWooCommerceStoreUrl(body.storeUrl ?? "");
     const consumerKey = body.consumerKey?.trim() ?? "";
     const consumerSecret = body.consumerSecret?.trim() ?? "";

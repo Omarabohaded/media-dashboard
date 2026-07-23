@@ -5,10 +5,13 @@ import {
   getTikTokConnection,
   upsertTikTokConnection,
 } from "@/lib/tiktokConnectionStore";
+import { requireClientAccess, requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
   try {
-    const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
+    const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
+    if (access.response) return access.response;
+    const client = await getRequiredClientById(access.clientId);
     const connection = await getTikTokConnection(client.id);
 
     if (!connection?.accessToken) {
@@ -40,7 +43,9 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
+    const access = await requireClientIntegrationAccess(request.nextUrl.searchParams.get("clientId"));
+    if (access.response) return access.response;
+    const client = await getRequiredClientById(access.clientId);
     const connection = await getTikTokConnection(client.id);
 
     if (!connection?.accessToken) {

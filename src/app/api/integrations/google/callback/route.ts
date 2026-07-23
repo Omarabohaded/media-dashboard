@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRequiredClientById } from "@/lib/clientStore";
 import { exchangeGoogleAdsCode, GOOGLE_ADS_CLIENT_COOKIE, GOOGLE_ADS_STATE_COOKIE } from "@/lib/integrations/googleAds";
 import { upsertGoogleAdsConnection } from "@/lib/googleAdsConnectionStore";
+import { requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin;
   const clientId = request.cookies.get(GOOGLE_ADS_CLIENT_COOKIE)?.value;
   if (!clientId) return NextResponse.redirect(new URL("/admin?google_error=missing_oauth_client", origin));
-  const client = await getRequiredClientById(clientId);
+  const access = await requireClientIntegrationAccess(clientId);
+  if (access.response) return access.response;
+  const client = await getRequiredClientById(access.clientId);
   const code = request.nextUrl.searchParams.get("code");
   const state = request.nextUrl.searchParams.get("state");
   const expected = request.cookies.get(GOOGLE_ADS_STATE_COOKIE)?.value;

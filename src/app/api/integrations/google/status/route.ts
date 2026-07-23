@@ -3,9 +3,12 @@ import { getRequiredClientById } from "@/lib/clientStore";
 import { clearGoogleAdsConnection, getGoogleAdsConnection } from "@/lib/googleAdsConnectionStore";
 import { buildGoogleAdsRedirectUri, fetchGoogleAdsCustomers, getGoogleAdsConfig } from "@/lib/integrations/googleAds";
 import { resolveSourceConversionMapping } from "@/lib/sourceConversionMappingStore";
+import { requireClientAccess, requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
-  const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
+  const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
+  if (access.response) return access.response;
+  const client = await getRequiredClientById(access.clientId);
   const connection = await getGoogleAdsConnection(client.id);
   const config = getGoogleAdsConfig();
   let accounts: Awaited<ReturnType<typeof fetchGoogleAdsCustomers>> = [];
@@ -25,7 +28,9 @@ export async function GET(request: NextRequest) {
   });
 }
 export async function DELETE(request: NextRequest) {
-  const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
+  const access = await requireClientIntegrationAccess(request.nextUrl.searchParams.get("clientId"));
+  if (access.response) return access.response;
+  const client = await getRequiredClientById(access.clientId);
   await clearGoogleAdsConnection(client.id);
   return NextResponse.json({ ok: true });
 }

@@ -3,11 +3,14 @@ import {
   fetchMetaAdAccounts,
 } from "@/lib/integrations/meta";
 import { getClientById, getMetaConnection, upsertMetaConnection } from "@/lib/clientStore";
+import { requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as { accountId?: string; clientId?: string };
-    const client = await getClientById(body.clientId);
+    const access = await requireClientIntegrationAccess(body.clientId);
+    if (access.response) return access.response;
+    const client = await getClientById(access.clientId);
     const connection = await getMetaConnection(client.id);
     const accessToken = connection?.accessToken;
 

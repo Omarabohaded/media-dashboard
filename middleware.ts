@@ -1,4 +1,9 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
+import NextAuth from "next-auth";
+import { authConfig } from "@/auth.config";
+import { hasValidAuthenticatedSession } from "@/lib/sessionPolicy";
+
+const { auth } = NextAuth(authConfig);
 
 const publicRoutes = ["/login"];
 const authRoutes = ["/api/auth"];
@@ -10,23 +15,14 @@ function isPublicPath(pathname: string) {
   );
 }
 
-function hasSessionCookie(request: NextRequest) {
-  return Boolean(
-    request.cookies.get("authjs.session-token")?.value ||
-      request.cookies.get("__Secure-authjs.session-token")?.value ||
-      request.cookies.get("next-auth.session-token")?.value ||
-      request.cookies.get("__Secure-next-auth.session-token")?.value
-  );
-}
-
-export function middleware(request: NextRequest) {
+export default auth((request) => {
   const { pathname } = request.nextUrl;
 
   if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
-  if (!hasSessionCookie(request)) {
+  if (!hasValidAuthenticatedSession(request.auth)) {
     if (pathname.startsWith("/api/")) {
       return NextResponse.json({ error: "Sign in is required." }, { status: 401 });
     }
@@ -37,7 +33,7 @@ export function middleware(request: NextRequest) {
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: [

@@ -4,8 +4,11 @@ import {
   validateWordPressStoreConnection,
   WORDPRESS_CONNECTED_COOKIE,
 } from "@/lib/integrations/wordpress";
+import { requireAdminAccess } from "@/lib/serverAccess";
 
 export async function POST() {
+  const access = await requireAdminAccess();
+  if (access.response) return access.response;
   const config = getWordPressConfig();
 
   if (config.missingEnv.length > 0) {

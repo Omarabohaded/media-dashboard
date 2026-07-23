@@ -9,10 +9,13 @@ import {
   getClientById,
   getMetaConnection,
 } from "@/lib/clientStore";
+import { requireClientAccess, requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
+  const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
+  if (access.response) return access.response;
   const config = getMetaConfig();
-  const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+  const client = await getClientById(access.clientId);
   const connection = await getMetaConnection(client.id);
   const accessToken = connection?.accessToken || null;
   const selectedAccountId = connection?.selectedAccountId ?? null;
@@ -67,7 +70,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+  const access = await requireClientIntegrationAccess(request.nextUrl.searchParams.get("clientId"));
+  if (access.response) return access.response;
+  const client = await getClientById(access.clientId);
   await clearMetaConnection(client.id);
   return NextResponse.json({ ok: true, clientId: client.id });
 }

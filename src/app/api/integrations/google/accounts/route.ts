@@ -2,15 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRequiredClientById } from "@/lib/clientStore";
 import { fetchGoogleAdsCustomers } from "@/lib/integrations/googleAds";
 import { getGoogleAdsConnection, upsertGoogleAdsConnection } from "@/lib/googleAdsConnectionStore";
+import { requireClientAccess, requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
-  const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
+  const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
+  if (access.response) return access.response;
+  const client = await getRequiredClientById(access.clientId);
   const connection = await getGoogleAdsConnection(client.id);
   if (!connection?.accessToken) return NextResponse.json({ error: "Connect Google Ads first." }, { status: 401 });
   return NextResponse.json({ accounts: await fetchGoogleAdsCustomers(connection.accessToken), selectedAccountId: connection.selectedCustomerId });
 }
 export async function POST(request: NextRequest) {
-  const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
+  const access = await requireClientIntegrationAccess(request.nextUrl.searchParams.get("clientId"));
+  if (access.response) return access.response;
+  const client = await getRequiredClientById(access.clientId);
   const connection = await getGoogleAdsConnection(client.id);
   if (!connection?.accessToken) return NextResponse.json({ error: "Connect Google Ads first." }, { status: 401 });
   const body = await request.json() as { customerId?: string; customerName?: string; loginCustomerId?: string | null };

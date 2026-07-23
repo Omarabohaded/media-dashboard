@@ -8,6 +8,7 @@ import {
   TIKTOK_STATE_COOKIE,
 } from "@/lib/integrations/tiktok";
 import { upsertTikTokConnection } from "@/lib/tiktokConnectionStore";
+import { requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin;
@@ -22,7 +23,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL("/admin?tiktok_error=missing_oauth_client", origin));
   }
 
-  const client = await getRequiredClientById(oauthClientId);
+  const access = await requireClientIntegrationAccess(oauthClientId);
+  if (access.response) return access.response;
+  const client = await getRequiredClientById(access.clientId);
 
   if (oauthError) {
     const response = NextResponse.redirect(

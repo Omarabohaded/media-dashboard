@@ -3,10 +3,13 @@ import {
   fetchMetaInsightsPreviewForRange,
 } from "@/lib/integrations/meta";
 import { getClientById, getMetaConnection } from "@/lib/clientStore";
+import { requireClientAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
   try {
-    const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+    const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
+    if (access.response) return access.response;
+    const client = await getClientById(access.clientId);
     const connection = await getMetaConnection(client.id);
     const accessToken = connection?.accessToken;
     const accountId = connection?.selectedAccountId;

@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { getSyncStorageMeta } from "@/lib/prototypeSyncStore";
 import { readSyncDashboardState } from "@/lib/syncEngine";
+import { requireAuthenticatedUser } from "@/lib/serverAccess";
 
 export async function GET() {
+  const access = await requireAuthenticatedUser();
+  if (access.response) return access.response;
   const [state, storage] = await Promise.all([
     readSyncDashboardState(),
     getSyncStorageMeta(),

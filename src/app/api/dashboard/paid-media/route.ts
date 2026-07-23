@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { buildClientPaidMediaReport } from "@/lib/paidMediaReportingService";
+import { requireClientAccess } from "@/lib/serverAccess";
 export async function GET(request: NextRequest) {
   const clientId = request.nextUrl.searchParams.get("clientId");
-  if (!clientId) return NextResponse.json({ error: "A client ID is required." }, { status: 400 });
+  const access = await requireClientAccess(clientId);
+  if (access.response) return access.response;
   try {
-    return NextResponse.json(await buildClientPaidMediaReport(clientId, {
+    return NextResponse.json(await buildClientPaidMediaReport(access.clientId, {
       datePreset: request.nextUrl.searchParams.get("datePreset") ?? undefined,
       since: request.nextUrl.searchParams.get("since") ?? undefined,
       until: request.nextUrl.searchParams.get("until") ?? undefined,

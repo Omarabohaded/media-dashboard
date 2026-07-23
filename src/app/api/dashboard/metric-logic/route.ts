@@ -5,10 +5,13 @@ import {
 } from "@/lib/dashboardMetricLogic";
 import { listMetricMappings } from "@/lib/metricMappingStore";
 import { listMetricOverrides } from "@/lib/metricOverrideStore";
+import { requireClientAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
   try {
     const clientId = request.nextUrl.searchParams.get("clientId");
+    const access = await requireClientAccess(clientId);
+    if (access.response) return access.response;
 
     const [overrides, mappings] = await Promise.all([
       listMetricOverrides(),
@@ -17,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       metricLogic: buildDashboardMetricLogic(overrides, mappings, {
-        clientId,
+        clientId: access.clientId,
       }),
     });
   } catch {

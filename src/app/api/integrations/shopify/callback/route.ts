@@ -14,6 +14,7 @@ import {
   getShopifyConnection,
   upsertShopifyConnection,
 } from "@/lib/clientStore";
+import { requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin;
@@ -24,7 +25,9 @@ export async function GET(request: NextRequest) {
   const state = searchParams.get("state");
   const expectedState = request.cookies.get(SHOPIFY_STATE_COOKIE)?.value;
   const oauthClientId = request.cookies.get(SHOPIFY_OAUTH_CLIENT_COOKIE)?.value;
-  const client = await getClientById(oauthClientId);
+  const access = await requireClientIntegrationAccess(oauthClientId);
+  if (access.response) return access.response;
+  const client = await getClientById(access.clientId);
   const existingConnection = await getShopifyConnection(client.id);
 
   if (!code || !shop || !state || !expectedState || state !== expectedState) {

@@ -3,8 +3,11 @@ import {
   fetchWordPressStoreTruthPreview,
   getWordPressConfig,
 } from "@/lib/integrations/wordpress";
+import { requireAdminAccess } from "@/lib/serverAccess";
 
 export async function GET() {
+  const access = await requireAdminAccess();
+  if (access.response) return access.response;
   try {
     const config = getWordPressConfig();
 

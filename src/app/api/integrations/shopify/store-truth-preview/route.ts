@@ -4,11 +4,14 @@ import {
   getShopifyConfig,
 } from "@/lib/integrations/shopify";
 import { getClientById, getShopifyConnection } from "@/lib/clientStore";
+import { requireClientAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
   try {
+    const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
+    if (access.response) return access.response;
     const config = getShopifyConfig();
-    const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+    const client = await getClientById(access.clientId);
     const connection = await getShopifyConnection(client.id);
 
     if (config.missingEnv.length > 0) {

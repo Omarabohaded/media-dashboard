@@ -1,13 +1,54 @@
 # Paid Media Dashboard Roadmap Status
 
-Last updated: 2026-07-22
+Last updated: 2026-07-23
 
-Current project completion: 99%
+Current project completion: 68%
 
-Current milestone: Phase 10 — Documentation and deployment readiness (credential-independent implementation complete)
+Current milestone: Audit remediation — access control and authorization
 
-Credential-independent code completion: 100%
-Remaining completion attributable to authenticated live validation: 1%
+Credential-independent code completion: 68%
+Remaining completion attributable to authenticated live validation: not yet isolated; credential-independent audit remediation is active
+
+## Final implementation audit remediation
+
+The repository-only Final Implementation Verification Report supersedes earlier
+completion claims. Its findings are mandatory acceptance criteria. No external
+platform validation will begin until every credential-independent remediation
+item is implemented and backed by automated evidence.
+
+Priority order:
+
+1. Access control and authorization.
+2. Client lifecycle and data cleanup.
+3. Multi-platform sync health and monitoring.
+4. Provider token refresh.
+5. Google Ads completeness.
+6. Snapchat completeness.
+7. Single-client reporting.
+8. Portfolio reporting.
+9. Route, storage, component, and end-to-end tests.
+10. Final credential-independent production-readiness audit.
+
+Evidence-based status at remediation start:
+
+- Fully implemented foundations: shared paid-media contract and calculations,
+  exact conversion-mapping resolver, TikTok normalization, shared aggregation,
+  and operational documentation.
+- Partial: client lifecycle, Admin mapping, Google Ads, Snapchat, single-client
+  reporting, portfolio reporting, integration health, and access control.
+- Stubbed or placeholder: Snapchat metric/event discovery labeling,
+  multi-platform sync execution evidence, production authenticated smoke
+  coverage, and Google customer display-name enrichment.
+- Not implemented: provider refresh orchestration, paid-platform sync-run
+  recording, complete handler/client authorization, cleanup of client-scoped
+  mappings/runtime state, and the required route/component/end-to-end tests.
+
+Remediation rollback checkpoint:
+
+- Deployed source baseline: `f42994b3e372311bbf2e8cedf5dbde94485a1b38`.
+- Existing release and rollback checkpoints remain unchanged.
+- New immutable remediation checkpoint: `audit-remediation-baseline-20260723`
+  (points to the deployed source baseline).
 
 ## Execution strategy — code-first completion
 
@@ -55,6 +96,30 @@ Remaining completion attributable to authenticated live validation: 1%
 - Contract verification: TikTok's official Business API SDK documents the synchronous integrated report as `GET /open_api/v1.3/report/integrated/get/`; the current implementation incorrectly uses POST and is being corrected in this milestone.
 
 ## Milestone log
+
+### Audit remediation 1 — Access control and authorization
+
+- Middleware now validates the decoded Auth.js session and expiry; it no longer
+  treats a session-cookie name as authentication.
+- Added handler-level authentication to protected Admin, reporting, sync,
+  Meta, TikTok, Google Ads, Snapchat, Shopify, WooCommerce, and WordPress
+  routes.
+- Added client-visibility authorization for every protected handler that accepts
+  a client ID.
+- Integration writes require owner/admin access or an explicit client-level
+  manage/admin assignment. Owner/Admin management remains enforced server-side.
+- `/api/reports/client` rejects users without visibility for the requested
+  client.
+- Health results are filtered to clients visible to the authenticated user.
+- Split Auth.js into an Edge-safe session-validation config and server-only
+  credential verification so middleware does not bundle Node-only storage or
+  cryptography.
+- Automated evidence covers no session, fabricated/unverified session,
+  expired/invalid session, valid session, visible client, unauthorized client,
+  non-admin management denial, and handler-level guard coverage.
+- Validation: clean `npm ci`; 64/64 tests; TypeScript; targeted lint; 63-route
+  production build.
+- Rollback: `audit-remediation-baseline-20260723`.
 
 ### Phase 10 — Documentation, backup, rollback, and deployment readiness
 

@@ -4,13 +4,13 @@ import {
   getClientById,
   getWooCommerceConnection,
 } from "@/lib/clientStore";
-import { requireAuthenticatedUser, requireClientManagementAccess } from "@/lib/serverAccess";
+import { requireClientAccess, requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
-  const access = await requireAuthenticatedUser();
+  const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
   if (access.response) return access.response;
 
-  const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+  const client = await getClientById(access.clientId);
   const connection = await getWooCommerceConnection(client.id);
 
   return NextResponse.json({
@@ -32,10 +32,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const access = await requireClientManagementAccess();
+  const access = await requireClientIntegrationAccess(request.nextUrl.searchParams.get("clientId"));
   if (access.response) return access.response;
 
-  const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+  const client = await getClientById(access.clientId);
   await clearWooCommerceConnection(client.id);
 
   return NextResponse.json({ ok: true, clientId: client.id });

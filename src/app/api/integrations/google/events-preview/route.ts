@@ -3,9 +3,12 @@ import { getRequiredClientById } from "@/lib/clientStore";
 import { fetchGoogleAdsConversionEvents } from "@/lib/integrations/googleAds";
 import { getGoogleAdsConnection, upsertGoogleAdsConnection } from "@/lib/googleAdsConnectionStore";
 import { resolveSourceConversionMapping } from "@/lib/sourceConversionMappingStore";
+import { requireClientAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
-  const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
+  const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
+  if (access.response) return access.response;
+  const client = await getRequiredClientById(access.clientId);
   const connection = await getGoogleAdsConnection(client.id);
   if (!connection?.accessToken || !connection.selectedCustomerId) return NextResponse.json({ error: "Connect Google Ads and select a customer first." }, { status: 400 });
   try {

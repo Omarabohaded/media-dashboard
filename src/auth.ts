@@ -3,6 +3,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { getPasswordHashFormat, verifyPasswordDetailed } from "@/lib/password";
 import { getUserByEmail, updateUser } from "@/lib/accessStore";
+import { authConfig } from "@/auth.config";
 
 type LoginFailureReason =
   | "user_not_found"
@@ -74,13 +75,7 @@ async function persistUserAfterLogin(
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || "media-dashboard-dev-secret",
-  session: {
-    strategy: "jwt",
-  },
-  pages: {
-    signIn: "/login",
-  },
+  ...authConfig,
   providers: [
     Credentials({
       credentials: {
@@ -190,25 +185,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.role = (user as { role?: string }).role;
-        token.status = (user as { status?: string }).status;
-      }
-
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        (session.user as { id?: string }).id = token.sub ?? "";
-        (session.user as { role?: string }).role =
-          typeof token.role === "string" ? token.role : "client_viewer";
-        (session.user as { status?: string }).status =
-          typeof token.status === "string" ? token.status : "active";
-      }
-
-      return session;
-    },
-  },
 });

@@ -7,11 +7,14 @@ import {
   META_STATE_COOKIE,
 } from "@/lib/integrations/meta";
 import { getClientById } from "@/lib/clientStore";
+import { requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
+  const access = await requireClientIntegrationAccess(request.nextUrl.searchParams.get("clientId"));
+  if (access.response) return access.response;
   const config = getMetaConfig();
   const origin = request.nextUrl.origin;
-  const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+  const client = await getClientById(access.clientId);
 
   if (config.missingEnv.length > 0) {
     return NextResponse.redirect(

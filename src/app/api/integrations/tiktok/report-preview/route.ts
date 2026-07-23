@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRequiredClientById } from "@/lib/clientStore";
 import { fetchTikTokPaidMediaRows } from "@/lib/integrations/tiktok";
 import { getTikTokConnection } from "@/lib/tiktokConnectionStore";
+import { requireClientAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
   try {
-    const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
+    const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
+    if (access.response) return access.response;
+    const client = await getRequiredClientById(access.clientId);
     const connection = await getTikTokConnection(client.id);
     const accessToken = connection?.accessToken;
     const advertiserId = connection?.selectedAdvertiserId;

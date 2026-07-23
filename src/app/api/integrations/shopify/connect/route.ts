@@ -9,11 +9,14 @@ import {
   SHOPIFY_STATE_COOKIE,
 } from "@/lib/integrations/shopify";
 import { getClientById } from "@/lib/clientStore";
+import { requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
+  const access = await requireClientIntegrationAccess(request.nextUrl.searchParams.get("clientId"));
+  if (access.response) return access.response;
   const config = getShopifyConfig();
   const origin = request.nextUrl.origin;
-  const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+  const client = await getClientById(access.clientId);
   const storeDomain = normalizeShopifyStoreDomain(
     request.nextUrl.searchParams.get("storeDomain") ?? ""
   );

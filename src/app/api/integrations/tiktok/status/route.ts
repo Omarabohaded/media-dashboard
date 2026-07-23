@@ -10,10 +10,13 @@ import {
   getTikTokConnection,
 } from "@/lib/tiktokConnectionStore";
 import { resolveSourceConversionMapping } from "@/lib/sourceConversionMappingStore";
+import { requireClientAccess, requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
+  const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
+  if (access.response) return access.response;
   const config = getTikTokConfig();
-  const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
+  const client = await getRequiredClientById(access.clientId);
   const connection = await getTikTokConnection(client.id);
   const accessToken = connection?.accessToken || null;
   const selectedAdvertiserId = connection?.selectedAdvertiserId ?? null;
@@ -77,7 +80,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
+  const access = await requireClientIntegrationAccess(request.nextUrl.searchParams.get("clientId"));
+  if (access.response) return access.response;
+  const client = await getRequiredClientById(access.clientId);
   await clearTikTokConnection(client.id);
   return NextResponse.json({ ok: true, clientId: client.id });
 }

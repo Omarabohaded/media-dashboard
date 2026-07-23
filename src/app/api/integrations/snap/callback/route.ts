@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRequiredClientById } from "@/lib/clientStore";
 import { exchangeSnapCode, SNAP_CLIENT_COOKIE, SNAP_STATE_COOKIE } from "@/lib/integrations/snap";
 import { upsertSnapConnection } from "@/lib/snapConnectionStore";
+import { requireClientIntegrationAccess } from "@/lib/serverAccess";
 export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin, clientId = request.cookies.get(SNAP_CLIENT_COOKIE)?.value;
   if (!clientId) return NextResponse.redirect(new URL("/admin?snap_error=missing_oauth_client", origin));
-  const client = await getRequiredClientById(clientId), code = request.nextUrl.searchParams.get("code"), state = request.nextUrl.searchParams.get("state"), expected = request.cookies.get(SNAP_STATE_COOKIE)?.value;
+  const access = await requireClientIntegrationAccess(clientId);
+  if (access.response) return access.response;
+  const client = await getRequiredClientById(access.clientId), code = request.nextUrl.searchParams.get("code"), state = request.nextUrl.searchParams.get("state"), expected = request.cookies.get(SNAP_STATE_COOKIE)?.value;
   if (!code || !state || state !== expected || request.nextUrl.searchParams.get("error")) return NextResponse.redirect(new URL(`/admin?clientId=${client.id}&snap_error=invalid_oauth_state`, origin));
   try {
     const token = await exchangeSnapCode(code, origin);

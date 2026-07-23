@@ -5,8 +5,11 @@ import {
   validateWordPressStoreConnection,
   WORDPRESS_CONNECTED_COOKIE,
 } from "@/lib/integrations/wordpress";
+import { requireAdminAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
+  const access = await requireAdminAccess();
+  if (access.response) return access.response;
   const config = getWordPressConfig();
   const hasCookie = request.cookies.get(WORDPRESS_CONNECTED_COOKIE)?.value === "1";
   let connectionError: string | null = null;

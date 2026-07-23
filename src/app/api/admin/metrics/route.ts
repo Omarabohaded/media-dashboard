@@ -4,7 +4,6 @@ import {
   getMetricRegistry,
   getMetricRegistryEntry,
   getMetricRegistrySummary,
-  type MetricAdminOverride,
   type MetricBenchmarkDirection,
   type MetricChannel,
   type MetricDenominatorChoice,
@@ -16,6 +15,7 @@ import {
   listMetricOverrides,
   upsertMetricOverride,
 } from "@/lib/metricOverrideStore";
+import { requireAdminAccess } from "@/lib/serverAccess";
 
 const ALLOWED_REVENUE_BASIS = new Set<MetricRevenueBasis>([
   "gross_sales",
@@ -43,6 +43,8 @@ const ALLOWED_BENCHMARK_DIRECTIONS = new Set<MetricBenchmarkDirection>([
 ]);
 
 export async function GET() {
+  const access = await requireAdminAccess();
+  if (access.response) return access.response;
   const overrides = await listMetricOverrides();
   const entries = getMetricRegistry(overrides);
 
@@ -54,6 +56,8 @@ export async function GET() {
 }
 
 export async function PATCH(request: NextRequest) {
+  const access = await requireAdminAccess();
+  if (access.response) return access.response;
   const body = (await request.json().catch(() => ({}))) as {
     metricId?: string;
     revenueBasis?: MetricRevenueBasis | null;
@@ -167,6 +171,8 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const access = await requireAdminAccess();
+  if (access.response) return access.response;
   const metricId = request.nextUrl.searchParams.get("metricId")?.trim() ?? "";
 
   if (!metricId) {

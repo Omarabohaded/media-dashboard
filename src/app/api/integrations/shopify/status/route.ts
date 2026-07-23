@@ -4,9 +4,12 @@ import {
   getShopifyConfig,
 } from "@/lib/integrations/shopify";
 import { getClientById, getShopifyConnection } from "@/lib/clientStore";
+import { requireClientAccess, requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
-  const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+  const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
+  if (access.response) return access.response;
+  const client = await getClientById(access.clientId);
   const connection = await getShopifyConnection(client.id);
   const config = getShopifyConfig();
   const storeDomain = connection?.storeDomain ?? "";
@@ -56,7 +59,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+  const access = await requireClientIntegrationAccess(request.nextUrl.searchParams.get("clientId"));
+  if (access.response) return access.response;
+  const client = await getClientById(access.clientId);
   const { clearShopifyConnection } = await import("@/lib/clientStore");
   await clearShopifyConnection(client.id);
   return NextResponse.json({ ok: true, clientId: client.id });

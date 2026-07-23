@@ -29,6 +29,7 @@ import {
 } from "@/lib/integrations/wordpress";
 import { listMetricMappings } from "@/lib/metricMappingStore";
 import { listMetricOverrides } from "@/lib/metricOverrideStore";
+import { requireClientManagementAccess } from "@/lib/serverAccess";
 
 type MultiStoreCard = {
   clientId: string;
@@ -77,6 +78,8 @@ function toWooCommerceDatePreset(value: string | null | undefined): WooCommerceD
 }
 
 export async function GET(request: NextRequest) {
+  const access = await requireClientManagementAccess();
+  if (access.response) return access.response;
   try {
     const clients = await listClients();
     const [overrides, mappings] = await Promise.all([

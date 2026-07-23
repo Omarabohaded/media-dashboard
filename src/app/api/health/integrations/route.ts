@@ -7,15 +7,17 @@ import { requireAuthenticatedUser } from "@/lib/serverAccess";
 import { getTikTokConnection } from "@/lib/tiktokConnectionStore";
 import { getGoogleAdsConnection } from "@/lib/googleAdsConnectionStore";
 import { getSnapConnection } from "@/lib/snapConnectionStore";
+import { getVisibleClientsForUser } from "@/lib/accessControl";
 
 export async function GET() {
   const access = await requireAuthenticatedUser();
   if (access.response) return access.response;
-  const [clients, syncState, storage] = await Promise.all([
+  const [allClients, syncState, storage] = await Promise.all([
     listClients(),
     readSyncStateStore(),
     getClientStoreHealth(),
   ]);
+  const clients = await getVisibleClientsForUser(access.user, allClients);
   const records = (
     await Promise.all(
       clients.flatMap((client) =>

@@ -6,10 +6,13 @@ import {
 } from "@/lib/integrations/tiktok";
 import { resolveSourceConversionMapping } from "@/lib/sourceConversionMappingStore";
 import { getTikTokConnection, recordTikTokEventDiscovery } from "@/lib/tiktokConnectionStore";
+import { requireClientAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
   try {
-    const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
+    const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
+    if (access.response) return access.response;
+    const client = await getRequiredClientById(access.clientId);
     const connection = await getTikTokConnection(client.id);
     const accessToken = connection?.accessToken;
     const advertiserId = connection?.selectedAdvertiserId;
@@ -56,8 +59,9 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     const clientId = request.nextUrl.searchParams.get("clientId");
-    if (clientId) {
-      await recordTikTokEventDiscovery(clientId, {
+    const access = await requireClientAccess(clientId);
+    if (!access.response) {
+      await recordTikTokEventDiscovery(access.clientId, {
         discoveredAt: null,
         error: error instanceof Error ? error.message : "TikTok event discovery failed.",
       });

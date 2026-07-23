@@ -4,7 +4,7 @@ import {
   fetchWooCommerceStoreTruthPreview,
   type WooCommerceDatePreset,
 } from "@/lib/integrations/woocommerce";
-import { requireAuthenticatedUser } from "@/lib/serverAccess";
+import { requireClientAccess } from "@/lib/serverAccess";
 
 const supportedDatePresets = new Set<WooCommerceDatePreset>([
   "today",
@@ -27,11 +27,11 @@ function getDatePreset(request: NextRequest): WooCommerceDatePreset {
 }
 
 export async function GET(request: NextRequest) {
-  const access = await requireAuthenticatedUser();
+  const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
   if (access.response) return access.response;
 
   try {
-    const client = await getClientById(request.nextUrl.searchParams.get("clientId"));
+    const client = await getClientById(access.clientId);
     const connection = await getWooCommerceConnection(client.id);
 
     if (!connection) {

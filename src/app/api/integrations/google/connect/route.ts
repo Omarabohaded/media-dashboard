@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRequiredClientById } from "@/lib/clientStore";
 import { buildGoogleAdsOauthUrl, getGoogleAdsConfig, GOOGLE_ADS_CLIENT_COOKIE, GOOGLE_ADS_STATE_COOKIE } from "@/lib/integrations/googleAds";
+import { requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
-  const client = await getRequiredClientById(request.nextUrl.searchParams.get("clientId"));
+  const access = await requireClientIntegrationAccess(request.nextUrl.searchParams.get("clientId"));
+  if (access.response) return access.response;
+  const client = await getRequiredClientById(access.clientId);
   const config = getGoogleAdsConfig();
   if (config.missingEnv.length) return NextResponse.redirect(new URL(`/admin?clientId=${client.id}&google_error=missing_config`, request.nextUrl.origin));
   const state = crypto.randomUUID();

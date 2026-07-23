@@ -7,6 +7,7 @@ import {
   META_STATE_COOKIE,
 } from "@/lib/integrations/meta";
 import { getClientById, upsertMetaConnection } from "@/lib/clientStore";
+import { requireClientIntegrationAccess } from "@/lib/serverAccess";
 
 export async function GET(request: NextRequest) {
   const origin = request.nextUrl.origin;
@@ -15,6 +16,8 @@ export async function GET(request: NextRequest) {
   const state = request.nextUrl.searchParams.get("state");
   const expectedState = request.cookies.get(META_STATE_COOKIE)?.value;
   const oauthClientId = request.cookies.get(META_OAUTH_CLIENT_COOKIE)?.value;
+  const access = await requireClientIntegrationAccess(oauthClientId);
+  if (access.response) return access.response;
   const client = await getClientById(oauthClientId);
 
   if (!code || !state || !expectedState || state !== expectedState) {
