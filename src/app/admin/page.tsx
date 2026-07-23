@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AppShell, StatusPill } from "@/components/AppShell";
 import { WooCommerceConnectionCard } from "@/components/WooCommerceConnectionCard";
+import { AdminPaidMediaSetup } from "@/components/AdminPaidMediaSetup";
 import {
   getCurrencyMeta,
   SUPPORTED_CLIENT_CURRENCIES,
@@ -351,6 +352,31 @@ export default function AdminPage() {
     setClientMessage(`${activeClient.name} was removed from the dashboard.`);
   }
 
+  async function handleEditClient() {
+    if (!activeClient) return;
+    const name = window.prompt("Client name", activeClient.name)?.trim();
+    if (!name) return;
+    const notes = window.prompt("Client notes", activeClient.notes ?? "") ?? activeClient.notes ?? "";
+    const response = await fetch("/api/admin/clients", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        clientId: activeClient.id,
+        name,
+        notes,
+        websitePlatform: activeClient.websitePlatform,
+        currencyCode: activeClient.currencyCode,
+      }),
+    });
+    const payload = (await response.json()) as { error?: string; client?: ClientRecord };
+    if (!response.ok || !payload.client) {
+      setClientMessage(payload.error ?? "Could not update the client.");
+      return;
+    }
+    await loadClients(payload.client.id);
+    setClientMessage(`${payload.client.name} was updated.`);
+  }
+
   async function handleSaveMetaAccount() {
     if (!accountDraft) {
       setMetaMessage("Choose a Meta ad account first.");
@@ -458,7 +484,7 @@ export default function AdminPage() {
       actionLabel: storefrontIsConnected ? "Review" : "Set up",
     },
     { id: "google-ads", name: "Google Ads", status: "Not connected", tone: "planned", context: "Integration not enabled yet", nextAction: "Keep visible as a missing paid channel for onboarding.", targetId: "planned-channels", actionLabel: "Planned" },
-    { id: "tiktok", name: "TikTok", status: "Not connected", tone: "planned", context: "Integration not enabled yet", nextAction: "Add this source when TikTok spend needs to be blended.", targetId: "planned-channels", actionLabel: "Planned" },
+    { id: "tiktok", name: "TikTok", status: "Implemented", tone: "needs-action", context: "Connection and mapping available", nextAction: "Connect, select an advertiser, and map detected events.", targetId: "paid-media-connections", actionLabel: "Configure" },
     { id: "snapchat", name: "Snapchat", status: "Not connected", tone: "planned", context: "Integration not enabled yet", nextAction: "Use this as an onboarding checklist item for paid social.", targetId: "planned-channels", actionLabel: "Planned" },
   ];
 
@@ -525,6 +551,7 @@ export default function AdminPage() {
               <div className="mt-3"><Notice message={clientMessage} /></div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button type="button" onClick={() => void handleCreateClient()} className={primaryButtonClass}>Create Client</button>
+                <button type="button" onClick={() => void handleEditClient()} className={secondaryButtonClass}>Edit Active Client</button>
                 <button type="button" onClick={() => void loadClients(activeClientId)} className={secondaryButtonClass}>Refresh Clients</button>
                 <button type="button" onClick={() => void handleDeleteClient()} className={dangerButtonClass}>Delete Active Client</button>
               </div>
@@ -563,6 +590,8 @@ export default function AdminPage() {
             </div>
           </AdminPanel>
         </div>
+
+        {activeClientId ? <AdminPaidMediaSetup clientId={activeClientId} /> : null}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr),minmax(360px,0.65fr)]">
           <AdminPanel eyebrow="Store Truth" title="Storefront Connections" description="Keep website source setup visible and client-scoped.">

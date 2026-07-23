@@ -2,9 +2,9 @@
 
 Last updated: 2026-07-22
 
-Current project completion: 70%
+Current project completion: 76%
 
-Current milestone: Phase 5.4 — Blended Meta and TikTok reporting (implemented, awaiting live validation)
+Current milestone: Phase 5.5 — Admin mapping and client-management polish (credential-independent implementation complete)
 
 ## Execution strategy — code-first completion
 
@@ -52,6 +52,19 @@ Current milestone: Phase 5.4 — Blended Meta and TikTok reporting (implemented,
 - Contract verification: TikTok's official Business API SDK documents the synchronous integrated report as `GET /open_api/v1.3/report/integrated/get/`; the current implementation incorrectly uses POST and is being corrected in this milestone.
 
 ## Milestone log
+
+### Phase 5.5 — Admin mapping and client-management polish
+
+- Status: credential-independent implementation complete; platform connections remain awaiting live validation.
+- Added authenticated Admin read/write routes for the existing shared source-conversion mapping store.
+- Admin supports global platform defaults and per-client overrides for exactly one purchases event and one purchase-value event.
+- Added explicit resolved mapping health for Meta, TikTok, Google Ads, and Snapchat without implicit fallback.
+- TikTok is no longer presented as a planned source: Admin now exposes connection/reconnection, advertiser selection, discovered-event loading, mapping health, token-expiry state, missing environment requirements, and last discovery time.
+- Added client editing while preserving existing identifiers and connection ownership; creation, selection, deletion, and durable-store diagnostics remain on the shared client store.
+- Manual mapping input remains available when event discovery is unavailable; discovered TikTok events populate role-filtered suggestions.
+- Architecture impact: extended the existing client store, source-conversion mapping store, and integration routes only. No schema migration, parallel store, or dashboard-owned platform calculation was introduced.
+- Validation: clean `npm ci`, storage tests (2/2), TikTok contract tests (7/7), paid-media aggregation tests (2/2), TypeScript, production build (48 routes), and targeted lint for new Phase 5.5 files passed. The two pre-existing Admin effect lint findings remain tracked for Phase 5.6 cleanup.
+- Rollback checkpoint: `4eef74d11fcc4dd4678f2fce6f9ae1de7fc6b609`.
 
 ### Phase 5.4 — Blended Meta and TikTok reporting
 
@@ -160,18 +173,20 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 - M0.2 — Reproducible dependency and validation baseline.
 - M0.3 — Client persistence diagnostics and automated validation.
 - Phase 5.1 — TikTok authentication and event-discovery hardening.
+- Phase 5.3 — TikTok paid-media normalization (awaiting live validation).
+- Phase 5.4 — Blended Meta and TikTok reporting (awaiting live validation).
+- Phase 5.5 — Admin mapping and client-management polish.
 
 ## Remaining milestones
 
-1. Phase 5.5 — Admin mapping and client-management polish.
-2. Phase 5.6 — Production QA infrastructure and monitoring code.
-3. Phase 6.1 — Google Ads complete credential-independent integration.
-4. Phase 6.2 — Snapchat complete credential-independent integration.
-5. Phase 7 — Single-client reporting.
-6. Phase 8 — Portfolio reporting.
-7. Phase 9 — Integration-health, token-expiry, failed-sync, data-freshness, and missing-mapping interfaces.
-8. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
-9. Combined External Setup and End-to-End Validation.
+1. Phase 5.6 — Production QA infrastructure and monitoring code.
+2. Phase 6.1 — Google Ads complete credential-independent integration.
+3. Phase 6.2 — Snapchat complete credential-independent integration.
+4. Phase 7 — Single-client reporting.
+5. Phase 8 — Portfolio reporting.
+6. Phase 9 — Integration-health, token-expiry, failed-sync, data-freshness, and missing-mapping interfaces.
+7. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
+8. Combined External Setup and End-to-End Validation.
 
 ## Combined External Setup and End-to-End Validation
 
@@ -192,7 +207,6 @@ This is the only final stage that requires developer portals, credentials, secre
 
 - Production client create/read persistence still requires authenticated live validation.
 - TikTok production OAuth, advertiser discovery, event discovery, and reporting remain implemented/implementing but awaiting live validation in the final combined stage.
-- Admin labels TikTok as planned despite the existing backend routes.
 - The lint baseline contains 14 errors and 14 warnings.
 
 ## Technical debt
@@ -214,4 +228,4 @@ This is the only final stage that requires developer portals, credentials, secre
 - Deployed commit: `8846815697717b66fd1b1d738dddcc95e1374857`.
 - Deployment timestamp: `2026-07-22 13:38:37 UTC` (READY).
 - Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
-- Next milestone: Phase 5.5 Admin mapping and client-management polish. TikTok production validation remains reclassified into Combined External Setup and End-to-End Validation.
+- Next milestone: Phase 5.6 Production QA infrastructure and monitoring code. TikTok production validation remains reclassified into Combined External Setup and End-to-End Validation.

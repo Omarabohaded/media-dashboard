@@ -77,3 +77,27 @@ export async function resolveSourceConversionMapping(sourceType: PaidMediaSource
 export async function saveSourceConversionMappings(mappings: SourceConversionMapping[]) {
   await writeRuntimeJsonStore(STORE_KEY, STORE_FILE, mappings);
 }
+
+export async function upsertSourceConversionMapping(
+  mapping: Omit<SourceConversionMapping, "updatedAt">
+) {
+  const mappings = await listSourceConversionMappings();
+  const updated: SourceConversionMapping = {
+    ...mapping,
+    clientId: mapping.scope === "global" ? null : mapping.clientId,
+    updatedAt: new Date().toISOString(),
+  };
+  const next = [
+    updated,
+    ...mappings.filter(
+      (item) =>
+        !(
+          item.sourceType === updated.sourceType &&
+          item.scope === updated.scope &&
+          item.clientId === updated.clientId
+        )
+    ),
+  ];
+  await saveSourceConversionMappings(next);
+  return updated;
+}

@@ -5,6 +5,7 @@ import {
   getClientStoreMeta,
   getClientStoreHealth,
   listClients,
+  updateClient,
   updateClientStoreAccess,
 } from "@/lib/clientStore";
 import { getVisibleClientsForUser } from "@/lib/accessControl";
@@ -101,6 +102,10 @@ export async function PATCH(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as {
     clientId?: string;
     storeAccessDeclined?: boolean;
+    name?: string;
+    websitePlatform?: WebsitePlatform;
+    currencyCode?: ClientCurrencyCode;
+    notes?: string;
   };
 
   const clientId = body.clientId?.trim() ?? "";
@@ -112,14 +117,34 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  if (typeof body.storeAccessDeclined !== "boolean") {
-    return NextResponse.json(
-      { error: "storeAccessDeclined must be true or false." },
-      { status: 400 }
-    );
-  }
-
   try {
+    if (body.name !== undefined) {
+      const name = body.name.trim();
+      if (!name) {
+        return NextResponse.json({ error: "Client name is required." }, { status: 400 });
+      }
+      const websitePlatform = allowedPlatforms.has(body.websitePlatform ?? "custom")
+        ? (body.websitePlatform as WebsitePlatform)
+        : "custom";
+      const allowedCurrencies = new Set(SUPPORTED_CLIENT_CURRENCIES.map((item) => item.code));
+      const currencyCode = allowedCurrencies.has(body.currencyCode ?? "USD")
+        ? (body.currencyCode as ClientCurrencyCode)
+        : "USD";
+      const client = await updateClient({
+        clientId,
+        name,
+        websitePlatform,
+        currencyCode,
+        notes: body.notes,
+      });
+      return NextResponse.json({ client });
+    }
+    if (typeof body.storeAccessDeclined !== "boolean") {
+      return NextResponse.json(
+        { error: "Provide client fields or storeAccessDeclined." },
+        { status: 400 }
+      );
+    }
     const client = await updateClientStoreAccess({
       clientId,
       storeAccessDeclined: body.storeAccessDeclined,

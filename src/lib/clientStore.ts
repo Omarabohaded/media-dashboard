@@ -200,6 +200,35 @@ export async function createClient(input: {
   return client;
 }
 
+export async function updateClient(input: {
+  clientId: string;
+  name: string;
+  websitePlatform: WebsitePlatform;
+  currencyCode: ClientCurrencyCode;
+  notes?: string | null;
+}) {
+  const nextState = await updateClientStore((state) => {
+    if (!state.clients.some((client) => client.id === input.clientId)) {
+      throw new Error("Client was not found.");
+    }
+    return {
+      ...state,
+      clients: state.clients.map((client) =>
+        client.id === input.clientId
+          ? {
+              ...client,
+              name: input.name.trim(),
+              websitePlatform: input.websitePlatform,
+              currencyCode: input.currencyCode,
+              notes: input.notes?.trim() || null,
+            }
+          : client
+      ),
+    };
+  });
+  return nextState.clients.find((client) => client.id === input.clientId)!;
+}
+
 export async function updateClientStoreAccess(input: {
   clientId: string;
   storeAccessDeclined: boolean;
