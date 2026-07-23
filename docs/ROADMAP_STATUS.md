@@ -2,11 +2,11 @@
 
 Last updated: 2026-07-23
 
-Current project completion: 76%
+Current project completion: 80%
 
-Current milestone: Audit remediation — multi-platform sync health
+Current milestone: Audit remediation — provider token refresh
 
-Credential-independent code completion: 76%
+Credential-independent code completion: 80%
 Remaining completion attributable to authenticated live validation: not yet isolated; credential-independent audit remediation is active
 
 ## Final implementation audit remediation
@@ -96,6 +96,22 @@ Remediation rollback checkpoint:
 - Contract verification: TikTok's official Business API SDK documents the synchronous integrated report as `GET /open_api/v1.3/report/integrated/get/`; the current implementation incorrectly uses POST and is being corrected in this milestone.
 
 ## Milestone log
+
+### Audit remediation 3 — Multi-platform sync health
+
+- Shared paid-media execution now records a persisted attempt, success or
+  failure, timestamps, row count, and failure reason for Meta, TikTok, Google
+  Ads, and Snapchat requests.
+- Single-client/blended reporting and each platform report-preview route use
+  the same sync recorder; no parallel monitoring store was introduced.
+- Sync history retention was expanded so portfolio health is not silently
+  truncated to the latest 25 runs.
+- Integration Health derives never-synced, stale, failed, expired-token,
+  missing-account, missing-mapping, and healthy states from shared connection,
+  mapping, and sync evidence.
+- Automated tests prove TikTok, Google Ads, and Snapchat success/failure
+  persistence and the complete health-state precedence.
+- Rollback: `fccc93f59869eff89e0a724f464784ed962dee21`.
 
 ### Audit remediation 2 — Client lifecycle and data cleanup
 

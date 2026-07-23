@@ -3,6 +3,7 @@ import { getRequiredClientById } from "@/lib/clientStore";
 import { fetchTikTokPaidMediaRows } from "@/lib/integrations/tiktok";
 import { getTikTokConnection } from "@/lib/tiktokConnectionStore";
 import { requireClientAccess } from "@/lib/serverAccess";
+import { executePaidMediaSync } from "@/lib/paidMediaSync";
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,11 +33,16 @@ export async function GET(request: NextRequest) {
       since: request.nextUrl.searchParams.get("since") ?? undefined,
       until: request.nextUrl.searchParams.get("until") ?? undefined,
     };
-    const rows = await fetchTikTokPaidMediaRows(
-      accessToken,
-      advertiserId,
-      { clientId: client.id, dateRange }
-    );
+    const rows = await executePaidMediaSync({
+      clientId: client.id,
+      clientName: client.name,
+      sourceType: "tiktok",
+      request: () =>
+        fetchTikTokPaidMediaRows(accessToken, advertiserId, {
+          clientId: client.id,
+          dateRange,
+        }),
+    });
 
     return NextResponse.json({
       clientId: client.id,

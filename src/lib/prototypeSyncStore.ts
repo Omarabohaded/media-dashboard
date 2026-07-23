@@ -80,7 +80,17 @@ export async function upsertConnectionRecord(
 export async function appendSyncRun(run: SyncRunRecord) {
   return updateSyncStateStore((state) => ({
     ...state,
-    syncRuns: [run, ...state.syncRuns].slice(0, 25),
+    syncRuns: [run, ...state.syncRuns].slice(0, 500),
+  }));
+}
+
+export async function upsertSyncRun(run: SyncRunRecord) {
+  return updateSyncStateStore((state) => ({
+    ...state,
+    syncRuns: [
+      run,
+      ...state.syncRuns.filter((item) => item.id !== run.id),
+    ].slice(0, 500),
   }));
 }
 
