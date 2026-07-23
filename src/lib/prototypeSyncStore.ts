@@ -1,4 +1,4 @@
-import {
+import type {
   BusinessTruthSnapshot,
   IntegrationConnectionRecord,
   MediaPlatformSnapshot,
@@ -95,5 +95,19 @@ export async function appendMediaSnapshot(snapshot: MediaPlatformSnapshot) {
   return updateSyncStateStore((state) => ({
     ...state,
     mediaSnapshots: [snapshot, ...state.mediaSnapshots].slice(0, 30),
+  }));
+}
+
+export async function clearClientSyncState(clientId: string) {
+  await updateSyncStateStore((state) => ({
+    ...state,
+    connections: state.connections.filter((item) => item.clientId !== clientId),
+    syncRuns: state.syncRuns.filter((item) => item.clientId !== clientId),
+    businessTruthSnapshots: state.businessTruthSnapshots.filter(
+      (item) => item.clientId !== clientId
+    ),
+    mediaSnapshots: state.mediaSnapshots.filter(
+      (item) => item.clientId !== clientId
+    ),
   }));
 }

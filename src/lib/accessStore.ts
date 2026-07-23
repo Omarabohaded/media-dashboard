@@ -145,6 +145,15 @@ export async function listAssignments() {
   return state.assignments;
 }
 
+export async function clearClientAssignments(clientId: string) {
+  await updateAccessStore((state) => ({
+    ...state,
+    assignments: state.assignments.filter(
+      (assignment) => assignment.clientId !== clientId
+    ),
+  }));
+}
+
 export async function getUserById(userId: string) {
   const state = await readAccessStore();
   return state.users.find((user) => user.id === userId) ?? null;

@@ -228,3 +228,13 @@ export async function clearMetricMapping(metricId: string, scope: MetricMappingS
     mappings: state.mappings.filter((mapping) => mappingKey(mapping) !== key),
   }));
 }
+
+export async function clearClientMetricMappings(clientId: string) {
+  await updateMetricMappingStore((state) => ({
+    ...state,
+    mappings: state.mappings.filter(
+      (mapping) =>
+        mapping.scope !== "client" || mapping.clientId !== clientId
+    ),
+  }));
+}

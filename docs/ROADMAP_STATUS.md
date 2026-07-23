@@ -2,11 +2,11 @@
 
 Last updated: 2026-07-23
 
-Current project completion: 68%
+Current project completion: 76%
 
-Current milestone: Audit remediation — access control and authorization
+Current milestone: Audit remediation — multi-platform sync health
 
-Credential-independent code completion: 68%
+Credential-independent code completion: 76%
 Remaining completion attributable to authenticated live validation: not yet isolated; credential-independent audit remediation is active
 
 ## Final implementation audit remediation
@@ -97,6 +97,23 @@ Remediation rollback checkpoint:
 
 ## Milestone log
 
+### Audit remediation 2 — Client lifecycle and data cleanup
+
+- Client create, list, update, and delete operations are exercised through the
+  configured runtime storage abstraction.
+- Active-client persistence and immediate browser event propagation are
+  covered by automated tests.
+- Client deletion now clears client-scoped source conversion mappings, metric
+  mappings, TikTok/Google Ads/Snapchat connections and selections, shared sync
+  state, media/business snapshots, and access assignments before deleting the
+  client record.
+- Meta, Shopify, and WooCommerce records remain cleaned atomically inside the
+  client store.
+- Cleanup steps are idempotent and the client record is deleted last, allowing
+  an interrupted cleanup to be retried safely.
+- Global conversion defaults and metric mappings are explicitly preserved.
+- Rollback: `de675bf797d96a04685701a4389b0f20ff78bc63`.
+
 ### Audit remediation 1 — Access control and authorization
 
 - Middleware now validates the decoded Auth.js session and expiry; it no longer
@@ -119,6 +136,14 @@ Remediation rollback checkpoint:
   non-admin management denial, and handler-level guard coverage.
 - Validation: clean `npm ci`; 64/64 tests; TypeScript; targeted lint; 63-route
   production build.
+- Production deployment: `de675bf797d96a04685701a4389b0f20ff78bc63`
+  (`READY` on Vercel).
+- Remote verification: deployed Git tree
+  `cbd142552b8adb6af77abacf9b12f6bef070f9d8` exactly matches the validated
+  local tree for `e201c4eb17f23d356018ac5727b1ccffa7c57c67`.
+- Production smoke validation: 12/12 passed, including unauthenticated
+  rejection for health, reporting, TikTok, Google Ads, and Snapchat protected
+  endpoints.
 - Rollback: `audit-remediation-baseline-20260723`.
 
 ### Phase 10 — Documentation, backup, rollback, and deployment readiness

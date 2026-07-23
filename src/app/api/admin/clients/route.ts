@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   createClient,
-  deleteClient,
   getClientStoreMeta,
   getClientStoreHealth,
   listClients,
   updateClient,
   updateClientStoreAccess,
 } from "@/lib/clientStore";
+import { deleteClientAndScopedData } from "@/lib/clientLifecycle";
 import { getVisibleClientsForUser } from "@/lib/accessControl";
 import {
   requireAuthenticatedUser,
@@ -18,9 +18,6 @@ import {
   SUPPORTED_CLIENT_CURRENCIES,
   type WebsitePlatform,
 } from "@/lib/clientTypes";
-import { clearTikTokConnection } from "@/lib/tiktokConnectionStore";
-import { clearGoogleAdsConnection } from "@/lib/googleAdsConnectionStore";
-import { clearSnapConnection } from "@/lib/snapConnectionStore";
 
 const allowedPlatforms = new Set<WebsitePlatform>([
   "shopify",
@@ -184,17 +181,13 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    await deleteClient(clientId.trim());
-    await Promise.all([
-      clearTikTokConnection(clientId.trim()),
-      clearGoogleAdsConnection(clientId.trim()),
-      clearSnapConnection(clientId.trim()),
-    ]);
+    const cleanup = await deleteClientAndScopedData(clientId.trim());
     const clients = await listClients();
 
     return NextResponse.json({
       ok: true,
       deletedClientId: clientId.trim(),
+      cleanup,
       clients,
       activeClientId: clients[0]?.id ?? "",
     });

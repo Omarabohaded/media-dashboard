@@ -101,3 +101,13 @@ export async function upsertSourceConversionMapping(
   await saveSourceConversionMappings(next);
   return updated;
 }
+
+export async function clearClientSourceConversionMappings(clientId: string) {
+  const mappings = await listSourceConversionMappings();
+  await saveSourceConversionMappings(
+    mappings.filter(
+      (mapping) =>
+        mapping.scope !== "client" || mapping.clientId !== clientId
+    )
+  );
+}
