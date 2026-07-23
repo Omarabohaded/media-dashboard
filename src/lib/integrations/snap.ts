@@ -34,7 +34,7 @@ export async function fetchSnapAdAccounts(accessToken: string): Promise<Array<{ 
   const payload = await snapGet("/me/organizations?with_ad_accounts=true", accessToken);
   return (payload.organizations ?? []).flatMap((wrapper: { organization?: { id?: string; ad_accounts?: Array<{ id?: string; name?: string }> } }) => (wrapper.organization?.ad_accounts ?? []).map((account) => ({ adAccountId: account.id ?? "", adAccountName: account.name ?? account.id ?? "Snap ad account", organizationId: wrapper.organization?.id ?? "" })));
 }
-export function discoverSnapConversionEvents(clientId: string): DiscoveredSourceConversionEvent[] {
+export function getSupportedSnapMetricCatalog(clientId: string): DiscoveredSourceConversionEvent[] {
   const now = new Date().toISOString();
   return [
     { sourceType: "snap", clientId, eventName: "conversion_purchases", label: "Purchases", roles: ["purchases"], firstSeenAt: now, lastSeenAt: now },

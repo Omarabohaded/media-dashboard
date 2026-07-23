@@ -75,9 +75,49 @@ async function googleRequest(path: string, accessToken: string, init?: RequestIn
   if (!response.ok) throw new Error(`${response.status}: ${payload?.error?.message ?? "Google Ads API request failed."}`);
   return payload;
 }
-export async function fetchGoogleAdsCustomers(accessToken: string): Promise<Array<{ customerId: string; customerName: string; resourceName: string }>> {
+export async function fetchGoogleAdsCustomers(accessToken: string): Promise<Array<{ customerId: string; customerName: string; resourceName: string; currencyCode: string | null }>> {
   const payload = await googleRequest("/customers:listAccessibleCustomers", accessToken);
-  return (payload.resourceNames ?? []).map((name: string) => ({ customerId: name.split("/").pop()!, customerName: name, resourceName: name }));
+  return Promise.all(
+    (payload.resourceNames ?? []).map(async (resourceName: string) => {
+      const customerId = resourceName.split("/").pop()!;
+      try {
+        const metadata = await googleRequest(
+          `/customers/${customerId}/googleAds:searchStream`,
+          accessToken,
+          {
+            method: "POST",
+            body: JSON.stringify({
+              query:
+                "SELECT customer.id, customer.descriptive_name, customer.currency_code FROM customer LIMIT 1",
+            }),
+          }
+        );
+        const customer = (
+          metadata as Array<{
+            results?: Array<{
+              customer?: {
+                descriptiveName?: string;
+                currencyCode?: string;
+              };
+            }>;
+          }>
+        ).flatMap((batch) => batch.results ?? [])[0]?.customer;
+        return {
+          customerId,
+          customerName: customer?.descriptiveName || resourceName,
+          resourceName,
+          currencyCode: customer?.currencyCode ?? null,
+        };
+      } catch {
+        return {
+          customerId,
+          customerName: resourceName,
+          resourceName,
+          currencyCode: null,
+        };
+      }
+    })
+  );
 }
 export async function fetchGoogleAdsConversionEvents(accessToken: string, customerId: string, loginCustomerId?: string | null): Promise<DiscoveredSourceConversionEvent[]> {
   const query = "SELECT conversion_action.resource_name, conversion_action.name, conversion_action.status, conversion_action.category FROM conversion_action WHERE conversion_action.status = 'ENABLED'";

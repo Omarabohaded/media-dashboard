@@ -2,11 +2,11 @@
 
 Last updated: 2026-07-23
 
-Current project completion: 84%
+Current project completion: 90%
 
-Current milestone: Audit remediation — Google Ads completeness
+Current milestone: Audit remediation — route, UI, and workflow test coverage
 
-Credential-independent code completion: 84%
+Credential-independent code completion: 90%
 Remaining completion attributable to authenticated live validation: not yet isolated; credential-independent audit remediation is active
 
 ## Final implementation audit remediation
@@ -96,6 +96,28 @@ Remediation rollback checkpoint:
 - Contract verification: TikTok's official Business API SDK documents the synchronous integrated report as `GET /open_api/v1.3/report/integrated/get/`; the current implementation incorrectly uses POST and is being corrected in this milestone.
 
 ## Milestone log
+
+### Audit remediation 5–8 — Provider and reporting completeness
+
+- Google Ads accessible customers are enriched with descriptive names and
+  currency metadata through the customer resource; resource identifiers remain
+  an explicit fallback only when metadata is unavailable.
+- Google OAuth exchange/refresh, customer HTTP discovery, metadata fallback,
+  and enabled conversion-action discovery are covered with mocked contracts.
+- Snapchat conversion selection is now honestly exposed as a supported
+  reporting-metric catalog, not upstream event discovery. The API response
+  declares `upstreamDiscovery: false` and documents the provider limitation.
+- Snapchat OAuth exchange/refresh, organization/account parsing, and metric
+  catalog are covered with mocked contracts.
+- Single-client money formatting now uses the client/report currency contract
+  instead of Meta account status.
+- Portfolio readiness summaries are recalculated after paid-media results are
+  merged, outdated Meta-only wording is removed, and mixed currencies remain
+  separate client boundaries rather than a misleading combined money total.
+- Portfolio merge tests cover readiness recalculation, unavailable platforms,
+  and multiple currencies.
+- Live-provider validation remains deferred.
+- Rollback: `b9351be030d58f953c46ee303fc9b37afef085e4`.
 
 ### Audit remediation 4 — Provider token refresh
 

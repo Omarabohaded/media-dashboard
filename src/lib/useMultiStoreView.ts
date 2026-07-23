@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useDashboardDate } from "@/components/AppShell";
 import type { ClientCurrencyCode, WebsitePlatform } from "@/lib/clientTypes";
+import { mergePortfolioPaidMedia } from "@/lib/portfolioMerge";
 
 export type MultiStoreCard = {
   clientId: string;
@@ -87,21 +88,15 @@ export function useMultiStoreView() {
           return;
         }
 
-        setCards((payload.cards ?? []).map((card) => {
-          const paid = paidPayload.clients.find((item) => item.clientId === card.clientId);
-          if (!paid) return card;
-          const connected = paid.channels.length > 0;
-          return {
-            ...card,
-            adSpend: paid.blended.spend,
-            roas: paid.blended.roas ?? null,
-            metaConnected: connected,
-            metaSourceLabel: paid.channels.map((item) => item.sourceType).join(" + ") || "Paid media unavailable",
-            issues: [...card.issues.filter((issue) => !issue.startsWith("Meta is not connected")), ...paid.issues.map((issue) => `${issue.sourceType}: ${issue.message}`)],
-            status: card.storeConnected && connected ? "ready" : card.storeConnected || connected ? "partial" : "blocked",
-          };
-        }));
-        setSummary(payload.summary ?? EMPTY_SUMMARY);
+        const merged = mergePortfolioPaidMedia(
+          payload.cards ?? [],
+          paidPayload.clients
+        );
+        setCards(merged.cards);
+        setSummary({
+          ...merged.summary,
+          currencies: merged.summary.currencies as ClientCurrencyCode[],
+        });
       } catch (loadError) {
         if (cancelled) {
           return;

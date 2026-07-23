@@ -6,9 +6,14 @@ export async function resolve(specifier, context, nextResolve) {
   if (specifier.startsWith("@/")) {
     const relative = specifier.slice(2);
     const resolved = path.resolve(process.cwd(), "src", relative);
+    const target = path.extname(resolved)
+      ? resolved
+      : existsSync(`${resolved}.ts`)
+        ? `${resolved}.ts`
+        : `${resolved}.tsx`;
     return {
       shortCircuit: true,
-      url: pathToFileURL(path.extname(resolved) ? resolved : `${resolved}.ts`).href,
+      url: pathToFileURL(target).href,
     };
   }
 
@@ -17,9 +22,13 @@ export async function resolve(specifier, context, nextResolve) {
     !path.extname(specifier) &&
     context.parentURL?.startsWith("file:")
   ) {
-    const candidate = new URL(`${specifier}.ts`, context.parentURL);
-    if (existsSync(candidate)) {
-      return { shortCircuit: true, url: candidate.href };
+    const tsCandidate = new URL(`${specifier}.ts`, context.parentURL);
+    const tsxCandidate = new URL(`${specifier}.tsx`, context.parentURL);
+    if (existsSync(tsCandidate)) {
+      return { shortCircuit: true, url: tsCandidate.href };
+    }
+    if (existsSync(tsxCandidate)) {
+      return { shortCircuit: true, url: tsxCandidate.href };
     }
   }
 

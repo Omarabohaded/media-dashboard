@@ -148,7 +148,7 @@ function PortfolioContent() {
           <MiniMetric
             label="Ready"
             value={String(summary.readyStores)}
-            hint="Store truth and Meta both connected"
+            hint="Store truth and paid media both ready"
             tone="good"
           />
           <MiniMetric
@@ -160,7 +160,7 @@ function PortfolioContent() {
           <MiniMetric
             label="Blocked"
             value={String(summary.blockedStores)}
-            hint="Neither storefront nor Meta is ready"
+            hint="Neither storefront nor paid media is ready"
             tone="bad"
           />
           <MiniMetric
@@ -342,7 +342,7 @@ function StoreCard({
           tone={card.storeConnected ? "good" : "warn"}
         />
         <SourcePill
-          label={card.metaConnected ? "Meta connected" : "Meta missing"}
+          label={card.metaConnected ? "Paid media ready" : "Paid media unavailable"}
           tone={card.metaConnected ? "good" : "warn"}
         />
       </div>

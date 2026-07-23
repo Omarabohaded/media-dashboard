@@ -48,7 +48,7 @@ export default function PaidMediaPage() {
 
   const hasMeta = Boolean(metaPreview && metaStatus?.selectedAccountId);
   const hasPaidMedia = Boolean(paidMediaReport?.rows.length);
-  const currency = metaStatus?.selectedAccount?.currency ?? "USD";
+  const currency = activeClient?.currencyCode ?? "USD";
   const blended = paidMediaReport?.blended;
   const spend = blended?.spend ?? 0;
   const revenue = blended?.purchaseValue ?? 0;
