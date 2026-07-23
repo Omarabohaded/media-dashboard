@@ -25,6 +25,7 @@ import {
   getMetricBenchmarkBasis,
   getMetricPairing,
 } from "@/lib/workbookSignals";
+import { IntegrationHealthPanel } from "@/components/IntegrationHealthPanel";
 
 function formatMoney(value: number, currencyCode: string) {
   const locale =
@@ -104,6 +105,7 @@ export default function HealthPage() {
   return (
     <AppShell>
       <div className="space-y-5">
+        <IntegrationHealthPanel />
         <Section
           title="Business Health"
           subtitle="This page follows the metric workbook: store truth for revenue and orders, platform data for spend, and blended/custom metrics only when both sources exist."
