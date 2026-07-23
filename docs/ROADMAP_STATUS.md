@@ -2,9 +2,9 @@
 
 Last updated: 2026-07-22
 
-Current project completion: 91%
+Current project completion: 94%
 
-Current milestone: Phase 6.2 — Snapchat integration (implemented, awaiting live validation)
+Current milestone: Phase 7 — Single-client reporting (credential-independent implementation complete)
 
 ## Execution strategy — code-first completion
 
@@ -52,6 +52,15 @@ Current milestone: Phase 6.2 — Snapchat integration (implemented, awaiting liv
 - Contract verification: TikTok's official Business API SDK documents the synchronous integrated report as `GET /open_api/v1.3/report/integrated/get/`; the current implementation incorrectly uses POST and is being corrected in this milestone.
 
 ## Milestone log
+
+### Phase 7 — Single-client reporting
+
+- Extracted one shared paid-media reporting service used by dashboard/report endpoints for Meta, TikTok, Google Ads, and Snapchat.
+- Added authenticated `GET /api/reports/client` with selected-client/date-range reporting, channel totals, blended totals, rows, mapping states, and explicit source issues.
+- The existing Paid Media UI now labels and renders all four sources through the same normalized rows and aggregation engine.
+- Included-channel rules are resolved once in the shared service; no page owns platform-specific formulas.
+- Validation: all suites passed, TypeScript passed, targeted lint passed, and the production build generated 63 routes.
+- Rollback checkpoint: `725618f743cbd91c92ff4f0d6c4ab61b3e50a4af`.
 
 ### Phase 6.2 — Snapchat integration
 
@@ -222,14 +231,14 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 - Phase 5.6 — Production QA infrastructure and monitoring.
 - Phase 6.1 — Google Ads integration (awaiting live validation).
 - Phase 6.2 — Snapchat integration (awaiting live validation).
+- Phase 7 — Single-client reporting (awaiting live validation).
 
 ## Remaining milestones
 
-1. Phase 7 — Single-client reporting.
-2. Phase 8 — Portfolio reporting.
-3. Phase 9 — Integration-health, token-expiry, failed-sync, data-freshness, and missing-mapping interfaces.
-4. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
-5. Combined External Setup and End-to-End Validation.
+1. Phase 8 — Portfolio reporting.
+2. Phase 9 — Integration-health, token-expiry, failed-sync, data-freshness, and missing-mapping interfaces.
+3. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
+4. Combined External Setup and End-to-End Validation.
 
 ## Combined External Setup and End-to-End Validation
 
@@ -271,4 +280,4 @@ This is the only final stage that requires developer portals, credentials, secre
 - Deployed commit: `8846815697717b66fd1b1d738dddcc95e1374857`.
 - Deployment timestamp: `2026-07-22 13:38:37 UTC` (READY).
 - Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
-- Next milestone: Phase 7 Single-client reporting. All paid-platform live validation remains in Combined External Setup and End-to-End Validation.
+- Next milestone: Phase 8 Portfolio reporting. All paid-platform live validation remains in Combined External Setup and End-to-End Validation.

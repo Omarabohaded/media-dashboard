@@ -100,8 +100,8 @@ export default function PaidMediaPage() {
             label={`CPA / CAC uses ${cpaDenominatorLabel}`}
             tone={cpaCac.blockedReason ? "warn" : "default"}
           />
-          <SourcePill label="Google pending" tone="default" />
-          <SourcePill label="Snap pending" tone="default" />
+          <SourcePill label={paidMediaReport?.channels.some((channel) => channel.sourceType === "google") ? "Google Ads included" : "Google Ads awaiting connection"} tone={paidMediaReport?.channels.some((channel) => channel.sourceType === "google") ? "good" : "warn"} />
+          <SourcePill label={paidMediaReport?.channels.some((channel) => channel.sourceType === "snap") ? "Snapchat included" : "Snapchat awaiting connection"} tone={paidMediaReport?.channels.some((channel) => channel.sourceType === "snap") ? "good" : "warn"} />
         </div>
 
         {!hasPaidMedia ? (
@@ -177,7 +177,7 @@ export default function PaidMediaPage() {
             {(paidMediaReport?.channels ?? []).map((channel) => (
               <div key={channel.sourceType} className="rounded-2xl border border-[var(--line)] p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-                  {channel.sourceType === "meta" ? "Meta" : "TikTok"}
+                  {channel.sourceType === "meta" ? "Meta" : channel.sourceType === "tiktok" ? "TikTok" : channel.sourceType === "google" ? "Google Ads" : "Snapchat"}
                 </p>
                 <p className="mt-2 text-2xl font-semibold text-[var(--ink)]">
                   {formatMoney(channel.spend, currency)}
@@ -228,7 +228,7 @@ export default function PaidMediaPage() {
                           {row.sourceRecordName ?? row.sourceRecordId ?? "Unnamed campaign"}
                         </td>
                         <td className="px-3 py-4 text-sm text-[var(--muted)]">
-                          {row.sourceType === "meta" ? "Meta" : "TikTok"}
+                          {row.sourceType === "meta" ? "Meta" : row.sourceType === "tiktok" ? "TikTok" : row.sourceType === "google" ? "Google Ads" : "Snapchat"}
                         </td>
                         <td className="px-3 py-4 text-sm text-[var(--muted)]">
                           {formatMoney(row.spend, currency)}
