@@ -2,9 +2,9 @@
 
 Last updated: 2026-07-22
 
-Current project completion: 86%
+Current project completion: 91%
 
-Current milestone: Phase 6.1 — Google Ads integration (implemented, awaiting live validation)
+Current milestone: Phase 6.2 — Snapchat integration (implemented, awaiting live validation)
 
 ## Execution strategy — code-first completion
 
@@ -52,6 +52,21 @@ Current milestone: Phase 6.1 — Google Ads integration (implemented, awaiting l
 - Contract verification: TikTok's official Business API SDK documents the synchronous integrated report as `GET /open_api/v1.3/report/integrated/get/`; the current implementation incorrectly uses POST and is being corrected in this milestone.
 
 ## Milestone log
+
+### Phase 6.2 — Snapchat integration
+
+- Status: credential-independent implementation complete; awaiting live validation.
+- Added per-client OAuth/token storage, expiry metadata, organization/account selection, discovery history, and error state.
+- Added OAuth connect/callback/disconnect, organization and ad-account discovery/selection, conversion metric catalog, status, and normalized report-preview routes.
+- Uses the official Snap Marketing API OAuth, `/me/organizations?with_ad_accounts=true`, and ad-account measurement contracts.
+- Campaign reporting normalizes micro-currency spend/value, impressions, swipes/clicks, purchases, purchase value, derived efficiency metrics, date range, campaign identity, and raw metadata into the shared contract.
+- Stats requests include base delivery fields plus exactly the two mapped conversion metrics. Missing mappings produce zero conversion values and explicit status without fallback.
+- Admin exposes connection, account selection, conversion discovery, missing environment values, token state, and mapping health.
+- Snapchat rows participate in unified included-channel/blended reporting and the shared fleet-health evaluator.
+- Contract fixtures passed (3/3): exact requested fields, micro-currency normalization, and no unrelated fallback.
+- Validation: clean `npm ci`, all suites (20/20), TypeScript, targeted lint, and production build passed; 61 routes generated.
+- Architecture impact: follows the existing platform connection-store, shared source-mapping resolver, normalized adapter, unified report, and health patterns.
+- Rollback checkpoint: `725b9bf54c71c36a49d18db102edbf1e95fe82e1`.
 
 ### Phase 6.1 — Google Ads integration
 
@@ -206,15 +221,15 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 - Phase 5.5 — Admin mapping and client-management polish.
 - Phase 5.6 — Production QA infrastructure and monitoring.
 - Phase 6.1 — Google Ads integration (awaiting live validation).
+- Phase 6.2 — Snapchat integration (awaiting live validation).
 
 ## Remaining milestones
 
-1. Phase 6.2 — Snapchat complete credential-independent integration.
-2. Phase 7 — Single-client reporting.
-3. Phase 8 — Portfolio reporting.
-4. Phase 9 — Integration-health, token-expiry, failed-sync, data-freshness, and missing-mapping interfaces.
-5. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
-6. Combined External Setup and End-to-End Validation.
+1. Phase 7 — Single-client reporting.
+2. Phase 8 — Portfolio reporting.
+3. Phase 9 — Integration-health, token-expiry, failed-sync, data-freshness, and missing-mapping interfaces.
+4. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
+5. Combined External Setup and End-to-End Validation.
 
 ## Combined External Setup and End-to-End Validation
 
@@ -256,4 +271,4 @@ This is the only final stage that requires developer portals, credentials, secre
 - Deployed commit: `8846815697717b66fd1b1d738dddcc95e1374857`.
 - Deployment timestamp: `2026-07-22 13:38:37 UTC` (READY).
 - Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
-- Next milestone: Phase 6.2 Snapchat credential-independent integration. TikTok and Google Ads production validation remain in Combined External Setup and End-to-End Validation.
+- Next milestone: Phase 7 Single-client reporting. All paid-platform live validation remains in Combined External Setup and End-to-End Validation.

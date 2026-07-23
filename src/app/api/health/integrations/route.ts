@@ -6,6 +6,7 @@ import { resolveSourceConversionMapping } from "@/lib/sourceConversionMappingSto
 import { requireAuthenticatedUser } from "@/lib/serverAccess";
 import { getTikTokConnection } from "@/lib/tiktokConnectionStore";
 import { getGoogleAdsConnection } from "@/lib/googleAdsConnectionStore";
+import { getSnapConnection } from "@/lib/snapConnectionStore";
 
 export async function GET() {
   const access = await requireAuthenticatedUser();
@@ -19,13 +20,14 @@ export async function GET() {
     await Promise.all(
       clients.flatMap((client) =>
         (["meta", "tiktok", "google", "snap"] as const).map(async (sourceType) => {
-          const [mapping, meta, tiktok, google] = await Promise.all([
+          const [mapping, meta, tiktok, google, snap] = await Promise.all([
             resolveSourceConversionMapping(sourceType, client.id),
             sourceType === "meta" ? getMetaConnection(client.id) : Promise.resolve(null),
             sourceType === "tiktok" ? getTikTokConnection(client.id) : Promise.resolve(null),
             sourceType === "google" ? getGoogleAdsConnection(client.id) : Promise.resolve(null),
+            sourceType === "snap" ? getSnapConnection(client.id) : Promise.resolve(null),
           ]);
-          const connection = meta ?? tiktok ?? google;
+          const connection = meta ?? tiktok ?? google ?? snap;
           const runs = syncState.syncRuns.filter(
             (run) => run.clientId === client.id && run.platform === sourceType
           );
@@ -42,7 +44,9 @@ export async function GET() {
                 : sourceType === "tiktok"
                   ? tiktok?.selectedAdvertiserId ?? null
                   : sourceType === "google"
-                    ? google?.selectedCustomerId ?? null
+                  ? google?.selectedCustomerId ?? null
+                  : sourceType === "snap"
+                    ? snap?.selectedAdAccountId ?? null
                   : null,
             mappingStatus: mapping.status,
             tokenExpiresAt:
@@ -50,6 +54,8 @@ export async function GET() {
                 ? tiktok?.accessTokenExpiresAt ?? null
                 : sourceType === "google"
                   ? google?.accessTokenExpiresAt ?? null
+                  : sourceType === "snap"
+                    ? snap?.accessTokenExpiresAt ?? null
                   : null,
             lastSuccessfulSyncAt: success?.finishedAt ?? null,
             lastAttemptAt: latest?.finishedAt ?? latest?.startedAt ?? null,

@@ -11,7 +11,8 @@
     "test:tiktok-contract": "node --test tests/tiktokReportContract.test.mjs",
     "test:paid-media": "node --test tests/paidMediaReporting.test.mjs",
     "test:integration-health": "node --test tests/integrationHealth.test.mjs",
-    "test:google-contract": "node --test tests/googleAdsContract.test.mjs"
+    "test:google-contract": "node --test tests/googleAdsContract.test.mjs",
+    "test:snap-contract": "node --test tests/snapContract.test.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.39.0",

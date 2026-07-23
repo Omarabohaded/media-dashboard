@@ -20,6 +20,7 @@ import {
 } from "@/lib/clientTypes";
 import { clearTikTokConnection } from "@/lib/tiktokConnectionStore";
 import { clearGoogleAdsConnection } from "@/lib/googleAdsConnectionStore";
+import { clearSnapConnection } from "@/lib/snapConnectionStore";
 
 const allowedPlatforms = new Set<WebsitePlatform>([
   "shopify",
@@ -187,6 +188,7 @@ export async function DELETE(request: NextRequest) {
     await Promise.all([
       clearTikTokConnection(clientId.trim()),
       clearGoogleAdsConnection(clientId.trim()),
+      clearSnapConnection(clientId.trim()),
     ]);
     const clients = await listClients();
 

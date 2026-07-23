@@ -6,6 +6,7 @@ import { AppShell, StatusPill } from "@/components/AppShell";
 import { WooCommerceConnectionCard } from "@/components/WooCommerceConnectionCard";
 import { AdminPaidMediaSetup } from "@/components/AdminPaidMediaSetup";
 import { GoogleAdsSetup } from "@/components/GoogleAdsSetup";
+import { SnapAdsSetup } from "@/components/SnapAdsSetup";
 import {
   getCurrencyMeta,
   SUPPORTED_CLIENT_CURRENCIES,
@@ -486,7 +487,7 @@ export default function AdminPage() {
     },
     { id: "google-ads", name: "Google Ads", status: "Implemented", tone: "needs-action", context: "Connection and reporting available", nextAction: "Connect, select a customer, and map conversions.", targetId: "google-ads-connection", actionLabel: "Configure" },
     { id: "tiktok", name: "TikTok", status: "Implemented", tone: "needs-action", context: "Connection and mapping available", nextAction: "Connect, select an advertiser, and map detected events.", targetId: "paid-media-connections", actionLabel: "Configure" },
-    { id: "snapchat", name: "Snapchat", status: "Not connected", tone: "planned", context: "Integration not enabled yet", nextAction: "Use this as an onboarding checklist item for paid social.", targetId: "planned-channels", actionLabel: "Planned" },
+    { id: "snapchat", name: "Snapchat", status: "Implemented", tone: "needs-action", context: "Connection and reporting available", nextAction: "Connect, select an account, and map conversions.", targetId: "snap-connection", actionLabel: "Configure" },
   ];
 
   const connectedCount = connectionItems.filter((item) => item.tone === "connected").length;
@@ -594,6 +595,7 @@ export default function AdminPage() {
 
         {activeClientId ? <AdminPaidMediaSetup clientId={activeClientId} /> : null}
         {activeClientId ? <GoogleAdsSetup clientId={activeClientId} /> : null}
+        {activeClientId ? <SnapAdsSetup clientId={activeClientId} /> : null}
 
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr),minmax(360px,0.65fr)]">
           <AdminPanel eyebrow="Store Truth" title="Storefront Connections" description="Keep website source setup visible and client-scoped.">

@@ -9,6 +9,8 @@ import { buildBlendedPaidMediaReport, type PaidMediaSourceType } from "@/lib/pai
 import { getTikTokConnection } from "@/lib/tiktokConnectionStore";
 import { getGoogleAdsConnection } from "@/lib/googleAdsConnectionStore";
 import { fetchGoogleAdsPaidMediaRows } from "@/lib/integrations/googleAds";
+import { getSnapConnection } from "@/lib/snapConnectionStore";
+import { fetchSnapPaidMediaRows } from "@/lib/integrations/snap";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,10 +20,11 @@ export async function GET(request: NextRequest) {
       since: request.nextUrl.searchParams.get("since") ?? undefined,
       until: request.nextUrl.searchParams.get("until") ?? undefined,
     };
-    const [metaConnection, tiktokConnection, googleConnection, overrides, mappings] = await Promise.all([
+    const [metaConnection, tiktokConnection, googleConnection, snapConnection, overrides, mappings] = await Promise.all([
       getMetaConnection(client.id),
       getTikTokConnection(client.id),
       getGoogleAdsConnection(client.id),
+      getSnapConnection(client.id),
       listMetricOverrides(),
       listMetricMappings(),
     ]);
@@ -83,6 +86,14 @@ export async function GET(request: NextRequest) {
       } else {
         issues.push({ sourceType: "google", message: "Google Ads is not connected or has no selected customer." });
       }
+    }
+
+    if (includedChannels.includes("snap")) {
+      if (snapConnection?.accessToken && snapConnection.selectedAdAccountId) {
+        const until = dateRange.until ?? new Date().toISOString().slice(0, 10);
+        const since = dateRange.since ?? new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10);
+        fetchers.push({ sourceType: "snap", request: fetchSnapPaidMediaRows({ accessToken: snapConnection.accessToken, adAccountId: snapConnection.selectedAdAccountId, clientId: client.id, since, until }) });
+      } else issues.push({ sourceType: "snap", message: "Snapchat is not connected or has no selected ad account." });
     }
 
     const results = await Promise.allSettled(fetchers.map((fetcher) => fetcher.request));
