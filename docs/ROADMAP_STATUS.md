@@ -2,11 +2,11 @@
 
 Last updated: 2026-07-23
 
-Current project completion: 90%
+Current project completion: 96%
 
-Current milestone: Audit remediation — route, UI, and workflow test coverage
+Current milestone: Final credential-independent production-readiness audit
 
-Credential-independent code completion: 90%
+Credential-independent code completion: 96%
 Remaining completion attributable to authenticated live validation: not yet isolated; credential-independent audit remediation is active
 
 ## Final implementation audit remediation
@@ -96,6 +96,22 @@ Remediation rollback checkpoint:
 - Contract verification: TikTok's official Business API SDK documents the synchronous integrated report as `GET /open_api/v1.3/report/integrated/get/`; the current implementation incorrectly uses POST and is being corrected in this milestone.
 
 ## Milestone log
+
+### Audit remediation 9 — Acceptance and workflow coverage
+
+- Added a production-style mocked workflow covering client creation, active
+  selection, mocked platform connection, account selection, exact conversion
+  mapping, normalized report execution, single-client aggregation, portfolio
+  readiness, health evaluation, deletion, and orphan cleanup.
+- Added reporting presentation-state coverage for loading, empty, partial,
+  healthy, and failure states; Portfolio consumes the shared state evaluator.
+- Existing route-surface tests verify handler-level authorization across Admin,
+  reporting, sync, Meta, TikTok, Google Ads, and Snapchat routes.
+- Provider HTTP suites cover OAuth exchange/refresh, account discovery,
+  metadata fallback, conversion/metric catalogs, and error contracts.
+- Remaining audit classification must not be upgraded solely from file
+  presence; the final repository-only audit follows this milestone.
+- Rollback: `2865deb3e3dc6682ba8d6fa14287078858cdcdd1`.
 
 ### Audit remediation 5–8 — Provider and reporting completeness
 

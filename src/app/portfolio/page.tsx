@@ -13,6 +13,7 @@ import {
 } from "@/components/AppShell";
 import { getCurrencyMeta, type ClientCurrencyCode } from "@/lib/clientTypes";
 import { useMultiStoreView, type MultiStoreCard } from "@/lib/useMultiStoreView";
+import { getReportingViewState } from "@/lib/reportingViewState";
 
 type SortKey =
   | "websiteSales"
@@ -68,6 +69,12 @@ function PortfolioContent() {
   }, [cards, currencyFilter, sortBy, statusFilter]);
 
   const mixedCurrencies = summary.currencies.length > 1;
+  const viewState = getReportingViewState({
+    loading: isLoading,
+    error,
+    rowCount: cards.length,
+    issueCount: cards.reduce((total, card) => total + card.issues.length, 0),
+  });
 
   if (!ownerMode) {
     return (
@@ -93,7 +100,7 @@ function PortfolioContent() {
     );
   }
 
-  if (isLoading) {
+  if (viewState === "loading") {
     return (
       <DashboardLoadingState
         title="Loading multi-store overview"
@@ -104,7 +111,7 @@ function PortfolioContent() {
 
   return (
     <div className="space-y-4">
-      {error ? (
+      {viewState === "failure" ? (
         <Section
           title="Portfolio view unavailable"
           subtitle="The route is in place, but the comparison payload did not load cleanly."
