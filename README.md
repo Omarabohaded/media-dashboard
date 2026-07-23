@@ -1,5 +1,12 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Operations
+
+- Roadmap source of truth: `docs/ROADMAP_STATUS.md`
+- Release, backup, and rollback: `docs/OPERATIONS.md`
+- Dashboard workflow: `docs/USER_GUIDE.md`
+- Deferred live setup and validation: `docs/EXTERNAL_VALIDATION_CHECKLIST.md`
+
 ## Getting Started
 
 First, run the development server:

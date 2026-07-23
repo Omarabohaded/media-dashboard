@@ -2,9 +2,12 @@
 
 Last updated: 2026-07-22
 
-Current project completion: 98%
+Current project completion: 99%
 
-Current milestone: Phase 9 — Integration health interfaces (credential-independent implementation complete)
+Current milestone: Phase 10 — Documentation and deployment readiness (credential-independent implementation complete)
+
+Credential-independent code completion: 100%
+Remaining completion attributable to authenticated live validation: 1%
 
 ## Execution strategy — code-first completion
 
@@ -52,6 +55,16 @@ Current milestone: Phase 9 — Integration health interfaces (credential-indepen
 - Contract verification: TikTok's official Business API SDK documents the synchronous integrated report as `GET /open_api/v1.3/report/integrated/get/`; the current implementation incorrectly uses POST and is being corrected in this milestone.
 
 ## Milestone log
+
+### Phase 10 — Documentation, backup, rollback, and deployment readiness
+
+- Added an executable production smoke suite for public pages and protected Admin/reporting/integration routes.
+- Added an environment-variable name inventory without secret values.
+- Added durable-runtime backup, recoverable Git/Vercel rollback, and release-gate instructions.
+- Added the final Admin/client/platform/reporting user workflow.
+- Consolidated every portal/credential/live-account action into `docs/EXTERNAL_VALIDATION_CHECKLIST.md` in exact test order.
+- No destructive migration or production-data mutation is required by the credential-independent roadmap.
+- Rollback checkpoint: `860898c2d1dec1b9b423db79c3dcaedfded949d3` before the health/documentation releases.
 
 ### Phase 9 — Integration health interfaces
 
@@ -252,11 +265,11 @@ Next: validate this milestone, then harden client-store diagnostics and producti
 - Phase 7 — Single-client reporting (awaiting live validation).
 - Phase 8 — Portfolio reporting (awaiting live validation).
 - Phase 9 — Integration health interfaces.
+- Phase 10 — Documentation, backup, rollback, and deployment readiness.
 
 ## Remaining milestones
 
-1. Phase 10 — Documentation, backups, deployment checks, and final user workflow.
-2. Combined External Setup and End-to-End Validation.
+1. Combined External Setup and End-to-End Validation.
 
 ## Combined External Setup and End-to-End Validation
 
@@ -298,4 +311,4 @@ This is the only final stage that requires developer portals, credentials, secre
 - Deployed commit: `8846815697717b66fd1b1d738dddcc95e1374857`.
 - Deployment timestamp: `2026-07-22 13:38:37 UTC` (READY).
 - Deployment status: READY (production); production alias `https://media-dashboard-psi.vercel.app`.
-- Next milestone: Phase 10 Documentation, backups, deployment checks, and final user workflow.
+- Next milestone: Combined External Setup and End-to-End Validation. No additional credential-independent roadmap work remains.

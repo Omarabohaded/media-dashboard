@@ -13,7 +13,8 @@
     "test:integration-health": "node --test tests/integrationHealth.test.mjs",
     "test:google-contract": "node --test tests/googleAdsContract.test.mjs",
     "test:snap-contract": "node --test tests/snapContract.test.mjs",
-    "test:portfolio-reporting": "node --test tests/portfolioReporting.test.mjs"
+    "test:portfolio-reporting": "node --test tests/portfolioReporting.test.mjs",
+    "smoke:production": "node scripts/production-smoke.mjs"
   },
   "dependencies": {
     "framer-motion": "^12.39.0",
