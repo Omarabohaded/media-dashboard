@@ -306,6 +306,9 @@ This is the only final stage that requires developer portals, credentials, secre
 
 ## Rollback and deployment
 
+- Final credential-independent code commit: `b03306b71201619b870a21f8f55b9862780c28a1`.
+- Final deployment: Vercel deployment `dpl_vBMfzWAD49tEGH5biyacAjSfRwSW` reached READY on 2026-07-23; production alias `https://media-dashboard-psi.vercel.app`.
+- Final credential-independent production smoke suite: 12/12 passed after the READY deployment.
 - Current rollback commit: `33e99625d7b80565d90fe66e9295a8b6b3ae4a90` (last production state before Phase 5.1).
 - Recreated GitHub commits: M0.1 `f77f30e830d9163b8fa5047999cfaf4cefbeb8e2`; M0.2 `7404b719603e33c6c4f095fef3a43d5cf7c70469`. These differ from local hashes `4e80f51` and `89792dd` because the connector recreated commit metadata; their Git trees match the validated local commits exactly.
 - Deployed commit: `8846815697717b66fd1b1d738dddcc95e1374857`.
