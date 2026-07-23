@@ -4,6 +4,7 @@ import { fetchTikTokPaidMediaRows } from "@/lib/integrations/tiktok";
 import { getTikTokConnection } from "@/lib/tiktokConnectionStore";
 import { requireClientAccess } from "@/lib/serverAccess";
 import { executePaidMediaSync } from "@/lib/paidMediaSync";
+import { withTikTokAccess } from "@/lib/providerAccess";
 
 export async function GET(request: NextRequest) {
   try {
@@ -38,10 +39,12 @@ export async function GET(request: NextRequest) {
       clientName: client.name,
       sourceType: "tiktok",
       request: () =>
-        fetchTikTokPaidMediaRows(accessToken, advertiserId, {
+        withTikTokAccess(client.id, (currentAccessToken) =>
+          fetchTikTokPaidMediaRows(currentAccessToken, advertiserId, {
           clientId: client.id,
           dateRange,
-        }),
+          })
+        ),
     });
 
     return NextResponse.json({

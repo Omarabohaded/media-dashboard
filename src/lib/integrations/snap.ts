@@ -13,7 +13,23 @@ export async function exchangeSnapCode(code: string, origin: string) {
   const config = getSnapConfig(); const response = await fetch("https://accounts.snapchat.com/login/oauth2/access_token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", client_id: config.clientId, client_secret: config.clientSecret, code, redirect_uri: buildSnapRedirectUri(origin) }) });
   const payload = await response.json(); if (!response.ok) throw new Error(payload.error_description ?? "Snap OAuth failed."); return payload as { access_token: string; refresh_token?: string; expires_in?: number };
 }
-async function snapGet(path: string, accessToken: string) { const response = await fetch(path.startsWith("http") ? path : `${base}${path}`, { headers: { Authorization: `Bearer ${accessToken}` } }); const payload = await response.json(); if (!response.ok || String(payload.request_status ?? "success").toLowerCase() === "error") throw new Error(payload.debug_message ?? "Snap API request failed."); return payload; }
+export async function refreshSnapAccessToken(refreshToken: string) {
+  const config = getSnapConfig();
+  const response = await fetch("https://accounts.snapchat.com/login/oauth2/access_token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      refresh_token: refreshToken,
+    }),
+  });
+  const payload = await response.json();
+  if (!response.ok) throw new Error(payload.error_description ?? payload.error ?? "Snap OAuth refresh failed.");
+  return payload as { access_token: string; refresh_token?: string; expires_in?: number };
+}
+async function snapGet(path: string, accessToken: string) { const response = await fetch(path.startsWith("http") ? path : `${base}${path}`, { headers: { Authorization: `Bearer ${accessToken}` } }); const payload = await response.json(); if (!response.ok || String(payload.request_status ?? "success").toLowerCase() === "error") throw new Error(`${response.status}: ${payload.debug_message ?? "Snap API request failed."}`); return payload; }
 export async function fetchSnapAdAccounts(accessToken: string): Promise<Array<{ adAccountId: string; adAccountName: string; organizationId: string }>> {
   const payload = await snapGet("/me/organizations?with_ad_accounts=true", accessToken);
   return (payload.organizations ?? []).flatMap((wrapper: { organization?: { id?: string; ad_accounts?: Array<{ id?: string; name?: string }> } }) => (wrapper.organization?.ad_accounts ?? []).map((account) => ({ adAccountId: account.id ?? "", adAccountName: account.name ?? account.id ?? "Snap ad account", organizationId: wrapper.organization?.id ?? "" })));

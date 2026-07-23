@@ -4,6 +4,7 @@ import { fetchSnapPaidMediaRows } from "@/lib/integrations/snap";
 import { getSnapConnection } from "@/lib/snapConnectionStore";
 import { requireClientAccess } from "@/lib/serverAccess";
 import { executePaidMediaSync } from "@/lib/paidMediaSync";
+import { withSnapAccess } from "@/lib/providerAccess";
 export async function GET(request: NextRequest) {
   const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
   if (access.response) return access.response;
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
       clientId: client.id,
       clientName: client.name,
       sourceType: "snap",
-      request: () => fetchSnapPaidMediaRows({ accessToken: connection.accessToken, adAccountId: connection.selectedAdAccountId!, clientId: client.id, since, until }),
+      request: () => withSnapAccess(client.id, (accessToken) => fetchSnapPaidMediaRows({ accessToken, adAccountId: connection.selectedAdAccountId!, clientId: client.id, since, until })),
     });
     return NextResponse.json({ rows, implementationStatus: "implemented_awaiting_live_validation" });
   }

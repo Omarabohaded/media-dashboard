@@ -6,6 +6,7 @@ import {
   upsertTikTokConnection,
 } from "@/lib/tiktokConnectionStore";
 import { requireClientAccess, requireClientIntegrationAccess } from "@/lib/serverAccess";
+import { withTikTokAccess } from "@/lib/providerAccess";
 
 export async function GET(request: NextRequest) {
   try {
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const accounts = await fetchTikTokAdvertisers(connection.accessToken);
+    const accounts = await withTikTokAccess(client.id, fetchTikTokAdvertisers);
 
     return NextResponse.json({
       clientId: client.id,
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const accounts = await fetchTikTokAdvertisers(connection.accessToken);
+    const accounts = await withTikTokAccess(client.id, fetchTikTokAdvertisers);
     const account = accounts.find((item) => item.advertiserId === advertiserId);
 
     if (!account) {

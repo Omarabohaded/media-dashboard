@@ -39,6 +39,26 @@ export async function exchangeGoogleAdsCode(code: string, origin: string) {
   if (!response.ok) throw new Error(payload.error_description ?? "Google OAuth token exchange failed.");
   return payload as { access_token: string; refresh_token?: string; expires_in?: number };
 }
+export async function refreshGoogleAdsAccessToken(refreshToken: string) {
+  const config = getGoogleAdsConfig();
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: config.clientId,
+      client_secret: config.clientSecret,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(
+      payload.error_description ?? payload.error ?? "Google OAuth token refresh failed."
+    );
+  }
+  return payload as { access_token: string; refresh_token?: string; expires_in?: number };
+}
 async function googleRequest(path: string, accessToken: string, init?: RequestInit, loginCustomerId?: string | null) {
   const config = getGoogleAdsConfig();
   const response = await fetch(`${apiBase}${path}`, {
@@ -52,7 +72,7 @@ async function googleRequest(path: string, accessToken: string, init?: RequestIn
     },
   });
   const payload = await response.json();
-  if (!response.ok) throw new Error(payload?.error?.message ?? "Google Ads API request failed.");
+  if (!response.ok) throw new Error(`${response.status}: ${payload?.error?.message ?? "Google Ads API request failed."}`);
   return payload;
 }
 export async function fetchGoogleAdsCustomers(accessToken: string): Promise<Array<{ customerId: string; customerName: string; resourceName: string }>> {

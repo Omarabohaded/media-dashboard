@@ -4,6 +4,7 @@ import { getGoogleAdsConnection } from "@/lib/googleAdsConnectionStore";
 import { fetchGoogleAdsPaidMediaRows } from "@/lib/integrations/googleAds";
 import { requireClientAccess } from "@/lib/serverAccess";
 import { executePaidMediaSync } from "@/lib/paidMediaSync";
+import { withGoogleAdsAccess } from "@/lib/providerAccess";
 
 export async function GET(request: NextRequest) {
   const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
       clientId: client.id,
       clientName: client.name,
       sourceType: "google",
-      request: () => fetchGoogleAdsPaidMediaRows({ accessToken: connection.accessToken, customerId: connection.selectedCustomerId!, loginCustomerId: connection.loginCustomerId, clientId: client.id, since, until }),
+      request: () => withGoogleAdsAccess(client.id, (accessToken) => fetchGoogleAdsPaidMediaRows({ accessToken, customerId: connection.selectedCustomerId!, loginCustomerId: connection.loginCustomerId, clientId: client.id, since, until })),
     });
     return NextResponse.json({ rows, implementationStatus: "implemented_awaiting_live_validation" });
   } catch (error) {

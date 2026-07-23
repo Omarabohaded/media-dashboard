@@ -7,6 +7,7 @@ import {
 import { resolveSourceConversionMapping } from "@/lib/sourceConversionMappingStore";
 import { getTikTokConnection, recordTikTokEventDiscovery } from "@/lib/tiktokConnectionStore";
 import { requireClientAccess } from "@/lib/serverAccess";
+import { withTikTokAccess } from "@/lib/providerAccess";
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,7 +36,9 @@ export async function GET(request: NextRequest) {
     }
 
     const dateRange = { datePreset, since, until };
-    const rawPreview = await fetchTikTokRawConversionEvents(accessToken, advertiserId, dateRange);
+    const rawPreview = await withTikTokAccess(client.id, (currentAccessToken) =>
+      fetchTikTokRawConversionEvents(currentAccessToken, advertiserId, dateRange)
+    );
     const discoveredAt = new Date().toISOString();
     const discoveredEvents = toDiscoveredTikTokConversionEvents(
       rawPreview.events,

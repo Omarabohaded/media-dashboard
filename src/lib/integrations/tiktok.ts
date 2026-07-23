@@ -124,7 +124,9 @@ async function parseTikTokResponse<T>(response: Response): Promise<T> {
   const payload = (await response.json()) as TikTokApiPayload<T>;
 
   if (!response.ok || (typeof payload.code === "number" && payload.code !== 0)) {
-    throw new Error(payload.message || "TikTok API request failed.");
+    throw new Error(
+      `${response.status}: ${payload.message || "TikTok API request failed."}`
+    );
   }
 
   return (payload.data ?? payload) as T;

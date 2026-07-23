@@ -2,11 +2,11 @@
 
 Last updated: 2026-07-23
 
-Current project completion: 80%
+Current project completion: 84%
 
-Current milestone: Audit remediation — provider token refresh
+Current milestone: Audit remediation — Google Ads completeness
 
-Credential-independent code completion: 80%
+Credential-independent code completion: 84%
 Remaining completion attributable to authenticated live validation: not yet isolated; credential-independent audit remediation is active
 
 ## Final implementation audit remediation
@@ -96,6 +96,25 @@ Remediation rollback checkpoint:
 - Contract verification: TikTok's official Business API SDK documents the synchronous integrated report as `GET /open_api/v1.3/report/integrated/get/`; the current implementation incorrectly uses POST and is being corrected in this milestone.
 
 ## Milestone log
+
+### Audit remediation 4 — Provider token refresh
+
+- TikTok's existing refresh contract is operationalized for advertiser,
+  event-discovery, report-preview, single-client, blended, and portfolio
+  reporting requests.
+- Added Google Ads and Snapchat OAuth refresh-token exchanges using provider
+  token endpoints.
+- Access tokens refresh proactively within five minutes of expiry and once
+  after a provider authentication failure.
+- Refreshed access token, rotated refresh token, and expiry metadata persist in
+  each provider's existing per-client connection store.
+- Refresh/request failures persist as connection errors for Integration Health.
+- Retry orchestration permits only one refresh and one request retry, preventing
+  loops for revoked refresh tokens.
+- Deterministic tests cover valid, expiring, expired, successfully refreshed,
+  failed-refresh, revoked-refresh, and missing-refresh-token behavior.
+- Live-provider validation remains deferred.
+- Rollback: `1347ccedd961cef0351edbb34c9a52d6fc9f693a`.
 
 ### Audit remediation 3 — Multi-platform sync health
 

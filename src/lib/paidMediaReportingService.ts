@@ -11,6 +11,11 @@ import { buildBlendedPaidMediaReport, type NormalizedPaidMediaRow, type PaidMedi
 import { getSnapConnection } from "@/lib/snapConnectionStore";
 import { getTikTokConnection } from "@/lib/tiktokConnectionStore";
 import { executePaidMediaSync } from "@/lib/paidMediaSync";
+import {
+  withGoogleAdsAccess,
+  withSnapAccess,
+  withTikTokAccess,
+} from "@/lib/providerAccess";
 export { summarizePortfolioPaidMedia } from "@/lib/portfolioReporting";
 
 export async function buildClientPaidMediaReport(clientId: string, dateRange: PaidMediaDateRange) {
@@ -31,15 +36,15 @@ export async function buildClientPaidMediaReport(clientId: string, dateRange: Pa
     else issues.push({ sourceType: "meta", message: "Meta is not connected or has no selected account." });
   }
   if (includedChannels.includes("tiktok")) {
-    if (tiktok?.accessToken && tiktok.selectedAdvertiserId) fetchers.push({ sourceType: "tiktok", request: () => fetchTikTokPaidMediaRows(tiktok.accessToken, tiktok.selectedAdvertiserId!, { clientId, dateRange }) });
+    if (tiktok?.accessToken && tiktok.selectedAdvertiserId) fetchers.push({ sourceType: "tiktok", request: () => withTikTokAccess(clientId, (accessToken) => fetchTikTokPaidMediaRows(accessToken, tiktok.selectedAdvertiserId!, { clientId, dateRange })) });
     else issues.push({ sourceType: "tiktok", message: "TikTok is not connected or has no selected advertiser." });
   }
   if (includedChannels.includes("google")) {
-    if (google?.accessToken && google.selectedCustomerId) fetchers.push({ sourceType: "google", request: () => fetchGoogleAdsPaidMediaRows({ accessToken: google.accessToken, customerId: google.selectedCustomerId!, loginCustomerId: google.loginCustomerId, clientId, since, until }) });
+    if (google?.accessToken && google.selectedCustomerId) fetchers.push({ sourceType: "google", request: () => withGoogleAdsAccess(clientId, (accessToken) => fetchGoogleAdsPaidMediaRows({ accessToken, customerId: google.selectedCustomerId!, loginCustomerId: google.loginCustomerId, clientId, since, until })) });
     else issues.push({ sourceType: "google", message: "Google Ads is not connected or has no selected customer." });
   }
   if (includedChannels.includes("snap")) {
-    if (snap?.accessToken && snap.selectedAdAccountId) fetchers.push({ sourceType: "snap", request: () => fetchSnapPaidMediaRows({ accessToken: snap.accessToken, adAccountId: snap.selectedAdAccountId!, clientId, since, until }) });
+    if (snap?.accessToken && snap.selectedAdAccountId) fetchers.push({ sourceType: "snap", request: () => withSnapAccess(clientId, (accessToken) => fetchSnapPaidMediaRows({ accessToken, adAccountId: snap.selectedAdAccountId!, clientId, since, until })) });
     else issues.push({ sourceType: "snap", message: "Snapchat is not connected or has no selected ad account." });
   }
   const settled = await Promise.allSettled(

@@ -4,6 +4,7 @@ import { fetchGoogleAdsConversionEvents } from "@/lib/integrations/googleAds";
 import { getGoogleAdsConnection, upsertGoogleAdsConnection } from "@/lib/googleAdsConnectionStore";
 import { resolveSourceConversionMapping } from "@/lib/sourceConversionMappingStore";
 import { requireClientAccess } from "@/lib/serverAccess";
+import { withGoogleAdsAccess } from "@/lib/providerAccess";
 
 export async function GET(request: NextRequest) {
   const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
@@ -12,7 +13,9 @@ export async function GET(request: NextRequest) {
   const connection = await getGoogleAdsConnection(client.id);
   if (!connection?.accessToken || !connection.selectedCustomerId) return NextResponse.json({ error: "Connect Google Ads and select a customer first." }, { status: 400 });
   try {
-    const events = (await fetchGoogleAdsConversionEvents(connection.accessToken, connection.selectedCustomerId, connection.loginCustomerId)).map((event) => ({ ...event, clientId: client.id }));
+    const events = (await withGoogleAdsAccess(client.id, (accessToken) =>
+      fetchGoogleAdsConversionEvents(accessToken, connection.selectedCustomerId!, connection.loginCustomerId)
+    )).map((event) => ({ ...event, clientId: client.id }));
     const discoveredAt = new Date().toISOString();
     await upsertGoogleAdsConnection({ ...connection, lastDiscoveryAt: discoveredAt, lastDiscoveryError: null });
     return NextResponse.json({ events, discoveredAt, mapping: await resolveSourceConversionMapping("google", client.id) });

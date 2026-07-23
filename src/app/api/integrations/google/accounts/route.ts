@@ -3,6 +3,7 @@ import { getRequiredClientById } from "@/lib/clientStore";
 import { fetchGoogleAdsCustomers } from "@/lib/integrations/googleAds";
 import { getGoogleAdsConnection, upsertGoogleAdsConnection } from "@/lib/googleAdsConnectionStore";
 import { requireClientAccess, requireClientIntegrationAccess } from "@/lib/serverAccess";
+import { withGoogleAdsAccess } from "@/lib/providerAccess";
 
 export async function GET(request: NextRequest) {
   const access = await requireClientAccess(request.nextUrl.searchParams.get("clientId"));
@@ -10,7 +11,7 @@ export async function GET(request: NextRequest) {
   const client = await getRequiredClientById(access.clientId);
   const connection = await getGoogleAdsConnection(client.id);
   if (!connection?.accessToken) return NextResponse.json({ error: "Connect Google Ads first." }, { status: 401 });
-  return NextResponse.json({ accounts: await fetchGoogleAdsCustomers(connection.accessToken), selectedAccountId: connection.selectedCustomerId });
+  return NextResponse.json({ accounts: await withGoogleAdsAccess(client.id, fetchGoogleAdsCustomers), selectedAccountId: connection.selectedCustomerId });
 }
 export async function POST(request: NextRequest) {
   const access = await requireClientIntegrationAccess(request.nextUrl.searchParams.get("clientId"));
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
   const connection = await getGoogleAdsConnection(client.id);
   if (!connection?.accessToken) return NextResponse.json({ error: "Connect Google Ads first." }, { status: 401 });
   const body = await request.json() as { customerId?: string; customerName?: string; loginCustomerId?: string | null };
-  const accounts = await fetchGoogleAdsCustomers(connection.accessToken);
+  const accounts = await withGoogleAdsAccess(client.id, fetchGoogleAdsCustomers);
   const account = accounts.find((item) => item.customerId === body.customerId);
   if (!account) return NextResponse.json({ error: "Accessible customer not found." }, { status: 404 });
   await upsertGoogleAdsConnection({ ...connection, selectedCustomerId: account.customerId, selectedCustomerName: body.customerName ?? account.customerName, loginCustomerId: body.loginCustomerId?.trim() || null, lastError: null });
